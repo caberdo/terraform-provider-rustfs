@@ -51,9 +51,9 @@ provider "rustfs" {}
 
 # Or via provider block
 provider "rustfs" {
-  endpoint      = "127.0.0.1:9001"
-  access_key    = "admin"
-  access_secret = "secret"
+  endpoint   = "127.0.0.1:9001"
+  access_key = "admin"
+  secret_key = "secret"
 }
 
 # Bucket
@@ -117,7 +117,9 @@ Credentials can be provided via the provider block or environment variables. Env
 |--------------------|---------------------|-------------|
 | `endpoint` | `RUSTFS_ENDPOINT` | RustFS server in `host:port` format |
 | `access_key` | `RUSTFS_USER` | Access key / username |
-| `access_secret` | `RUSTFS_SECRET` | Secret key / password |
+| `secret_key` | `RUSTFS_SECRET` | Secret key / password |
+
+> **Note:** `access_secret` is deprecated in favor of `secret_key`. Both are currently supported; `access_secret` will be removed in a future release. When both are set, `secret_key` takes precedence.
 
 ## Building
 
