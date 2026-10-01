@@ -6,7 +6,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
 )
 
 var _ datasource.DataSource = &KmsStatusDataSource{}
@@ -164,6 +166,19 @@ func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
+	config, diags := kmsStatusModelFromStatus(ctx, status)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+}
+
+func kmsStatusModelFromStatus(ctx context.Context, status *rustfs.KmsStatus) (KmsStatusDataSourceModel, diag.Diagnostics) {
+	var config KmsStatusDataSourceModel
+	var diags diag.Diagnostics
+
 	config.BackendType = types.StringValue(status.BackendType)
 	config.BackendStatus = types.StringValue(status.BackendStatus)
 	config.CacheEnabled = types.BoolValue(status.CacheEnabled)
@@ -179,10 +194,10 @@ func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	if status.Capabilities != nil {
-		capabilities, diags := types.MapValueFrom(ctx, types.BoolType, status.Capabilities)
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
+		capabilities, d := types.MapValueFrom(ctx, types.BoolType, status.Capabilities)
+		diags.Append(d...)
+		if diags.HasError() {
+			return config, diags
 		}
 		config.Capabilities = capabilities
 	} else {
@@ -204,5 +219,5 @@ func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadReque
 		}
 	}
 
-	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+	return config, diags
 }

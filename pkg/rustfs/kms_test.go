@@ -3,6 +3,7 @@ package rustfs
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -229,6 +230,8 @@ func TestGetKmsStatusError(t *testing.T) {
 
 	if _, err := client.GetKmsStatus(); err == nil {
 		t.Fatal("expected error, got nil")
+	} else if !strings.Contains(err.Error(), "KMS status not available") {
+		t.Errorf("expected error containing 'KMS status not available', got %v", err)
 	}
 }
 
@@ -247,5 +250,7 @@ func TestGetKmsConfigError(t *testing.T) {
 
 	if _, err := client.GetKmsConfig(); err == nil {
 		t.Fatal("expected error, got nil")
+	} else if !strings.Contains(err.Error(), "KMS config not available") {
+		t.Errorf("expected error containing 'KMS config not available', got %v", err)
 	}
 }

@@ -45,6 +45,12 @@ services:
     environment:
       RUSTFS_ACCESS_KEY: rustfsadmin
       RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_KMS_ENABLE: "true"
+      RUSTFS_KMS_BACKEND: "local"
+      RUSTFS_KMS_KEY_DIR: "/data/kms"
+      RUSTFS_KMS_LOCAL_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      RUSTFS_KMS_DEFAULT_KEY_ID: "rustfs-default-key"
+      RUSTFS_KMS_ALLOW_INSECURE_DEV_DEFAULTS: "true"
 
 volumes:
   go-modules:

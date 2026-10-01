@@ -6,7 +6,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
 )
 
 var _ datasource.DataSource = &KmsConfigDataSource{}
@@ -91,11 +93,21 @@ func (d *KmsConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
+	config, diags := kmsConfigModelFromConfig(kmsConfig)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+}
+
+func kmsConfigModelFromConfig(kmsConfig *rustfs.KmsConfig) (KmsConfigDataSourceModel, diag.Diagnostics) {
+	var config KmsConfigDataSourceModel
 	config.Backend = types.StringValue(kmsConfig.Backend)
 	config.CacheEnabled = types.BoolValue(kmsConfig.CacheEnabled)
 	config.CacheMaxKeys = types.Int64Value(int64(kmsConfig.CacheMaxKeys))
 	config.CacheTTLSeconds = types.Int64Value(int64(kmsConfig.CacheTTLSeconds))
 	config.DefaultKeyID = stringFromPtr(kmsConfig.DefaultKeyID)
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
+	return config, nil
 }
