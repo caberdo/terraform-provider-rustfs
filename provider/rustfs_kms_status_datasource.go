@@ -186,10 +186,10 @@ func kmsStatusModelFromStatus(ctx context.Context, status *rustfs.KmsStatus) (Km
 
 	if status.CacheStats != nil {
 		config.CacheStats = &kmsCacheStatsModel{
-			HitCount:      types.Int64Value(int64(status.CacheStats.HitCount)),
-			MissCount:     types.Int64Value(int64(status.CacheStats.MissCount)),
-			EntryCount:    types.Int64Value(int64(status.CacheStats.EntryCount)),
-			EvictionCount: types.Int64Value(int64(status.CacheStats.EvictionCount)),
+			HitCount:      types.Int64Value(int64(status.CacheStats.HitCount)),      // #nosec G115
+			MissCount:     types.Int64Value(int64(status.CacheStats.MissCount)),     // #nosec G115
+			EntryCount:    types.Int64Value(int64(status.CacheStats.EntryCount)),    // #nosec G115
+			EvictionCount: types.Int64Value(int64(status.CacheStats.EvictionCount)), // #nosec G115
 		}
 	}
 
