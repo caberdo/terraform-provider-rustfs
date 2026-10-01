@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
 func TestKmsConfigDataSourceSchema(t *testing.T) {
@@ -33,4 +34,21 @@ func TestKmsConfigDataSourceMetadata(t *testing.T) {
 	if resp.TypeName != "rustfs_kms_config" {
 		t.Errorf("expected rustfs_kms_config, got %s", resp.TypeName)
 	}
+}
+
+func TestAccKmsConfigDataSource(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProviderConfig() + `
+data "rustfs_kms_config" "current" {}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("data.rustfs_kms_config.current", "backend"),
+				),
+			},
+		},
+	})
 }
