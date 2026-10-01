@@ -148,6 +148,7 @@ func (p *RustfsProvider) DataSources(ctx context.Context) []func() datasource.Da
 		NewUsersDataSource,
 		NewIAMPoliciesDataSource,
 		NewIAMPolicyDataSource,
+		NewKmsStatusDataSource,
 	}
 }
 
