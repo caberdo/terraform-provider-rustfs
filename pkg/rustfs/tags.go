@@ -73,7 +73,7 @@ func (c *RustfsAdmin) GetBucketTagging(bucket string) (map[string]string, error)
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

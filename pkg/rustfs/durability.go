@@ -30,7 +30,7 @@ func (c *RustfsAdmin) GetBucketDurability(bucket string) (BucketDurability, erro
 	if err != nil {
 		return BucketDurability{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var d BucketDurability
 	err = json.NewDecoder(resp.Body).Decode(&d)
 	return d, err
@@ -54,7 +54,7 @@ func (c *RustfsAdmin) SetBucketDurability(bucket string, d BucketDurability) (Bu
 	if err != nil {
 		return BucketDurability{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var read BucketDurability
 	err = json.NewDecoder(resp.Body).Decode(&read)
 	return read, err
@@ -73,6 +73,6 @@ func (c *RustfsAdmin) DeleteBucketDurability(bucket string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

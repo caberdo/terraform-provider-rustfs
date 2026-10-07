@@ -20,7 +20,7 @@ func (c *RustfsAdmin) ListPools() ([]PoolInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var pools []PoolInfo
 	err = json.NewDecoder(resp.Body).Decode(&pools)
 	return pools, err

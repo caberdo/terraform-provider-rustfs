@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -9,7 +10,7 @@ import (
 func TestGroupResourceSchema(t *testing.T) {
 	r := NewGroupResource()
 	resp := &resource.SchemaResponse{}
-	r.Schema(nil, resource.SchemaRequest{}, resp)
+	r.Schema(context.TODO(), resource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -30,7 +31,7 @@ func TestGroupResourceSchema(t *testing.T) {
 func TestGroupResourceMetadata(t *testing.T) {
 	r := NewGroupResource()
 	resp := &resource.MetadataResponse{}
-	r.Metadata(nil, resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	r.Metadata(context.TODO(), resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_group" {
 		t.Errorf("expected rustfs_group, got %s", resp.TypeName)

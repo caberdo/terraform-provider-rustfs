@@ -108,7 +108,7 @@ func (c *RustfsAdmin) ServerInfo() (ServerInfo, error) {
 	if err != nil {
 		return ServerInfo{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var info ServerInfo
 	err = json.NewDecoder(resp.Body).Decode(&info)
 	return info, err

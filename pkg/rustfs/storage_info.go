@@ -76,7 +76,7 @@ func (c *RustfsAdmin) StorageInfo() (*StorageInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	var info StorageInfo
 	err = json.NewDecoder(resp.Body).Decode(&info)

@@ -15,6 +15,6 @@ func (c *RustfsAdmin) StartRebalance() error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

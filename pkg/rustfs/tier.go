@@ -17,7 +17,7 @@ func (c *RustfsAdmin) AddTier(config json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -33,7 +33,7 @@ func (c *RustfsAdmin) EditTier(name string, config json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -48,7 +48,7 @@ func (c *RustfsAdmin) RemoveTier(name string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -73,7 +73,7 @@ func (c *RustfsAdmin) TierStats() (map[string]TierStat, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var stats map[string]TierStat
 	err = json.NewDecoder(resp.Body).Decode(&stats)
 	return stats, err

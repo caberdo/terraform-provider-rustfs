@@ -59,7 +59,7 @@ func (c *RustfsAdmin) GetKmsStatus() (*KmsStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	var status KmsStatus
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
@@ -80,7 +80,7 @@ func (c *RustfsAdmin) GetKmsConfig() (*KmsConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	var config KmsConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
@@ -171,7 +171,7 @@ func (c *RustfsAdmin) CreateKmsKey(name string) (KmsKey, error) {
 	if err != nil {
 		return KmsKey{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out kmsCreateResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return KmsKey{}, err
@@ -194,7 +194,7 @@ func (c *RustfsAdmin) DescribeKmsKey(keyID string) (KmsKey, error) {
 	if err != nil {
 		return KmsKey{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out kmsDescribeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return KmsKey{}, err
@@ -217,7 +217,7 @@ func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out kmsListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func (c *RustfsAdmin) setKmsKeyState(keyID, relPath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out kmsLifecycleResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return err
@@ -291,7 +291,7 @@ func (c *RustfsAdmin) RotateKmsKey(keyID string) (KmsKey, error) {
 	if err != nil {
 		return KmsKey{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out kmsLifecycleResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return KmsKey{}, err
@@ -329,6 +329,6 @@ func (c *RustfsAdmin) DeleteKmsKey(keyID string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

@@ -51,7 +51,7 @@ func (c *RustfsAdmin) GetBucketPolicy(bucket string) (string, error) {
 		}
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

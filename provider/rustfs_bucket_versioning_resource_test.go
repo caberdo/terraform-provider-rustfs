@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -9,7 +10,7 @@ import (
 func TestBucketVersioningResourceSchema(t *testing.T) {
 	r := NewBucketVersioningResource()
 	resp := &resource.SchemaResponse{}
-	r.Schema(nil, resource.SchemaRequest{}, resp)
+	r.Schema(context.TODO(), resource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -27,7 +28,7 @@ func TestBucketVersioningResourceSchema(t *testing.T) {
 func TestBucketVersioningResourceMetadata(t *testing.T) {
 	r := NewBucketVersioningResource()
 	resp := &resource.MetadataResponse{}
-	r.Metadata(nil, resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	r.Metadata(context.TODO(), resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_bucket_versioning" {
 		t.Errorf("expected rustfs_bucket_versioning, got %s", resp.TypeName)

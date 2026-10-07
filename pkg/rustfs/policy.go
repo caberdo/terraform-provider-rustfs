@@ -65,10 +65,11 @@ func (c *RustfsAdmin) CreatePolicy(policy Policy) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
+	drainClose(resp)
 	return nil
 }
 
@@ -91,6 +92,7 @@ func (c *RustfsAdmin) ReadPolicy(policy string) (Policy, error) {
 	if err != nil {
 		return Policy{}, err
 	}
+	defer drainClose(resp)
 
 	err = json.NewDecoder(resp.Body).Decode(&instance)
 	if err != nil {
@@ -148,7 +150,11 @@ func (c *RustfsAdmin) DeletePolicy(policy string) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 
 }

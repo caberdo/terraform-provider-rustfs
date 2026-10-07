@@ -19,6 +19,7 @@ func TestDoRequest_NetworkError(t *testing.T) {
 	}
 
 	resp, err := client.doRequest(context.Background(), reqData)
+	defer drainClose(resp)
 	if err == nil {
 		t.Fatal("expected error from network failure, got nil")
 	}
@@ -46,6 +47,7 @@ func TestDoRequest_HTTPError(t *testing.T) {
 	}
 
 	resp, err := client.doRequest(context.Background(), reqData)
+	defer drainClose(resp)
 	if err == nil {
 		t.Fatal("expected error for 500 status, got nil")
 	}
@@ -73,6 +75,7 @@ func TestDoDirectRequest_HTTPError(t *testing.T) {
 	}
 
 	resp, err := client.DoDirectRequest(context.Background(), reqData)
+	defer drainClose(resp)
 	if err == nil {
 		t.Fatal("expected error for 500 status, got nil")
 	}

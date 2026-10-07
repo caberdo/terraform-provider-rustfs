@@ -16,7 +16,7 @@ func (c *RustfsAdmin) ExportBucketMetadata() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return io.ReadAll(resp.Body)
 }
 
@@ -32,6 +32,6 @@ func (c *RustfsAdmin) ImportBucketMetadata(data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

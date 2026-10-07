@@ -55,7 +55,7 @@ func (c *RustfsAdmin) GetModuleSwitches() (*ModuleSwitchState, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	state := &ModuleSwitchState{}
 	err = json.NewDecoder(resp.Body).Decode(state)
 	return state, err
@@ -79,7 +79,7 @@ func (c *RustfsAdmin) SetModuleSwitches(update ModuleSwitchUpdate) (*ModuleSwitc
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	state := &ModuleSwitchState{}
 	err = json.NewDecoder(resp.Body).Decode(state)
 	return state, err

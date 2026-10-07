@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 func stringPtr(s string) *string { return &s }
@@ -16,7 +16,7 @@ func stringPtr(s string) *string { return &s }
 func TestKmsStatusDataSourceSchema(t *testing.T) {
 	d := NewKmsStatusDataSource()
 	resp := &datasource.SchemaResponse{}
-	d.Schema(nil, datasource.SchemaRequest{}, resp)
+	d.Schema(context.TODO(), datasource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -44,7 +44,7 @@ func TestKmsStatusDataSourceSchema(t *testing.T) {
 func TestKmsStatusDataSourceMetadata(t *testing.T) {
 	d := NewKmsStatusDataSource()
 	resp := &datasource.MetadataResponse{}
-	d.Metadata(nil, datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	d.Metadata(context.TODO(), datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_kms_status" {
 		t.Errorf("expected rustfs_kms_status, got %s", resp.TypeName)

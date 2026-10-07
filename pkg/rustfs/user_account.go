@@ -35,10 +35,11 @@ func (c *RustfsAdmin) CreateUserAccount(user UserAccount) error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
+	drainClose(resp)
 
 	if user.Policy != "" {
 		return c.AttachPolicyToUser(user.AccessKey, user.Policy)
@@ -61,6 +62,7 @@ func (c *RustfsAdmin) ReadUserAccount(name string) (UserAccount, error) {
 	if err != nil {
 		return instance, err
 	}
+	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&instance)
 	instance.AccessKey = name
 	return instance, err
@@ -78,10 +80,11 @@ func (c *RustfsAdmin) UpdateUserAccount(account UserAccount) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
+	drainClose(resp)
 	if account.Policy != "" {
 		return c.AttachPolicyToUser(account.AccessKey, account.Policy)
 	}
@@ -98,11 +101,12 @@ func (c *RustfsAdmin) DeleteUserAccount(account UserAccount) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
-	return err
+	drainClose(resp)
+	return nil
 }
 
 // AttachPolicyToUser attaches a policy to an existing user.
@@ -118,8 +122,12 @@ func (c *RustfsAdmin) AttachPolicyToUser(user string, policy string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
 
 // SetUserSecretKey rotates the user's secret key in place.
@@ -141,8 +149,12 @@ func (c *RustfsAdmin) SetUserSecretKey(accessKey, secretKey string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
 
 // SetUserStatus enables or disables an existing user.
@@ -157,6 +169,10 @@ func (c *RustfsAdmin) SetUserStatus(accessKey, status string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
