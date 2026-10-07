@@ -145,7 +145,7 @@ provider_installation {
 
 ```bash
 go test ./pkg/rustfs/... -v
-go test ./provider/... -v -run "^[^T]"  # Skip acceptance tests
+go test ./provider/... -v -skip '^TestAcc'  # Skip acceptance tests
 ```
 
 ### Acceptance tests
