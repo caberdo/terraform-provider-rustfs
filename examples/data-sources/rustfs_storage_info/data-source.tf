@@ -1,16 +1,16 @@
 terraform {
   required_providers {
     rustfs = {
-      source = "weinmann/rustfs"
+      source = "weinmann-emt/rustfs"
     }
   }
 }
 
 provider "rustfs" {
-  endpoint      = "rustfs:9001"
-  access_key    = "rustfsadmin"
-  access_secret = "rustfsadmin"
-  ssl           = false
+  endpoint   = "rustfs:9001"
+  access_key = "rustfsadmin"
+  secret_key = "rustfsadmin"
+  ssl        = false
 }
 
 data "rustfs_storage_info" "cluster" {}

@@ -86,6 +86,11 @@ jobs:
           go build ./...
           go vet ./...
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
       - name: Validate examples
         run: ./scripts/validate-examples.sh
 

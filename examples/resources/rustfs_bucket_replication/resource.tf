@@ -3,9 +3,9 @@ resource "rustfs_bucket" "source" {
 }
 
 resource "rustfs_bucket_replication" "example" {
-  bucket            = rustfs_bucket.source.name
-  role              = "arn:minio:replication::id:source-bucket"
+  bucket             = rustfs_bucket.source.name
+  role               = "arn:minio:replication::id:source-bucket"
   destination_bucket = "arn:aws:s3:::dest-bucket"
-  priority          = 1
-  status            = "Enabled"
+  priority           = 1
+  status             = "Enabled"
 }
