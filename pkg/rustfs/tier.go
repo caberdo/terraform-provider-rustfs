@@ -52,16 +52,34 @@ func (c *RustfsAdmin) RemoveTier(name string) error {
 	return nil
 }
 
-// TierStat holds per-tier usage statistics as reported by the tier-stats
-// endpoint.
+// TierStat holds a tier's total size, version count and object count.
 type TierStat struct {
-	TotalSize   int64 `json:"total_size"`
-	NumVersions int64 `json:"num_versions"`
-	NumObjects  int64 `json:"num_objects"`
+	TotalSize   int64 `json:"totalSize"`
+	NumVersions int64 `json:"numVersions"`
+	NumObjects  int64 `json:"numObjects"`
 }
 
-// TierStats returns per-tier usage statistics keyed by tier name. When no
-// tiers are configured the server returns an empty map.
+// tierStatsEnvelope is the version 2 body of GET tier-stats (the server
+// default). Version 1 was a bare map of tier name to the answering process's
+// rolling counters and is only returned under ?format=legacy; v2 separates the
+// cluster-wide stored inventory from the rolling 24-hour transition activity.
+type tierStatsEnvelope struct {
+	ContractVersion int            `json:"contractVersion"`
+	Tiers           []tierInfoBody `json:"tiers"`
+}
+
+type tierInfoBody struct {
+	Name string `json:"name"`
+	// Inventory is absent whenever the scanner has not accounted the tier yet
+	// ("not accounted", never zero).
+	Inventory          *TierStat `json:"inventory"`
+	TransitionsLast24h TierStat  `json:"transitionsLast24h"`
+}
+
+// TierStats returns per-tier usage statistics keyed by tier name. It surfaces
+// the cluster-wide stored inventory and falls back to the rolling 24-hour
+// transition counters when the scanner has not accounted the tier yet. When no
+// tiers are configured the server returns an empty list.
 func (c *RustfsAdmin) TierStats() (map[string]TierStat, error) {
 	reqData := RequestData{
 		Method:  "GET",
@@ -74,7 +92,17 @@ func (c *RustfsAdmin) TierStats() (map[string]TierStat, error) {
 		return nil, err
 	}
 	defer drainClose(resp)
-	var stats map[string]TierStat
-	err = json.NewDecoder(resp.Body).Decode(&stats)
-	return stats, err
+	var body tierStatsEnvelope
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, err
+	}
+	stats := make(map[string]TierStat, len(body.Tiers))
+	for _, tier := range body.Tiers {
+		if tier.Inventory != nil {
+			stats[tier.Name] = *tier.Inventory
+			continue
+		}
+		stats[tier.Name] = tier.TransitionsLast24h
+	}
+	return stats, nil
 }
