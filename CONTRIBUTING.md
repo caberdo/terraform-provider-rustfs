@@ -6,8 +6,8 @@ Thank you for considering contributing to the Terraform Provider for RustFS! Thi
 
 ### Prerequisites
 
-- [Go](https://golang.org/doc/install) 1.22 or later
-- [Podman](https://podman.io) and `podman-compose`
+- [Go](https://golang.org/doc/install) 1.25 or later
+- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (or Podman with `podman compose`)
 - [Git](https://git-scm.com)
 
 ### First Time Setup
@@ -42,17 +42,20 @@ provider_installation {
 
 ```
 ├── provider/                # Terraform resource implementations
+├── provider/                # Provider definition + resources (legacy flat package)
 │   ├── provider.go          # Provider definition and registration
 │   ├── rustfs_*_resource.go # Resource CRUD implementations
-│   ├── rustfs_*_datasource.go # Data source implementations
-│   ├── *_test.go            # Tests
-│   └── provider_test.go     # Test infrastructure
-├── internal/client/         # RustFS API client library
-│   ├── admin_client.go      # HTTP client with AWS SigV4 signing
-│   └── *.go                 # Per-resource API methods
+│   ├── *_test.go            # Schema/metadata unit tests + resource acceptance tests
+│   └── provider_test.go     # Resource test infrastructure
+├── internal/                # Provider internals
+│   ├── acceptance/          # Live acceptance-test harness (LivePreCheck, factories)
+│   ├── client/              # RustFS API client library (SigV4 signing)
+│   ├── datasources/<name>/  # Data sources (+ acceptance_test.go per data source)
+│   └── models/              # Terraform model structs
 ├── examples/                # Example Terraform configurations
 ├── docs/                    # Generated documentation
-├── acc_test/                # Acceptance test Docker environment
+├── scripts/                 # Acceptance-test helper scripts
+├── docker-compose.yml       # RustFS + test/acc services
 └── .github/                 # CI, templates
 ```
 
@@ -100,14 +103,19 @@ go test ./provider/... -v -run "^[^T]"
 
 ### Acceptance Tests
 
-Start a RustFS instance and run acceptance tests:
+The live suite uses the shared harness in `internal/acceptance` and the RustFS
+server in the root `docker-compose.yml`:
 
 ```bash
-podman-compose -f acc_test/docker-compose.yml up -d
+# Bring up RustFS and run the live suite
+make testacc-live
+
+# ...or manage the server yourself
+make testacc-up
 RUSTFS_ENDPOINT="127.0.0.1:9001" \
   RUSTFS_USER="rustfsadmin" RUSTFS_SECRET="rustfsadmin" \
-  TF_ACC=1 go test -v ./provider -run "TestAcc"
-podman-compose -f acc_test/docker-compose.yml down
+  TF_ACC=1 go test -v ./internal/... ./provider -run "TestAcc"
+make testacc-down
 ```
 
 Run a specific test:

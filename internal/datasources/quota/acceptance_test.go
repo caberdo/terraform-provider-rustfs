@@ -19,7 +19,7 @@ func TestAccQuotaDataSource(t *testing.T) {
 	dataSourceName := "data.rustfs_quota.test"
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { acceptance.PreCheck(t) },
+		PreCheck:                 acceptance.LivePreCheck(t),
 		ProtoV6ProviderFactories: acceptance.ProtoV6ProviderFactories(),
 		CheckDestroy:             checkQuotaAndBucketDestroy,
 		Steps: []resource.TestStep{

@@ -21,4 +21,16 @@ test:
 testacc:
 	TF_ACC=1 go test -v -cover -timeout 120m ./...
 
-.PHONY: fmt lint test testacc build install generate
+# Live acceptance tests against a throwaway RustFS server via docker compose.
+# Requires docker (or podman) with the compose plugin.
+testacc-live:
+	docker compose run --rm acc
+
+# Start the RustFS server used by the live acceptance tests and leave it running.
+testacc-up:
+	docker compose up -d rustfs
+
+testacc-down:
+	docker compose down -v
+
+.PHONY: fmt lint test testacc testacc-live testacc-up testacc-down build install generate

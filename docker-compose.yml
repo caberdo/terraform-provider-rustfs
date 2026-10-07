@@ -1,16 +1,75 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
+# Live acceptance-test environment for the RustFS Terraform provider.
+#
+#   docker compose up -d rustfs          # start a RustFS server only
+#   docker compose run --rm test         # run the full provider test suite
+#   docker compose run --rm acc          # run the live acceptance subset
+#   make testacc-live                    # docker compose run --rm acc
+#
+# Override the server image with RUSTFS_VERSION, and the live-test selector with
+# GO_TEST_FILTER (defaults to TestAcc).
 services:
+  # Used by .devcontainer/devcontainer.json ("service": "go").
   go:
     image: mcr.microsoft.com/devcontainers/go:2-1.26-trixie
-  rustfs:
-    image: rustfs/rustfs:latest
 
+  rustfs:
+    image: rustfs/rustfs:${RUSTFS_VERSION:-latest}
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
       RUSTFS_ACCESS_KEY: rustfsadmin
       RUSTFS_SECRET_KEY: rustfsadmin
-      RUSTFS_CONSOLE_ENABLE: true
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_KMS_ENABLE: "true"
+      RUSTFS_KMS_BACKEND: "local"
+      RUSTFS_KMS_KEY_DIR: "/data/kms"
+      RUSTFS_KMS_LOCAL_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      RUSTFS_KMS_DEFAULT_KEY_ID: "rustfs-default-key"
+      RUSTFS_KMS_ALLOW_INSECURE_DEV_DEFAULTS: "true"
+
+  test:
+    image: golang:1.26
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
+        until (exec 3<>/dev/tcp/rustfs/9001) 2>/dev/null; do
+          echo "waiting for RustFS on rustfs:9001..."
+          sleep 2
+        done
+        go mod download
+        go test -v -cover -timeout 30m ./internal/... ./provider/...
+    environment:
+      TF_ACC: "1"
+      RUSTFS_ENDPOINT: "rustfs:9001"
+      RUSTFS_USER: "rustfsadmin"
+      RUSTFS_SECRET: "rustfsadmin"
+    depends_on:
+      rustfs:
+        condition: service_started
+
+  acc:
+    image: golang:1.26
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+    working_dir: /app
+    entrypoint: ["bash", "/app/scripts/testacc-live.sh"]
+    environment:
+      TF_ACC: "1"
+      RUSTFS_ENDPOINT: "rustfs:9001"
+      RUSTFS_USER: "rustfsadmin"
+      RUSTFS_SECRET: "rustfsadmin"
+      GO_TEST_FILTER: "${GO_TEST_FILTER:-TestAcc}"
+    depends_on:
+      rustfs:
+        condition: service_started
+
+volumes:
+  go-modules:
