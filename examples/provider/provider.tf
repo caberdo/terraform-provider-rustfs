@@ -3,6 +3,6 @@ provider "rustfs" {
   endpoint = "127.0.0.1:9001"
   # access_key can also be set via RUSTFS_USER env var
   access_key = "admin"
-  # access_secret can also be set via RUSTFS_SECRET env var
-  access_secret = var.rustfs_secret
+  # secret_key can also be set via RUSTFS_SECRET env var
+  secret_key = var.rustfs_secret
 }

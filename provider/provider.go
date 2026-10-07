@@ -31,6 +31,7 @@ type RustfsProvider struct {
 type RustfsProviderModel struct {
 	Endpoint     types.String `tfsdk:"endpoint"`
 	AccessKey    types.String `tfsdk:"access_key"`
+	SecretKey    types.String `tfsdk:"secret_key"`
 	AccessSecret types.String `tfsdk:"access_secret"`
 	Ssl          types.Bool   `tfsdk:"ssl"`
 	Insecure     types.Bool   `tfsdk:"insecure"`
@@ -54,10 +55,16 @@ func (p *RustfsProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 				Optional:    true,
 				Description: "Username or access key. Defaults to RUSTFS_USER environment variable.",
 			},
-			"access_secret": schema.StringAttribute{
+			"secret_key": schema.StringAttribute{
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Secret to be used as pass. Defaults to RUSTFS_SECRET environment variable.",
+				Description: "Secret key to be used as pass. Defaults to RUSTFS_SECRET environment variable.",
+			},
+			"access_secret": schema.StringAttribute{
+				Optional:           true,
+				Sensitive:          true,
+				Description:        "Secret to be used as pass. Defaults to RUSTFS_SECRET environment variable.",
+				DeprecationMessage: "Use secret_key instead. access_secret will be removed in a future release.",
 			},
 			"insecure": schema.BoolAttribute{
 				Optional:    true,
@@ -92,7 +99,7 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 
 	accessKey := envOrDefault("RUSTFS_USER", config.AccessKey.ValueString())
-	secretKey := envOrDefault("RUSTFS_SECRET", config.AccessSecret.ValueString())
+	secretKey := envOrDefault("RUSTFS_SECRET", config.secretKey())
 
 	// Example client configuration for data sources and resources
 	tr, err := minio.DefaultTransport(config.Ssl.ValueBool())

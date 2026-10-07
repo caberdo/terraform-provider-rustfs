@@ -15,9 +15,9 @@ Provider to access with RustFS
 
 ```terraform
 provider "rustfs" {
-  endpoint      = "127.0.0.1:9001"
-  access_key    = "admin"
-  access_secret = "secret"
+  endpoint   = "127.0.0.1:9001"
+  access_key = "admin"
+  secret_key = "secret"
 }
 ```
 
@@ -41,8 +41,9 @@ When both an environment variable and a provider attribute are set, the environm
 ### Optional
 
 - `access_key` (String) Username or access key. Defaults to RUSTFS_USER environment variable.
-- `access_secret` (String, Sensitive) Secret to be used as pass. Defaults to RUSTFS_SECRET environment variable.
+- `access_secret` (String, Sensitive, Deprecated) Secret to be used as pass. Defaults to RUSTFS_SECRET environment variable.
 - `endpoint` (String) RUSTFS server endpoint in the format host:port. Defaults to RUSTFS_ENDPOINT environment variable.
+- `secret_key` (String, Sensitive) Secret key to be used as pass. Defaults to RUSTFS_SECRET environment variable.
 
 ### Optional
 

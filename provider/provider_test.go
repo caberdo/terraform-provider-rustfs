@@ -31,10 +31,10 @@ func testAccPreCheck(t *testing.T) {
 
 func testAccProviderConfig() string {
 	return `provider "rustfs" {
-  endpoint      = "` + os.Getenv("RUSTFS_ENDPOINT") + `"
-  access_key    = "` + os.Getenv("RUSTFS_USER") + `"
-  access_secret = "` + os.Getenv("RUSTFS_SECRET") + `"
-  ssl           = false
+  endpoint   = "` + os.Getenv("RUSTFS_ENDPOINT") + `"
+  access_key = "` + os.Getenv("RUSTFS_USER") + `"
+  secret_key = "` + os.Getenv("RUSTFS_SECRET") + `"
+  ssl        = false
 }
 `
 }
