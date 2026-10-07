@@ -1,29 +1,44 @@
 version: 2
+
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
+      interval: "daily"
+      time: "03:00"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 5
-
-  - package-ecosystem: "gomod"
-    directory: "/tools"
-    schedule:
-      interval: "weekly"
-      day: "monday"
     labels:
       - "dependencies"
-      - "tools"
-    open-pull-requests-limit: 3
+      - "deps"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "03:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "deps"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "03:00"
+      timezone: "Europe/Amsterdam"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "ci"
+      - "deps"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
