@@ -12,7 +12,7 @@ func TestCreateUserAccount(t *testing.T) {
 		AccessKey: randomString(8),
 		SecretKey: randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateUserAccount(account)
 	if err != nil {
 		t.Error(err)
@@ -38,7 +38,7 @@ func TestCreateUserAccountWithGrp(t *testing.T) {
 		SecretKey: randomString(8),
 		Policy:    "readwrite",
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateUserAccount(account)
 	if err != nil {
 		t.Error(err)
@@ -54,7 +54,7 @@ func TestAddUserWithAccesKey(t *testing.T) {
 		AccessKey: randomString(8),
 		SecretKey: randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateUserAccount(account)
 	if err != nil {
 		t.Error(err)

@@ -12,7 +12,7 @@ func TestCreateUpdateDelete(t *testing.T) {
 	name := randomString(8)
 	name = strings.ToLower(name)
 	days := 20
-	dut := getClient()
+	dut := getClient(t)
 	dut.CreateBucket(name)
 
 	lifecycleConfig := rustfs.LifecycleConfiguration{
