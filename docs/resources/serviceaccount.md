@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_serviceaccount Resource - rustfs"
+page_title: "rustfs_serviceaccount Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage ServiceUser/API Keys

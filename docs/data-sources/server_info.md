@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_server_info Data Source - rustfs"
+page_title: "rustfs_server_info Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Exposes cluster, server, pool and drive information from the RustFS admin API.

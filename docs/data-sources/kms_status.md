@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_kms_status Data Source - rustfs"
+page_title: "rustfs_kms_status Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Fetch the current RustFS KMS service status, including backend health, cache stats, capabilities, and cluster config.

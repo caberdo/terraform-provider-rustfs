@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_quota Data Source - rustfs"
+page_title: "rustfs_quota Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Read the quota of a RustFS bucket

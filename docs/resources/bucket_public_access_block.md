@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_public_access_block Resource - rustfs"
+page_title: "rustfs_bucket_public_access_block Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage the block public access configuration of an S3 bucket in rustfs

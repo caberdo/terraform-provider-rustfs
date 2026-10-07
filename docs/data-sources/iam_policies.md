@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_iam_policies Data Source - rustfs"
+page_title: "rustfs_iam_policies Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   List all canned IAM policies available on the RustFS cluster

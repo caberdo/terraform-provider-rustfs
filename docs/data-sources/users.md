@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_users Data Source - rustfs"
+page_title: "rustfs_users Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   List all RustFS IAM users, optionally filtered by bucket name

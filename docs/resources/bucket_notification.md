@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_notification Resource - rustfs"
+page_title: "rustfs_bucket_notification Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS bucket event notification configuration
