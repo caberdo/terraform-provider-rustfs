@@ -151,6 +151,7 @@ func (p *RustfsProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewKmsKeyRessource,
 		NewConfigRessource,
 		NewBucketDurabilityRessource,
+		NewSiteReplicationRessource,
 	}
 }
 
