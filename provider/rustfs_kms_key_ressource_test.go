@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 const kmsKeyTestResourceName = "rustfs_kms_key.test"
@@ -134,8 +134,8 @@ func testAccCheckKmsKeyDestroy(s *terraform.State) error {
 	return nil
 }
 
-func newKmsKeyAccClient() *rustfs.RustfsAdmin {
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+func newKmsKeyAccClient() *client.RustfsAdmin {
+	client := client.New(&client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),

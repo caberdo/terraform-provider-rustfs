@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func envOrDefault(envKey, defaultValue string) string {
@@ -23,8 +23,8 @@ func (m RustfsProviderModel) secretKey() string {
 	return m.AccessSecret.ValueString()
 }
 
-func generateRustClientConfig(model RustfsProviderModel) *rustfs.RustfsAdminConfig {
-	config := &rustfs.RustfsAdminConfig{
+func generateRustClientConfig(model RustfsProviderModel) *client.RustfsAdminConfig {
+	config := &client.RustfsAdminConfig{
 		Endpoint:     envOrDefault("RUSTFS_ENDPOINT", model.Endpoint.ValueString()),
 		AccessKey:    envOrDefault("RUSTFS_USER", model.AccessKey.ValueString()),
 		AccessSecret: envOrDefault("RUSTFS_SECRET", model.secretKey()),

@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func stringPtr(s string) *string { return &s }
@@ -70,11 +70,11 @@ data "rustfs_kms_status" "current" {}
 }
 
 func TestKmsStatusModelFromStatus_Full(t *testing.T) {
-	status := &rustfs.KmsStatus{
+	status := &client.KmsStatus{
 		BackendType:   "local",
 		BackendStatus: "healthy",
 		CacheEnabled:  true,
-		CacheStats: &rustfs.KmsCacheStats{
+		CacheStats: &client.KmsCacheStats{
 			HitCount:      1,
 			MissCount:     2,
 			EntryCount:    3,
@@ -82,9 +82,9 @@ func TestKmsStatusModelFromStatus_Full(t *testing.T) {
 		},
 		DefaultKeyID: stringPtr("key-01"),
 		Capabilities: map[string]bool{"encrypt": true},
-		ClusterConfig: &rustfs.KmsClusterConfig{
+		ClusterConfig: &client.KmsClusterConfig{
 			Consistent: true,
-			Nodes: []rustfs.KmsClusterNode{
+			Nodes: []client.KmsClusterNode{
 				{Host: "local", ConfigFingerprint: stringPtr("abc123")},
 			},
 		},
@@ -142,7 +142,7 @@ func TestKmsStatusModelFromStatus_Full(t *testing.T) {
 }
 
 func TestKmsStatusModelFromStatus_OptionalAbsent(t *testing.T) {
-	status := &rustfs.KmsStatus{
+	status := &client.KmsStatus{
 		BackendType:   "aws",
 		BackendStatus: "error",
 		CacheEnabled:  false,

@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -104,7 +104,7 @@ func (r *RustfsUserResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	account := rustfs.UserAccount{
+	account := client.UserAccount{
 		AccessKey: plan.AccessKey.ValueString(),
 		SecretKey: plan.SecretKey.ValueString(),
 		Policy:    plan.Policy.ValueString(),
@@ -204,7 +204,7 @@ func (r *RustfsUserResource) Delete(ctx context.Context, req resource.DeleteRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	account := rustfs.UserAccount{
+	account := client.UserAccount{
 		AccessKey: data.AccessKey.ValueString(),
 	}
 	err := r.client.RustClient.DeleteUserAccount(account)

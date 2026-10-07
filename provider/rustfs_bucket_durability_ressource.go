@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -81,7 +81,7 @@ func (r *BucketDurabilityRessource) Create(ctx context.Context, req resource.Cre
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	d := rustfs.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
+	d := client.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
 	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -118,7 +118,7 @@ func (r *BucketDurabilityRessource) Update(ctx context.Context, req resource.Upd
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	d := rustfs.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
+	d := client.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
 	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
 	if err != nil {
 		resp.Diagnostics.AddError(

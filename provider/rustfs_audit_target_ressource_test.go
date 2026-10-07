@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 const auditTargetResourceName = "rustfs_audit_target.test"
@@ -64,12 +64,12 @@ func TestAccAuditTargetResource(t *testing.T) {
 func testAccAuditTargetPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 
-	client := testAccRustClient()
+	cl := testAccRustClient()
 	probe := fmt.Sprintf("tf-audit-probe-%d", acctest.RandInt())
-	probeConfig := []rustfs.AuditTargetKeyValue{
+	probeConfig := []client.AuditTargetKeyValue{
 		{Key: "endpoint", Value: "https://hooks.example.com/webhook/" + probe},
 	}
-	err := client.SetAuditTarget("audit_webhook", probe, probeConfig)
+	err := cl.SetAuditTarget("audit_webhook", probe, probeConfig)
 	if err != nil {
 		if strings.Contains(err.Error(), "audit module is disabled") {
 			t.Skipf("audit module is disabled on the running RustFS; skipping: %v", err)
@@ -77,7 +77,7 @@ func testAccAuditTargetPreCheck(t *testing.T) {
 		t.Fatalf("audit target management is not available on the running RustFS, skipping: %v", err)
 	}
 	// Clean up the probe target so it does not linger in the server config.
-	if err := client.ResetAuditTarget("audit_webhook", probe); err != nil {
+	if err := cl.ResetAuditTarget("audit_webhook", probe); err != nil {
 		t.Logf("could not clean up audit target probe %s: %v", probe, err)
 	}
 }
@@ -117,8 +117,8 @@ func testAccCheckAuditTargetExists(name string) resource.TestCheckFunc {
 			return fmt.Errorf("no target_name set")
 		}
 
-		client := testAccRustClient()
-		targets, err := client.ListAuditTargets()
+		cl := testAccRustClient()
+		targets, err := cl.ListAuditTargets()
 		if err != nil {
 			return err
 		}
@@ -132,8 +132,8 @@ func testAccCheckAuditTargetExists(name string) resource.TestCheckFunc {
 }
 
 func testAccCheckAuditTargetDestroy(s *terraform.State) error {
-	client := testAccRustClient()
-	targets, err := client.ListAuditTargets()
+	cl := testAccRustClient()
+	targets, err := cl.ListAuditTargets()
 	if err != nil {
 		return err
 	}

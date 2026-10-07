@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -113,7 +113,7 @@ func (r *LDAPServiceAccountResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		AccessKey:   plan.AccessKey.ValueString(),
 		SecretKey:   plan.SecretKey.ValueString(),
 		Name:        plan.Name.ValueString(),
@@ -180,7 +180,7 @@ func (r *LDAPServiceAccountResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		AccessKey:   plan.AccessKey.ValueString(),
 		SecretKey:   plan.SecretKey.ValueString(),
 		Name:        plan.Name.ValueString(),
@@ -212,7 +212,7 @@ func (r *LDAPServiceAccountResource) Delete(ctx context.Context, req resource.De
 
 	// No LDAP-specific delete endpoint exists; a created LDAP service account
 	// is a standard service account and is removed via delete-service-accounts.
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		AccessKey: data.AccessKey.ValueString(),
 	}
 	err := r.client.RustClient.DeleteServiceAccount(account)

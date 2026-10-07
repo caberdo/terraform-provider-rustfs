@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // TestAccSiteReplicationResource exercises the rustfs_site_replication resource
@@ -53,20 +53,20 @@ resource "rustfs_site_replication" "peer" {
 // reachable while allowing the suite to run on a single instance.
 func checkSiteReplicationAvailable(t *testing.T) {
 	t.Helper()
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	cl := client.New(&client.RustfsAdminConfig{
 		AccessKey:    rustfsadminAccessKey(),
 		AccessSecret: rustfsadminSecretKey(),
 		Endpoint:     rustfsadminEndpoint(),
 		Ssl:          false,
 	})
-	err := client.SiteReplicationAdd(rustfs.SiteReplicationSite{
+	err := cl.SiteReplicationAdd(client.SiteReplicationSite{
 		Name:      "tf-acc-probe",
 		Endpoint:  "http://localhost:9002",
 		AccessKey: "rustfsadmin",
 		SecretKey: "rustfsadmin",
 	})
 	if err == nil {
-		_ = client.SiteReplicationRemove([]string{"tf-acc-probe"})
+		_ = cl.SiteReplicationRemove([]string{"tf-acc-probe"})
 		return
 	}
 	if strings.Contains(err.Error(), "InvalidRequest") || strings.Contains(err.Error(), "loopback") {

@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func TestAccUserResource_basic(t *testing.T) {
@@ -108,11 +108,11 @@ func testAccCheckUserDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccRustClient() rustfs.RustfsAdmin {
-	config := &rustfs.RustfsAdminConfig{
+func testAccRustClient() client.RustfsAdmin {
+	config := &client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 	}
-	return rustfs.New(config)
+	return client.New(config)
 }

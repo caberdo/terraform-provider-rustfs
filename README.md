@@ -144,7 +144,7 @@ provider_installation {
 ### Unit tests
 
 ```bash
-go test ./pkg/rustfs/... -v
+go test ./internal/client/... -v
 go test ./provider/... -v -run "^[^T]"  # Skip acceptance tests
 ```
 

@@ -42,7 +42,7 @@ Describe how you tested this change:
 ## Checklist for Specific Changes
 
 ### New Resources
-- [ ] API client methods in `pkg/rustfs/<name>.go`
+- [ ] API client methods in `internal/client/<name>.go`
 - [ ] Resource file in `provider/rustfs_<name>_resource.go`
 - [ ] Registered in `provider/provider.go`
 - [ ] ImportState implemented

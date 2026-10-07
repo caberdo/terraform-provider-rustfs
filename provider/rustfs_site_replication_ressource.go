@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -121,7 +121,7 @@ func (r *SiteReplicationRessource) Read(ctx context.Context, req resource.ReadRe
 		resp.Diagnostics.AddError("Error reading site replication", err.Error())
 		return
 	}
-	var found *rustfs.SiteReplicationPeer
+	var found *client.SiteReplicationPeer
 	for i := range info.Sites {
 		if info.Sites[i].Name == state.Name.ValueString() {
 			found = &info.Sites[i]
@@ -166,8 +166,8 @@ func (r *SiteReplicationRessource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
 }
 
-func modelToSite(plan SiteReplicationRessourceModel) rustfs.SiteReplicationSite {
-	return rustfs.SiteReplicationSite{
+func modelToSite(plan SiteReplicationRessourceModel) client.SiteReplicationSite {
+	return client.SiteReplicationSite{
 		Name:          plan.Name.ValueString(),
 		Endpoint:      strings.TrimSuffix(plan.Endpoint.ValueString(), "/"),
 		AccessKey:     plan.AccessKey.ValueString(),

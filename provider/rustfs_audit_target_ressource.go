@@ -17,7 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -161,11 +161,11 @@ func (r *auditTargetRessource) Configure(_ context.Context, req resource.Configu
 
 // auditTargetKeyValues builds the key/value config body from the resource model,
 // including only the fields the user has actually set.
-func (r *auditTargetRessource) auditTargetKeyValues(plan *auditTargetRessourceModel) []rustfs.AuditTargetKeyValue {
-	var kvs []rustfs.AuditTargetKeyValue
+func (r *auditTargetRessource) auditTargetKeyValues(plan *auditTargetRessourceModel) []client.AuditTargetKeyValue {
+	var kvs []client.AuditTargetKeyValue
 	add := func(key string, value string) {
 		if value != "" {
-			kvs = append(kvs, rustfs.AuditTargetKeyValue{Key: key, Value: value})
+			kvs = append(kvs, client.AuditTargetKeyValue{Key: key, Value: value})
 		}
 	}
 	add("endpoint", plan.Endpoint.ValueString())
@@ -176,10 +176,10 @@ func (r *auditTargetRessource) auditTargetKeyValues(plan *auditTargetRessourceMo
 	add("client_key", plan.ClientKey.ValueString())
 	add("client_ca", plan.ClientCA.ValueString())
 	if !plan.QueueLimit.IsNull() && !plan.QueueLimit.IsUnknown() {
-		kvs = append(kvs, rustfs.AuditTargetKeyValue{Key: "queue_limit", Value: strconv.FormatInt(plan.QueueLimit.ValueInt64(), 10)})
+		kvs = append(kvs, client.AuditTargetKeyValue{Key: "queue_limit", Value: strconv.FormatInt(plan.QueueLimit.ValueInt64(), 10)})
 	}
 	if !plan.SkipTLSVerify.IsNull() && !plan.SkipTLSVerify.IsUnknown() {
-		kvs = append(kvs, rustfs.AuditTargetKeyValue{Key: "skip_tls_verify", Value: strconv.FormatBool(plan.SkipTLSVerify.ValueBool())})
+		kvs = append(kvs, client.AuditTargetKeyValue{Key: "skip_tls_verify", Value: strconv.FormatBool(plan.SkipTLSVerify.ValueBool())})
 	}
 	return kvs
 }
@@ -264,7 +264,7 @@ func (r *auditTargetRessource) Read(ctx context.Context, req resource.ReadReques
 
 	key := state.TargetName.ValueString()
 	service := serviceForType(state.TargetType.ValueString())
-	var found *rustfs.AuditTarget
+	var found *client.AuditTarget
 	for i := range targets {
 		t := &targets[i]
 		if t.AccountID == key && (service == "" || t.Service == service) {

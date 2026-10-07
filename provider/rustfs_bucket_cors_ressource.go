@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -140,10 +140,10 @@ func stringSliceFromSet(ctx context.Context, s types.Set) []string {
 	return out
 }
 
-func buildCorsConfig(ctx context.Context, plan bucketCorsModel) *rustfs.CORSConfiguration {
-	rules := make([]rustfs.CORSRule, 0, len(plan.Rule))
+func buildCorsConfig(ctx context.Context, plan bucketCorsModel) *client.CORSConfiguration {
+	rules := make([]client.CORSRule, 0, len(plan.Rule))
 	for _, rp := range plan.Rule {
-		rule := rustfs.CORSRule{
+		rule := client.CORSRule{
 			ID:             rp.Id.ValueString(),
 			MaxAgeSeconds:  int(rp.MaxAgeSeconds.ValueInt64()),
 			AllowedHeaders: stringSliceFromSet(ctx, rp.AllowedHeaders),
@@ -153,10 +153,10 @@ func buildCorsConfig(ctx context.Context, plan bucketCorsModel) *rustfs.CORSConf
 		}
 		rules = append(rules, rule)
 	}
-	return &rustfs.CORSConfiguration{Rules: rules}
+	return &client.CORSConfiguration{Rules: rules}
 }
 
-func flattenCorsRules(cfg *rustfs.CORSConfiguration) []corsRuleModel {
+func flattenCorsRules(cfg *client.CORSConfiguration) []corsRuleModel {
 	rules := make([]corsRuleModel, 0, len(cfg.Rules))
 	for _, rc := range cfg.Rules {
 		rules = append(rules, corsRuleModel{

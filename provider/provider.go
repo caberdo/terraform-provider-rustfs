@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure RustfsProvider satisfies various provider interfaces.
@@ -120,7 +120,7 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	}
 	client := &AllClient{
 		Minio:      minio_client,
-		RustClient: rustfs.New(generatedConfig),
+		RustClient: client.New(generatedConfig),
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client

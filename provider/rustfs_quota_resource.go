@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 const (
@@ -37,7 +37,7 @@ func isTransientQuotaError(err error) bool {
 
 // quotaReadWithRetry retries the quota read while the server reports that the
 // bucket's authoritative usage is not computed yet. Other errors fail fast.
-func quotaReadWithRetry(ctx context.Context, bucket string, read func(string) (rustfs.Quota, error)) (rustfs.Quota, error) {
+func quotaReadWithRetry(ctx context.Context, bucket string, read func(string) (client.Quota, error)) (client.Quota, error) {
 	var lastErr error
 	for attempt := 0; attempt < quotaReadMaxAttempts; attempt++ {
 		quota, err := read(bucket)
@@ -46,23 +46,23 @@ func quotaReadWithRetry(ctx context.Context, bucket string, read func(string) (r
 		}
 		lastErr = err
 		if !isTransientQuotaError(err) {
-			return rustfs.Quota{}, err
+			return client.Quota{}, err
 		}
 		timer := time.NewTimer(quotaReadRetryInterval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return rustfs.Quota{}, ctx.Err()
+			return client.Quota{}, ctx.Err()
 		case <-timer.C:
 		}
 	}
-	return rustfs.Quota{}, lastErr
+	return client.Quota{}, lastErr
 }
 
 // quotaSetWithRetry retries setting the bucket quota while the cluster has not
 // yet confirmed the durable quota capability (fresh single-node startup).
 // Other errors fail fast.
-func quotaSetWithRetry(ctx context.Context, quota rustfs.Quota, set func(rustfs.Quota) (rustfs.Quota, error)) (rustfs.Quota, error) {
+func quotaSetWithRetry(ctx context.Context, quota client.Quota, set func(client.Quota) (client.Quota, error)) (client.Quota, error) {
 	var lastErr error
 	for attempt := 0; attempt < quotaReadMaxAttempts; attempt++ {
 		got, err := set(quota)
@@ -71,17 +71,17 @@ func quotaSetWithRetry(ctx context.Context, quota rustfs.Quota, set func(rustfs.
 		}
 		lastErr = err
 		if !isTransientQuotaError(err) {
-			return rustfs.Quota{}, err
+			return client.Quota{}, err
 		}
 		timer := time.NewTimer(quotaReadRetryInterval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return rustfs.Quota{}, ctx.Err()
+			return client.Quota{}, ctx.Err()
 		case <-timer.C:
 		}
 	}
-	return rustfs.Quota{}, lastErr
+	return client.Quota{}, lastErr
 }
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -153,7 +153,7 @@ func (r *quotaResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	q := rustfs.Quota{Bucket: plan.Bucket.ValueString(), Quota: int(plan.Quota.ValueInt64()), Quota_Type: "HARD"}
+	q := client.Quota{Bucket: plan.Bucket.ValueString(), Quota: int(plan.Quota.ValueInt64()), Quota_Type: "HARD"}
 	_, err := quotaSetWithRetry(ctx, q, r.client.RustClient.SetQuota)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -205,7 +205,7 @@ func (r *quotaResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
-	quota := rustfs.Quota{Bucket: plan.Bucket.ValueString(), Quota: int(plan.Quota.ValueInt64()), Quota_Type: "HARD"}
+	quota := client.Quota{Bucket: plan.Bucket.ValueString(), Quota: int(plan.Quota.ValueInt64()), Quota_Type: "HARD"}
 	read, err := quotaSetWithRetry(ctx, quota, r.client.RustClient.SetQuota)
 	if err != nil {
 		resp.Diagnostics.AddError(

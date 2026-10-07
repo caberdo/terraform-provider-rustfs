@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var _ datasource.DataSource = &ReplicationMetricsDataSource{}
@@ -295,14 +295,14 @@ func (d *ReplicationMetricsDataSource) Read(ctx context.Context, req datasource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func replicationRStatValue(stat rustfs.ReplicationRStat) types.Object {
+func replicationRStatValue(stat client.ReplicationRStat) types.Object {
 	return types.ObjectValueMust(replicationRStatAttrTypes, map[string]attr.Value{
 		"count": types.Float64Value(stat.Count),
 		"bytes": types.Int64Value(stat.Bytes),
 	})
 }
 
-func replicationTimedErrStatsValue(stats rustfs.ReplicationTimedErrStats) types.Object {
+func replicationTimedErrStatsValue(stats client.ReplicationTimedErrStats) types.Object {
 	return types.ObjectValueMust(replicationTimedErrStatsAttrTypes, map[string]attr.Value{
 		"last_minute": replicationRStatValue(stats.LastMinute),
 		"last_hour":   replicationRStatValue(stats.LastHour),
@@ -310,14 +310,14 @@ func replicationTimedErrStatsValue(stats rustfs.ReplicationTimedErrStats) types.
 	})
 }
 
-func replicationQStatValue(stat rustfs.ReplicationQStat) types.Object {
+func replicationQStatValue(stat client.ReplicationQStat) types.Object {
 	return types.ObjectValueMust(replicationQStatAttrTypes, map[string]attr.Value{
 		"count": types.Float64Value(stat.Count),
 		"bytes": types.Float64Value(stat.Bytes),
 	})
 }
 
-func replicationInQueueMetricValue(metric rustfs.ReplicationInQueueMetric) types.Object {
+func replicationInQueueMetricValue(metric client.ReplicationInQueueMetric) types.Object {
 	return types.ObjectValueMust(replicationInQueueMetricAttrTypes, map[string]attr.Value{
 		"curr": replicationQStatValue(metric.Curr),
 		"avg":  replicationQStatValue(metric.Avg),
@@ -326,7 +326,7 @@ func replicationInQueueMetricValue(metric rustfs.ReplicationInQueueMetric) types
 	})
 }
 
-func replicationTargetMetricValue(target string, metric rustfs.ReplicationTargetMetric) types.Object {
+func replicationTargetMetricValue(target string, metric client.ReplicationTargetMetric) types.Object {
 	return types.ObjectValueMust(replicationTargetMetricAttrTypes, map[string]attr.Value{
 		"target":                     types.StringValue(target),
 		"replication_count":          types.Int64Value(metric.ReplicationCount),
@@ -339,7 +339,7 @@ func replicationTargetMetricValue(target string, metric rustfs.ReplicationTarget
 	})
 }
 
-func replicationTargetsValue(stats map[string]rustfs.ReplicationTargetMetric) types.List {
+func replicationTargetsValue(stats map[string]client.ReplicationTargetMetric) types.List {
 	targets := make([]string, 0, len(stats))
 	for arn := range stats {
 		targets = append(targets, arn)

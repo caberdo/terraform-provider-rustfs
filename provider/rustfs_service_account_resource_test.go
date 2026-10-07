@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func TestAccServiceAccountResource_basic(t *testing.T) {
@@ -108,8 +108,8 @@ func testAccCheckServiceAccountDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccSAClient() rustfs.RustfsAdmin {
-	return rustfs.New(&rustfs.RustfsAdminConfig{
+func testAccSAClient() client.RustfsAdmin {
+	return client.New(&client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),

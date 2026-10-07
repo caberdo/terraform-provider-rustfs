@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func TestIsTransientQuotaError(t *testing.T) {
@@ -35,12 +35,12 @@ func TestQuotaReadWithRetry(t *testing.T) {
 
 	t.Run("retries transient then succeeds", func(t *testing.T) {
 		calls := 0
-		read := func(bucket string) (rustfs.Quota, error) {
+		read := func(bucket string) (client.Quota, error) {
 			calls++
 			if calls < 3 {
-				return rustfs.Quota{}, transientErr
+				return client.Quota{}, transientErr
 			}
-			return rustfs.Quota{Bucket: bucket, Quota: 100000, Quota_Type: "HARD"}, nil
+			return client.Quota{Bucket: bucket, Quota: 100000, Quota_Type: "HARD"}, nil
 		}
 		got, err := quotaReadWithRetry(context.Background(), "b", read)
 		if err != nil {
@@ -52,8 +52,8 @@ func TestQuotaReadWithRetry(t *testing.T) {
 	})
 
 	t.Run("permanent error fails fast", func(t *testing.T) {
-		read := func(bucket string) (rustfs.Quota, error) {
-			return rustfs.Quota{}, errors.New("NoSuchBucket")
+		read := func(bucket string) (client.Quota, error) {
+			return client.Quota{}, errors.New("NoSuchBucket")
 		}
 		start := time.Now()
 		_, err := quotaReadWithRetry(context.Background(), "b", read)
@@ -69,10 +69,10 @@ func TestQuotaReadWithRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		calls := 0
-		read := func(bucket string) (rustfs.Quota, error) {
+		read := func(bucket string) (client.Quota, error) {
 			calls++
 			cancel()
-			return rustfs.Quota{}, transientErr
+			return client.Quota{}, transientErr
 		}
 		_, err := quotaReadWithRetry(ctx, "b", read)
 		if err != context.Canceled {
@@ -86,15 +86,15 @@ func TestQuotaSetWithRetry(t *testing.T) {
 
 	t.Run("retries transient then succeeds", func(t *testing.T) {
 		calls := 0
-		set := func(q rustfs.Quota) (rustfs.Quota, error) {
+		set := func(q client.Quota) (client.Quota, error) {
 			calls++
 			if calls < 3 {
-				return rustfs.Quota{}, transientErr
+				return client.Quota{}, transientErr
 			}
 			q.Quota_Type = "HARD"
 			return q, nil
 		}
-		got, err := quotaSetWithRetry(context.Background(), rustfs.Quota{Bucket: "b", Quota: 100}, set)
+		got, err := quotaSetWithRetry(context.Background(), client.Quota{Bucket: "b", Quota: 100}, set)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -104,11 +104,11 @@ func TestQuotaSetWithRetry(t *testing.T) {
 	})
 
 	t.Run("permanent error fails fast", func(t *testing.T) {
-		set := func(q rustfs.Quota) (rustfs.Quota, error) {
-			return rustfs.Quota{}, errors.New("InvalidArgument")
+		set := func(q client.Quota) (client.Quota, error) {
+			return client.Quota{}, errors.New("InvalidArgument")
 		}
 		start := time.Now()
-		_, err := quotaSetWithRetry(context.Background(), rustfs.Quota{Bucket: "b"}, set)
+		_, err := quotaSetWithRetry(context.Background(), client.Quota{Bucket: "b"}, set)
 		if err == nil || !strings.Contains(err.Error(), "InvalidArgument") {
 			t.Fatalf("expected InvalidArgument error, got %v", err)
 		}

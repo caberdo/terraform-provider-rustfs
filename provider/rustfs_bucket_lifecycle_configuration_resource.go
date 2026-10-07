@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -227,21 +227,21 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		return
 	}
 
-	var rules []rustfs.LifecycleRule
+	var rules []client.LifecycleRule
 	for _, rulePlan := range plan.Rule {
-		rule := rustfs.LifecycleRule{
+		rule := client.LifecycleRule{
 			ID:     rulePlan.Id.ValueString(),
 			Status: rulePlan.Status.ValueString(),
 		}
 
 		if rulePlan.Filter != nil {
-			rule.Filter = rustfs.LifecycleFilter{
+			rule.Filter = client.LifecycleFilter{
 				Prefix: rulePlan.Filter.Prefix.ValueString(),
 			}
 		}
 
 		if rulePlan.Expiration != nil {
-			exp := &rustfs.LifecycleExpiration{}
+			exp := &client.LifecycleExpiration{}
 			if !rulePlan.Expiration.Days.IsNull() {
 				daysVal := int(rulePlan.Expiration.Days.ValueInt64())
 				exp.Days = &daysVal
@@ -257,7 +257,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		}
 
 		if rulePlan.Transition != nil {
-			tr := &rustfs.LifecycleTransition{StorageClass: rulePlan.Transition.StorageClass.ValueString()}
+			tr := &client.LifecycleTransition{StorageClass: rulePlan.Transition.StorageClass.ValueString()}
 			if !rulePlan.Transition.Days.IsNull() {
 				daysVal := int(rulePlan.Transition.Days.ValueInt64())
 				tr.Days = &daysVal
@@ -269,7 +269,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		}
 
 		if rulePlan.NoncurrentVersionExpiration != nil {
-			ncExp := &rustfs.LifecycleNoncurrentVersionExpiration{}
+			ncExp := &client.LifecycleNoncurrentVersionExpiration{}
 			if !rulePlan.NoncurrentVersionExpiration.NoncurrentDays.IsNull() {
 				daysVal := int(rulePlan.NoncurrentVersionExpiration.NoncurrentDays.ValueInt64())
 				ncExp.NoncurrentDays = &daysVal
@@ -278,7 +278,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		}
 
 		if rulePlan.NoncurrentVersionTransition != nil {
-			ncTr := &rustfs.LifecycleNoncurrentVersionTransition{StorageClass: rulePlan.NoncurrentVersionTransition.StorageClass.ValueString()}
+			ncTr := &client.LifecycleNoncurrentVersionTransition{StorageClass: rulePlan.NoncurrentVersionTransition.StorageClass.ValueString()}
 			if !rulePlan.NoncurrentVersionTransition.NoncurrentDays.IsNull() {
 				daysVal := int(rulePlan.NoncurrentVersionTransition.NoncurrentDays.ValueInt64())
 				ncTr.NoncurrentDays = &daysVal
@@ -287,7 +287,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		}
 
 		if rulePlan.AbortIncompleteMultipartUpload != nil {
-			abort := &rustfs.LifecycleAbortIncompleteMultipartUpload{}
+			abort := &client.LifecycleAbortIncompleteMultipartUpload{}
 			if !rulePlan.AbortIncompleteMultipartUpload.DaysAfterInitiation.IsNull() {
 				daysVal := int(rulePlan.AbortIncompleteMultipartUpload.DaysAfterInitiation.ValueInt64())
 				abort.DaysAfterInitiation = &daysVal
@@ -298,7 +298,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 		rules = append(rules, rule)
 	}
 
-	config := &rustfs.LifecycleConfiguration{
+	config := &client.LifecycleConfiguration{
 		Rules: rules,
 	}
 
@@ -419,21 +419,21 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		return
 	}
 
-	var rules []rustfs.LifecycleRule
+	var rules []client.LifecycleRule
 	for _, rulePlan := range plan.Rule {
-		rule := rustfs.LifecycleRule{
+		rule := client.LifecycleRule{
 			ID:     rulePlan.Id.ValueString(),
 			Status: rulePlan.Status.ValueString(),
 		}
 
 		if rulePlan.Filter != nil {
-			rule.Filter = rustfs.LifecycleFilter{
+			rule.Filter = client.LifecycleFilter{
 				Prefix: rulePlan.Filter.Prefix.ValueString(),
 			}
 		}
 
 		if rulePlan.Expiration != nil {
-			exp := &rustfs.LifecycleExpiration{}
+			exp := &client.LifecycleExpiration{}
 			if !rulePlan.Expiration.Days.IsNull() {
 				daysVal := int(*rulePlan.Expiration.Days.ValueInt64Pointer())
 				exp.Days = &daysVal
@@ -449,7 +449,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		}
 
 		if rulePlan.Transition != nil {
-			tr := &rustfs.LifecycleTransition{StorageClass: rulePlan.Transition.StorageClass.ValueString()}
+			tr := &client.LifecycleTransition{StorageClass: rulePlan.Transition.StorageClass.ValueString()}
 			if !rulePlan.Transition.Days.IsNull() {
 				daysVal := int(*rulePlan.Transition.Days.ValueInt64Pointer())
 				tr.Days = &daysVal
@@ -461,7 +461,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		}
 
 		if rulePlan.NoncurrentVersionExpiration != nil {
-			ncExp := &rustfs.LifecycleNoncurrentVersionExpiration{}
+			ncExp := &client.LifecycleNoncurrentVersionExpiration{}
 			if !rulePlan.NoncurrentVersionExpiration.NoncurrentDays.IsNull() {
 				daysVal := int(*rulePlan.NoncurrentVersionExpiration.NoncurrentDays.ValueInt64Pointer())
 				ncExp.NoncurrentDays = &daysVal
@@ -470,7 +470,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		}
 
 		if rulePlan.NoncurrentVersionTransition != nil {
-			ncTr := &rustfs.LifecycleNoncurrentVersionTransition{StorageClass: rulePlan.NoncurrentVersionTransition.StorageClass.ValueString()}
+			ncTr := &client.LifecycleNoncurrentVersionTransition{StorageClass: rulePlan.NoncurrentVersionTransition.StorageClass.ValueString()}
 			if !rulePlan.NoncurrentVersionTransition.NoncurrentDays.IsNull() {
 				daysVal := int(*rulePlan.NoncurrentVersionTransition.NoncurrentDays.ValueInt64Pointer())
 				ncTr.NoncurrentDays = &daysVal
@@ -479,7 +479,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		}
 
 		if rulePlan.AbortIncompleteMultipartUpload != nil {
-			abort := &rustfs.LifecycleAbortIncompleteMultipartUpload{}
+			abort := &client.LifecycleAbortIncompleteMultipartUpload{}
 			if !rulePlan.AbortIncompleteMultipartUpload.DaysAfterInitiation.IsNull() {
 				daysVal := int(*rulePlan.AbortIncompleteMultipartUpload.DaysAfterInitiation.ValueInt64Pointer())
 				abort.DaysAfterInitiation = &daysVal
@@ -490,7 +490,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 		rules = append(rules, rule)
 	}
 
-	config := &rustfs.LifecycleConfiguration{
+	config := &client.LifecycleConfiguration{
 		Rules: rules,
 	}
 

@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -159,7 +159,7 @@ func (r *RemoteTargetRessource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Error listing remote targets", err.Error())
 		return
 	}
-	var found *rustfs.RemoteTarget
+	var found *client.RemoteTarget
 	for i := range targets {
 		if targets[i].Arn == state.Arn.ValueString() {
 			found = &targets[i]
@@ -234,15 +234,15 @@ func (r *RemoteTargetRessource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("arn"), parts[1])...)
 }
 
-func (r *RemoteTargetRessource) targetFromModel(plan RemoteTargetRessourceModel) rustfs.RemoteTarget {
-	return rustfs.RemoteTarget{
+func (r *RemoteTargetRessource) targetFromModel(plan RemoteTargetRessourceModel) client.RemoteTarget {
+	return client.RemoteTarget{
 		Type:         plan.Type.ValueString(),
 		Endpoint:     plan.Endpoint.ValueString(),
 		Secure:       plan.Secure.ValueBool(),
 		Region:       plan.Region.ValueString(),
 		Path:         plan.Path.ValueString(),
 		TargetBucket: plan.TargetBucket.ValueString(),
-		Credentials: &rustfs.RemoteTargetCredentials{
+		Credentials: &client.RemoteTargetCredentials{
 			AccessKey: plan.AccessKey.ValueString(),
 			SecretKey: plan.SecretKey.ValueString(),
 		},
