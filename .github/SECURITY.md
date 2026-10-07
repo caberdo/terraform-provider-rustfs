@@ -13,7 +13,7 @@ Only the latest released version receives security updates.
 
 If you discover a security vulnerability, please **DO NOT** open a public issue.
 
-**Preferred Method:** Use GitHub's [Private Vulnerability Reporting](https://github.com/weinmann-emt/terraform-provider-rustfs/security/advisories/new)
+**Preferred Method:** Use GitHub's [Private Vulnerability Reporting](https://github.com/caberdo/terraform-provider-rustfs/security/advisories/new)
 
 ### What to Include
 

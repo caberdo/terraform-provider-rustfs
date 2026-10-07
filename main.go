@@ -11,7 +11,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/weinmann-emt/terraform-provider-rustfs/provider"
+	"github.com/caberdo/terraform-provider-rustfs/provider"
 )
 
 var (
@@ -33,7 +33,7 @@ func main() {
 		// TODO: Update this string with the published name of your provider.
 		// Also update the tfplugindocs generate command to either remove the
 		// -provider-name flag or set its value to the updated provider name.
-		Address: "registry.terraform.io/weinmann-emt/rustfs",
+		Address: "registry.terraform.io/caberdo/rustfs",
 		Debug:   debug,
 	}
 

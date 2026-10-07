@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 // TestAccSiteReplicationResource exercises the rustfs_site_replication resource

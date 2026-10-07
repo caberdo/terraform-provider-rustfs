@@ -1,7 +1,7 @@
 # Terraform Provider for RustFS
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/weinmann-emt/terraform-provider-rustfs)](https://golang.org/doc/devel/release.html)
-[![CI](https://img.shields.io/github/actions/workflow/status/weinmann-emt/terraform-provider-rustfs/test.yml?branch=main)](https://github.com/weinmann-emt/terraform-provider-rustfs/actions)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/caberdo/terraform-provider-rustfs)](https://golang.org/doc/devel/release.html)
+[![CI](https://img.shields.io/github/actions/workflow/status/caberdo/terraform-provider-rustfs/test.yml?branch=main)](https://github.com/caberdo/terraform-provider-rustfs/actions)
 
 Terraform provider for managing [RustFS](https://github.com/rustfs/rustfs) — an S3-compatible object storage system. Manage buckets, IAM users, policies, service accounts, quotas, lifecycle rules, encryption, versioning, and more.
 
@@ -52,7 +52,7 @@ notification targets — work once the matching RustFS sub-system is enabled and
 terraform {
   required_providers {
     rustfs = {
-      source  = "weinmann-emt/rustfs"
+      source  = "caberdo/rustfs"
       version = "~> 0.0.7"
     }
   }
@@ -136,7 +136,7 @@ Credentials can be provided via the provider block or environment variables. Env
 ## Building
 
 ```bash
-git clone https://github.com/weinmann-emt/terraform-provider-rustfs.git
+git clone https://github.com/caberdo/terraform-provider-rustfs.git
 cd terraform-provider-rustfs
 go build -o terraform-provider-rustfs
 ```
@@ -146,7 +146,7 @@ For local development, add to `~/.terraformrc`:
 ```hcl
 provider_installation {
   dev_overrides {
-    "weinmann-emt/rustfs" = "/path/to/terraform-provider-rustfs"
+    "caberdo/rustfs" = "/path/to/terraform-provider-rustfs"
   }
 }
 ```
@@ -180,7 +180,7 @@ podman-compose -f acc_test/docker-compose.yml down
 
 ## Documentation
 
-Full resource documentation is available in the [`docs/`](./docs/) directory or on the [Terraform Registry](https://registry.terraform.io/providers/weinmann-emt/rustfs).
+Full resource documentation is available in the [`docs/`](./docs/) directory or on the [Terraform Registry](https://registry.terraform.io/providers/caberdo/rustfs).
 
 Regenerate it from the schema and examples with:
 

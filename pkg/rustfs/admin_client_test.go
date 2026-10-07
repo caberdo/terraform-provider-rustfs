@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 // newTestAdminServer spins up an httptest server speaking the RustFS admin

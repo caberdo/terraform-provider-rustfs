@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 const testBucketPolicy = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::test-bucket/*"]}]}`

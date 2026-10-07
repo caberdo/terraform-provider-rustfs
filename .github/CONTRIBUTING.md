@@ -13,7 +13,7 @@ Thank you for considering contributing to the Terraform Provider for RustFS! Thi
 ### First Time Setup
 
 ```bash
-git clone https://github.com/weinmann-emt/terraform-provider-rustfs.git
+git clone https://github.com/caberdo/terraform-provider-rustfs.git
 cd terraform-provider-rustfs
 go mod download
 ```
@@ -33,7 +33,7 @@ Add to `~/.terraformrc`:
 ```hcl
 provider_installation {
   dev_overrides {
-    "weinmann-emt/rustfs" = "/path/to/terraform-provider-rustfs"
+    "caberdo/rustfs" = "/path/to/terraform-provider-rustfs"
   }
 }
 ```

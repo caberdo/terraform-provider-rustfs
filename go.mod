@@ -1,4 +1,4 @@
-module github.com/weinmann-emt/terraform-provider-rustfs
+module github.com/caberdo/terraform-provider-rustfs
 
 go 1.26.4
 

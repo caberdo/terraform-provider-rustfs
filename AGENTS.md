@@ -6,7 +6,7 @@ A Terraform provider for [RustFS](https://github.com/rustfs/rustfs), an S3-compa
 storage system, built with the Plugin Framework (v1.19.0) and Go 1.26.4. The provider serves
 both the S3 API (through `minio-go`) and the RustFS admin API (`/rustfs/admin/v3`).
 
-Registry address: `registry.terraform.io/weinmann-emt/rustfs`.
+Registry address: `registry.terraform.io/caberdo/rustfs`.
 
 ## Resources and Data Sources
 

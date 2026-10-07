@@ -15,7 +15,7 @@ Storage layout and health information for the RustFS cluster, including the stor
 terraform {
   required_providers {
     rustfs = {
-      source = "weinmann-emt/rustfs"
+      source = "caberdo/rustfs"
     }
   }
 }
