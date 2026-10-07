@@ -11,20 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
-
-// Data models.
-type policyStatementModel struct {
-	Effect   string   `tfsdk:"effect"`
-	Action   []string `tfsdk:"action"`
-	Resource []string `tfsdk:"resource"`
-}
-
-type policyResourceModel struct {
-	Name      types.String           `tfsdk:"name"`
-	Version   types.String           `tfsdk:"version"`
-	Statement []policyStatementModel `tfsdk:"statement"`
-}
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -102,7 +90,7 @@ func (r *PolicyResource) Configure(_ context.Context, req resource.ConfigureRequ
 // Create creates the resource and sets the initial Terraform state.
 func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan policyResourceModel
+	var plan models.PolicyResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 
 	resp.Diagnostics.Append(diags...)
@@ -140,7 +128,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 // Read refreshes the Terraform state with the latest data.
 func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state policyResourceModel
+	var state models.PolicyResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -165,10 +153,10 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	state.Name = types.StringValue(actual.Name)
 	state.Version = types.StringValue(actual.Version)
-	state.Statement = []policyStatementModel{}
+	state.Statement = []models.PolicyStatementModel{}
 	for _, read_statement := range actual.Statement {
 		state.Statement = append(state.Statement,
-			policyStatementModel{
+			models.PolicyStatementModel{
 				Effect:   read_statement.Effect,
 				Action:   read_statement.Action,
 				Resource: read_statement.Resource,
@@ -184,7 +172,7 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan policyResourceModel
+	var plan models.PolicyResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -224,7 +212,7 @@ func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *PolicyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data policyResourceModel
+	var data models.PolicyResourceModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)

@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &HealthInfoDataSource{}
@@ -16,25 +17,6 @@ var _ datasource.DataSource = &HealthInfoDataSource{}
 // HealthInfoDataSource provides cluster health and OBD diagnostics.
 type HealthInfoDataSource struct {
 	client *AllClient
-}
-
-// HealthInfoDataSourceModel describes the data source state.
-type HealthInfoDataSourceModel struct {
-	HealthInfo types.String `tfsdk:"health_info"`
-	ObdInfo    types.String `tfsdk:"obd_info"`
-	Version    types.String `tfsdk:"version"`
-	Region     types.String `tfsdk:"region"`
-	Timestamp  types.String `tfsdk:"timestamp"`
-	Drives     types.List   `tfsdk:"drives"`
-}
-
-type healthDriveModel struct {
-	Endpoint       types.String `tfsdk:"endpoint"`
-	DrivePath      types.String `tfsdk:"drive_path"`
-	State          types.String `tfsdk:"state"`
-	TotalSpace     types.Int64  `tfsdk:"total_space"`
-	UsedSpace      types.Int64  `tfsdk:"used_space"`
-	AvailableSpace types.Int64  `tfsdk:"available_space"`
 }
 
 func NewHealthInfoDataSource() datasource.DataSource {
@@ -162,9 +144,9 @@ func (d *HealthInfoDataSource) Read(ctx context.Context, _ datasource.ReadReques
 		return
 	}
 
-	drives := make([]healthDriveModel, 0, len(health.Drives))
+	drives := make([]models.HealthDriveModel, 0, len(health.Drives))
 	for _, drv := range health.Drives {
-		drives = append(drives, healthDriveModel{
+		drives = append(drives, models.HealthDriveModel{
 			Endpoint:       types.StringValue(drv.Endpoint),
 			DrivePath:      types.StringValue(drv.DrivePath),
 			State:          types.StringValue(drv.State),
@@ -188,7 +170,7 @@ func (d *HealthInfoDataSource) Read(ctx context.Context, _ datasource.ReadReques
 		return
 	}
 
-	state := HealthInfoDataSourceModel{
+	state := models.HealthInfoDataSourceModel{
 		HealthInfo: types.StringValue(string(healthRaw)),
 		ObdInfo:    types.StringValue(string(obdRaw)),
 		Version:    types.StringValue(health.Version),

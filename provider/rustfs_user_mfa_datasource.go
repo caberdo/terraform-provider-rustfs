@@ -7,19 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &UserMfaDataSource{}
 
 type UserMfaDataSource struct {
 	client *AllClient
-}
-
-type UserMfaDataSourceModel struct {
-	AccessKey              types.String `tfsdk:"access_key"`
-	Enabled                types.Bool   `tfsdk:"enabled"`
-	ActivatedAt            types.String `tfsdk:"activated_at"`
-	RecoveryCodesRemaining types.Int64  `tfsdk:"recovery_codes_remaining"`
 }
 
 func NewUserMfaDataSource() datasource.DataSource {
@@ -71,7 +65,7 @@ func (d *UserMfaDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *UserMfaDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config UserMfaDataSourceModel
+	var config models.UserMfaDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

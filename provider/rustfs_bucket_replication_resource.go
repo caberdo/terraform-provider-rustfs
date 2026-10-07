@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7/pkg/replication"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -22,16 +23,6 @@ var (
 
 type BucketReplicationResource struct {
 	client *AllClient
-}
-
-type bucketReplicationResourceModel struct {
-	Bucket                  types.String `tfsdk:"bucket"`
-	Role                    types.String `tfsdk:"role"`
-	DestinationBucket       types.String `tfsdk:"destination_bucket"`
-	Priority                types.Int64  `tfsdk:"priority"`
-	Status                  types.String `tfsdk:"status"`
-	DeleteMarkerReplication types.String `tfsdk:"delete_marker_replication"`
-	DeleteReplication       types.String `tfsdk:"delete_replication"`
 }
 
 func NewBucketReplicationResource() resource.Resource {
@@ -97,7 +88,7 @@ func (r *BucketReplicationResource) Configure(_ context.Context, req resource.Co
 }
 
 func (r *BucketReplicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketReplicationResourceModel
+	var plan models.BucketReplicationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -113,7 +104,7 @@ func (r *BucketReplicationResource) Create(ctx context.Context, req resource.Cre
 }
 
 func (r *BucketReplicationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketReplicationResourceModel
+	var state models.BucketReplicationResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -141,7 +132,7 @@ func (r *BucketReplicationResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *BucketReplicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketReplicationResourceModel
+	var plan models.BucketReplicationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -157,7 +148,7 @@ func (r *BucketReplicationResource) Update(ctx context.Context, req resource.Upd
 }
 
 func (r *BucketReplicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketReplicationResourceModel
+	var data models.BucketReplicationResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -173,7 +164,7 @@ func (r *BucketReplicationResource) ImportState(ctx context.Context, req resourc
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func buildReplicationConfig(plan bucketReplicationResourceModel) replication.Config {
+func buildReplicationConfig(plan models.BucketReplicationResourceModel) replication.Config {
 	var rules []replication.Rule
 
 	rule := replication.Rule{

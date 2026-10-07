@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -22,13 +23,6 @@ func NewQuotaDataSource() datasource.DataSource {
 // quotaDataSource is the data source implementation.
 type quotaDataSource struct {
 	client *AllClient
-}
-
-// quotaDataSourceModel maps the data source schema data.
-type quotaDataSourceModel struct {
-	Bucket    types.String `tfsdk:"bucket"`
-	Quota     types.Int64  `tfsdk:"quota"`
-	QuotaType types.String `tfsdk:"quota_type"`
 }
 
 // Metadata returns the data source type name.
@@ -76,7 +70,7 @@ func (d *quotaDataSource) Configure(_ context.Context, req datasource.ConfigureR
 
 // Read refreshes the data source state with the latest data.
 func (d *quotaDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config quotaDataSourceModel
+	var config models.QuotaDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

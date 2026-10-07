@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -29,52 +30,6 @@ func NewBucketLifecycleConfigurationResource() resource.Resource {
 // bucketLifecycleConfigurationResource is the resource implementation.
 type bucketLifecycleConfigurationResource struct {
 	client *AllClient
-}
-
-type bucketLifecycleConfigurationModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Id     types.String `tfsdk:"id"`
-	Rule   []ruleModel  `tfsdk:"rule"`
-}
-
-type ruleModel struct {
-	Id                             types.String                         `tfsdk:"id"`
-	Status                         types.String                         `tfsdk:"status"`
-	Filter                         *filterModel                         `tfsdk:"filter"`
-	Expiration                     *expirationModel                     `tfsdk:"expiration"`
-	Transition                     *transitionModel                     `tfsdk:"transition"`
-	NoncurrentVersionExpiration    *noncurrentVersionExpirationModel    `tfsdk:"noncurrent_version_expiration"`
-	NoncurrentVersionTransition    *noncurrentVersionTransitionModel    `tfsdk:"noncurrent_version_transition"`
-	AbortIncompleteMultipartUpload *abortIncompleteMultipartUploadModel `tfsdk:"abort_incomplete_multipart_upload"`
-}
-
-type filterModel struct {
-	Prefix types.String `tfsdk:"prefix"`
-}
-
-type expirationModel struct {
-	Days                      types.Int64  `tfsdk:"days"`
-	Date                      types.String `tfsdk:"date"`
-	ExpiredObjectDeleteMarker types.Bool   `tfsdk:"expired_object_delete_marker"`
-}
-
-type transitionModel struct {
-	Days         types.Int64  `tfsdk:"days"`
-	Date         types.String `tfsdk:"date"`
-	StorageClass types.String `tfsdk:"storage_class"`
-}
-
-type noncurrentVersionExpirationModel struct {
-	NoncurrentDays types.Int64 `tfsdk:"noncurrent_days"`
-}
-
-type noncurrentVersionTransitionModel struct {
-	NoncurrentDays types.Int64  `tfsdk:"noncurrent_days"`
-	StorageClass   types.String `tfsdk:"storage_class"`
-}
-
-type abortIncompleteMultipartUploadModel struct {
-	DaysAfterInitiation types.Int64 `tfsdk:"days_after_initiation"`
 }
 
 // Metadata returns the resource type name.
@@ -219,7 +174,7 @@ func (r *bucketLifecycleConfigurationResource) Configure(_ context.Context, req 
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketLifecycleConfigurationModel
+	var plan models.BucketLifecycleConfigurationModel
 	diags := req.Plan.Get(ctx, &plan)
 
 	resp.Diagnostics.Append(diags...)
@@ -319,7 +274,7 @@ func (r *bucketLifecycleConfigurationResource) Create(ctx context.Context, req r
 
 // Read refreshes the Terraform state with the latest data.
 func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketLifecycleConfigurationModel
+	var state models.BucketLifecycleConfigurationModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -341,21 +296,21 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		return
 	}
 
-	state.Rule = []ruleModel{}
+	state.Rule = []models.RuleModel{}
 	for _, ruleAPI := range config.Rules {
-		rm := ruleModel{
+		rm := models.RuleModel{
 			Id:     types.StringValue(ruleAPI.ID),
 			Status: types.StringValue(ruleAPI.Status),
 		}
 
 		if ruleAPI.Filter.Prefix != "" {
-			rm.Filter = &filterModel{
+			rm.Filter = &models.FilterModel{
 				Prefix: types.StringValue(ruleAPI.Filter.Prefix),
 			}
 		}
 
 		if ruleAPI.Expiration != nil {
-			exp := &expirationModel{}
+			exp := &models.ExpirationModel{}
 			if ruleAPI.Expiration.Days != nil {
 				exp.Days = types.Int64Value(int64(*ruleAPI.Expiration.Days))
 			}
@@ -369,7 +324,7 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		}
 
 		if ruleAPI.Transition != nil {
-			tr := &transitionModel{StorageClass: types.StringValue(ruleAPI.Transition.StorageClass)}
+			tr := &models.TransitionModel{StorageClass: types.StringValue(ruleAPI.Transition.StorageClass)}
 			if ruleAPI.Transition.Days != nil {
 				tr.Days = types.Int64Value(int64(*ruleAPI.Transition.Days))
 			}
@@ -380,7 +335,7 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		}
 
 		if ruleAPI.NoncurrentVersionExpiration != nil {
-			ncExp := &noncurrentVersionExpirationModel{}
+			ncExp := &models.NoncurrentVersionExpirationModel{}
 			if ruleAPI.NoncurrentVersionExpiration.NoncurrentDays != nil {
 				ncExp.NoncurrentDays = types.Int64Value(int64(*ruleAPI.NoncurrentVersionExpiration.NoncurrentDays))
 			}
@@ -388,7 +343,7 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		}
 
 		if ruleAPI.NoncurrentVersionTransition != nil {
-			ncTr := &noncurrentVersionTransitionModel{StorageClass: types.StringValue(ruleAPI.NoncurrentVersionTransition.StorageClass)}
+			ncTr := &models.NoncurrentVersionTransitionModel{StorageClass: types.StringValue(ruleAPI.NoncurrentVersionTransition.StorageClass)}
 			if ruleAPI.NoncurrentVersionTransition.NoncurrentDays != nil {
 				ncTr.NoncurrentDays = types.Int64Value(int64(*ruleAPI.NoncurrentVersionTransition.NoncurrentDays))
 			}
@@ -396,7 +351,7 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		}
 
 		if ruleAPI.AbortIncompleteMultipartUpload != nil {
-			abort := &abortIncompleteMultipartUploadModel{}
+			abort := &models.AbortIncompleteMultipartUploadModel{}
 			if ruleAPI.AbortIncompleteMultipartUpload.DaysAfterInitiation != nil {
 				abort.DaysAfterInitiation = types.Int64Value(int64(*ruleAPI.AbortIncompleteMultipartUpload.DaysAfterInitiation))
 			}
@@ -412,7 +367,7 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketLifecycleConfigurationModel
+	var plan models.BucketLifecycleConfigurationModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -509,7 +464,7 @@ func (r *bucketLifecycleConfigurationResource) Update(ctx context.Context, req r
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *bucketLifecycleConfigurationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketLifecycleConfigurationModel
+	var data models.BucketLifecycleConfigurationModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

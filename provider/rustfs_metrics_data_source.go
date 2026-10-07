@@ -7,16 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &MetricsDataSource{}
 
 type MetricsDataSource struct {
 	client *AllClient
-}
-
-type MetricsDataSourceModel struct {
-	Metrics types.String `tfsdk:"metrics"`
 }
 
 func NewMetricsDataSource() datasource.DataSource {
@@ -65,7 +62,7 @@ func (d *MetricsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, 
 		)
 		return
 	}
-	state := MetricsDataSourceModel{
+	state := models.MetricsDataSourceModel{
 		Metrics: types.StringValue(raw),
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

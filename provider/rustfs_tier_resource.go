@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -20,12 +20,6 @@ var (
 
 type TierResource struct {
 	client *AllClient
-}
-
-type tierResourceModel struct {
-	Name       types.String `tfsdk:"name"`
-	TierType   types.String `tfsdk:"tier_type"`
-	ConfigJson types.String `tfsdk:"config_json"`
 }
 
 func NewTierResource() resource.Resource {
@@ -73,7 +67,7 @@ func (r *TierResource) Configure(_ context.Context, req resource.ConfigureReques
 }
 
 func (r *TierResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan tierResourceModel
+	var plan models.TierResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -93,13 +87,13 @@ func (r *TierResource) Create(ctx context.Context, req resource.CreateRequest, r
 }
 
 func (r *TierResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state tierResourceModel
+	var state models.TierResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *TierResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan tierResourceModel
+	var plan models.TierResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -119,7 +113,7 @@ func (r *TierResource) Update(ctx context.Context, req resource.UpdateRequest, r
 }
 
 func (r *TierResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data tierResourceModel
+	var data models.TierResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 func TestBuildReplicationConfig_basic(t *testing.T) {
-	plan := bucketReplicationResourceModel{
+	plan := models.BucketReplicationResourceModel{
 		Bucket:            types.StringValue("source-bucket"),
 		Role:              types.StringValue("arn:minio:replication::id:src"),
 		DestinationBucket: types.StringValue("arn:aws:s3:::dest"),
@@ -32,7 +33,7 @@ func TestBuildReplicationConfig_basic(t *testing.T) {
 }
 
 func TestBuildReplicationConfig_deleteReplication(t *testing.T) {
-	plan := bucketReplicationResourceModel{
+	plan := models.BucketReplicationResourceModel{
 		Bucket:                  types.StringValue("source"),
 		Role:                    types.StringValue("arn:minio:replication::id:src"),
 		DestinationBucket:       types.StringValue("arn:aws:s3:::dest"),

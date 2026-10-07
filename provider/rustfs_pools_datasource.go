@@ -7,16 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &PoolsDataSource{}
 
 type PoolsDataSource struct {
 	client *AllClient
-}
-
-type PoolsDataSourceModel struct {
-	Names types.List `tfsdk:"names"`
 }
 
 func NewPoolsDataSource() datasource.DataSource {
@@ -57,7 +54,7 @@ func (d *PoolsDataSource) Configure(_ context.Context, req datasource.ConfigureR
 }
 
 func (d *PoolsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config PoolsDataSourceModel
+	var config models.PoolsDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7/pkg/notification"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -20,18 +21,6 @@ var (
 
 type BucketNotificationResource struct {
 	client *AllClient
-}
-
-type bucketNotificationQueueModel struct {
-	Arn          types.String `tfsdk:"arn"`
-	Events       types.Set    `tfsdk:"events"`
-	FilterPrefix types.String `tfsdk:"filter_prefix"`
-	FilterSuffix types.String `tfsdk:"filter_suffix"`
-}
-
-type bucketNotificationResourceModel struct {
-	Bucket types.String                   `tfsdk:"bucket"`
-	Queue  []bucketNotificationQueueModel `tfsdk:"queue"`
 }
 
 func NewBucketNotificationResource() resource.Resource {
@@ -99,7 +88,7 @@ func (r *BucketNotificationResource) Configure(_ context.Context, req resource.C
 }
 
 func (r *BucketNotificationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketNotificationResourceModel
+	var plan models.BucketNotificationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -118,7 +107,7 @@ func (r *BucketNotificationResource) Create(ctx context.Context, req resource.Cr
 }
 
 func (r *BucketNotificationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketNotificationResourceModel
+	var state models.BucketNotificationResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -133,7 +122,7 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	var queues []bucketNotificationQueueModel
+	var queues []models.BucketNotificationQueueModel
 	for _, q := range config.QueueConfigs {
 		var events []string
 		for _, e := range q.Events {
@@ -154,7 +143,7 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 			}
 		}
 
-		queues = append(queues, bucketNotificationQueueModel{
+		queues = append(queues, models.BucketNotificationQueueModel{
 			Arn:          types.StringValue(q.Queue),
 			Events:       eventsSet,
 			FilterPrefix: types.StringValue(prefix),
@@ -167,7 +156,7 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 }
 
 func (r *BucketNotificationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketNotificationResourceModel
+	var plan models.BucketNotificationResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -186,7 +175,7 @@ func (r *BucketNotificationResource) Update(ctx context.Context, req resource.Up
 }
 
 func (r *BucketNotificationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketNotificationResourceModel
+	var data models.BucketNotificationResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -205,7 +194,7 @@ func (r *BucketNotificationResource) ImportState(ctx context.Context, req resour
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func buildNotificationConfig(plan bucketNotificationResourceModel) notification.Configuration {
+func buildNotificationConfig(plan models.BucketNotificationResourceModel) notification.Configuration {
 	var config notification.Configuration
 	for _, q := range plan.Queue {
 		var events []notification.EventType

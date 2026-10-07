@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 ) // originalModuleSwitch captures the server's module switch state before the
 // test mutates it, so the test can restore the original state afterwards.
 var originalModuleSwitch *client.ModuleSwitchState
@@ -96,7 +97,7 @@ func TestModuleSwitchResourceSchema(t *testing.T) {
 }
 
 func TestModuleSwitchUpdateFromModel(t *testing.T) {
-	update := moduleSwitchUpdateFromModel(ModuleSwitchRessourceModel{
+	update := moduleSwitchUpdateFromModel(models.ModuleSwitchRessourceModel{
 		NotifyEnabled: types.BoolValue(true),
 		AuditEnabled:  types.BoolValue(false),
 	})

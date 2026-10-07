@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 func TestBuildNotificationConfig_SingleQueue(t *testing.T) {
 	eventsSet, _ := types.SetValueFrom(context.Background(), types.StringType, []string{"s3:ObjectCreated:*", "s3:ObjectRemoved:*"})
-	plan := bucketNotificationResourceModel{
+	plan := models.BucketNotificationResourceModel{
 		Bucket: types.StringValue("test-bucket"),
-		Queue: []bucketNotificationQueueModel{
+		Queue: []models.BucketNotificationQueueModel{
 			{
 				Arn:          types.StringValue("arn:minio:sqs::PRIMARY:amqp"),
 				Events:       eventsSet,
@@ -63,9 +64,9 @@ func TestBuildNotificationConfig_SingleQueue(t *testing.T) {
 
 func TestBuildNotificationConfig_NoFilter(t *testing.T) {
 	eventsSet, _ := types.SetValueFrom(context.Background(), types.StringType, []string{"s3:ObjectCreated:*"})
-	plan := bucketNotificationResourceModel{
+	plan := models.BucketNotificationResourceModel{
 		Bucket: types.StringValue("test-bucket"),
-		Queue: []bucketNotificationQueueModel{
+		Queue: []models.BucketNotificationQueueModel{
 			{
 				Arn:    types.StringValue("arn:minio:sqs::PRIMARY:amqp"),
 				Events: eventsSet,
@@ -85,9 +86,9 @@ func TestBuildNotificationConfig_NoFilter(t *testing.T) {
 func TestBuildNotificationConfig_MultipleQueues(t *testing.T) {
 	events1, _ := types.SetValueFrom(context.Background(), types.StringType, []string{"s3:ObjectCreated:*"})
 	events2, _ := types.SetValueFrom(context.Background(), types.StringType, []string{"s3:ObjectRemoved:*"})
-	plan := bucketNotificationResourceModel{
+	plan := models.BucketNotificationResourceModel{
 		Bucket: types.StringValue("test-bucket"),
-		Queue: []bucketNotificationQueueModel{
+		Queue: []models.BucketNotificationQueueModel{
 			{Arn: types.StringValue("arn:minio:sqs::PRIMARY:q1"), Events: events1},
 			{Arn: types.StringValue("arn:minio:sqs::PRIMARY:q2"), Events: events2},
 		},

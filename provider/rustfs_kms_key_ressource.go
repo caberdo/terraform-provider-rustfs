@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -29,14 +30,6 @@ func NewKmsKeyRessource() resource.Resource {
 // kmsKeyRessource is the resource implementation.
 type kmsKeyRessource struct {
 	client *AllClient
-}
-
-type kmsKeyRessourceModel struct {
-	Name        types.String `tfsdk:"name"`
-	KeyID       types.String `tfsdk:"key_id"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	Enabled     types.Bool   `tfsdk:"enabled"`
-	SkipDestroy types.Bool   `tfsdk:"skip_destroy"`
 }
 
 // Metadata returns the resource type name.
@@ -96,7 +89,7 @@ func (r *kmsKeyRessource) Configure(_ context.Context, req resource.ConfigureReq
 
 // Create creates the KMS key and sets the initial Terraform state.
 func (r *kmsKeyRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan kmsKeyRessourceModel
+	var plan models.KmsKeyRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -128,7 +121,7 @@ func (r *kmsKeyRessource) Create(ctx context.Context, req resource.CreateRequest
 
 // Read refreshes the Terraform state with the latest data.
 func (r *kmsKeyRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state kmsKeyRessourceModel
+	var state models.KmsKeyRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -188,7 +181,7 @@ func (r *kmsKeyRessource) resolveKeyID(ctx context.Context, name string, resp *r
 
 // Update enables or disables the key and updates the Terraform state on success.
 func (r *kmsKeyRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan, state kmsKeyRessourceModel
+	var plan, state models.KmsKeyRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -223,7 +216,7 @@ func (r *kmsKeyRessource) Update(ctx context.Context, req resource.UpdateRequest
 
 // Delete irreversibly deletes the KMS key unless skip_destroy is set.
 func (r *kmsKeyRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state kmsKeyRessourceModel
+	var state models.KmsKeyRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 const (
@@ -100,11 +101,6 @@ type quotaResource struct {
 	client *AllClient
 }
 
-type quotaResourceModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Quota  types.Int64  `tfsdk:"quota"`
-}
-
 // Metadata returns the resource type name.
 func (r *quotaResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_quota"
@@ -146,7 +142,7 @@ func (r *quotaResource) Configure(_ context.Context, req resource.ConfigureReque
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *quotaResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan quotaResourceModel
+	var plan models.QuotaResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	// ToDo: Check if bucket exists
 	resp.Diagnostics.Append(diags...)
@@ -168,7 +164,7 @@ func (r *quotaResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 // Read refreshes the Terraform state with the latest data.
 func (r *quotaResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state quotaResourceModel
+	var state models.QuotaResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -198,7 +194,7 @@ func (r *quotaResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *quotaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan quotaResourceModel
+	var plan models.QuotaResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -224,7 +220,7 @@ func (r *quotaResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *quotaResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data quotaResourceModel
+	var data models.QuotaResourceModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)

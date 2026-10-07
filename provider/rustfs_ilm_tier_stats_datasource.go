@@ -9,24 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &IlmTierStatsDataSource{}
 
 type IlmTierStatsDataSource struct {
 	client *AllClient
-}
-
-type IlmTierStatsDataSourceModel struct {
-	ID    types.String `tfsdk:"id"`
-	Tiers types.List   `tfsdk:"tiers"`
-}
-
-type TierStatsModel struct {
-	Name        types.String `tfsdk:"name"`
-	NumObjects  types.Int64  `tfsdk:"num_objects"`
-	NumVersions types.Int64  `tfsdk:"num_versions"`
-	TotalSize   types.Int64  `tfsdk:"total_size"`
 }
 
 func NewIlmTierStatsDataSource() datasource.DataSource {
@@ -90,7 +79,7 @@ func (d *IlmTierStatsDataSource) Configure(_ context.Context, req datasource.Con
 }
 
 func (d *IlmTierStatsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config IlmTierStatsDataSourceModel
+	var config models.IlmTierStatsDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -111,10 +100,10 @@ func (d *IlmTierStatsDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 	sort.Strings(names)
 
-	tiers := make([]TierStatsModel, 0, len(names))
+	tiers := make([]models.TierStatsModel, 0, len(names))
 	for _, name := range names {
 		stat := stats[name]
-		tiers = append(tiers, TierStatsModel{
+		tiers = append(tiers, models.TierStatsModel{
 			Name:        types.StringValue(name),
 			NumObjects:  types.Int64Value(stat.NumObjects),
 			NumVersions: types.Int64Value(stat.NumVersions),

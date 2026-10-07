@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/minio/minio-go/v7"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -21,11 +22,6 @@ var (
 
 type BucketVersioningResource struct {
 	client *AllClient
-}
-
-type BucketVersioningResourceModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Status types.String `tfsdk:"status"`
 }
 
 func NewBucketVersioningResource() resource.Resource {
@@ -72,7 +68,7 @@ func (r *BucketVersioningResource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *BucketVersioningResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan BucketVersioningResourceModel
+	var plan models.BucketVersioningResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -94,7 +90,7 @@ func (r *BucketVersioningResource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *BucketVersioningResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state BucketVersioningResourceModel
+	var state models.BucketVersioningResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -114,7 +110,7 @@ func (r *BucketVersioningResource) Read(ctx context.Context, req resource.ReadRe
 }
 
 func (r *BucketVersioningResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BucketVersioningResourceModel
+	var plan models.BucketVersioningResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -135,7 +131,7 @@ func (r *BucketVersioningResource) Update(ctx context.Context, req resource.Upda
 }
 
 func (r *BucketVersioningResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data BucketVersioningResourceModel
+	var data models.BucketVersioningResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

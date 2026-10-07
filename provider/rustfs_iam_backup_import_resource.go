@@ -9,17 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ resource.Resource = &IamBackupImportResource{}
 
 type IamBackupImportResource struct {
 	client *AllClient
-}
-
-type IamBackupImportResourceModel struct {
-	ContentBase64 types.String `tfsdk:"content_base64"`
 }
 
 func NewIamBackupImportResource() resource.Resource {
@@ -63,7 +59,7 @@ func (r *IamBackupImportResource) Configure(_ context.Context, req resource.Conf
 }
 
 func (r *IamBackupImportResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan IamBackupImportResourceModel
+	var plan models.IamBackupImportResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -87,7 +83,7 @@ func (r *IamBackupImportResource) Create(ctx context.Context, req resource.Creat
 }
 
 func (r *IamBackupImportResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state IamBackupImportResourceModel
+	var state models.IamBackupImportResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -96,7 +92,7 @@ func (r *IamBackupImportResource) Read(ctx context.Context, req resource.ReadReq
 }
 
 func (r *IamBackupImportResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan IamBackupImportResourceModel
+	var plan models.IamBackupImportResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return

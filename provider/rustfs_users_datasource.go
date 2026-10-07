@@ -7,17 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &UsersDataSource{}
 
 type UsersDataSource struct {
 	client *AllClient
-}
-
-type UsersDataSourceModel struct {
-	Bucket     types.String `tfsdk:"bucket"`
-	AccessKeys types.List   `tfsdk:"access_keys"`
 }
 
 func NewUsersDataSource() datasource.DataSource {
@@ -62,7 +58,7 @@ func (d *UsersDataSource) Configure(_ context.Context, req datasource.ConfigureR
 }
 
 func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config UsersDataSourceModel
+	var config models.UsersDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

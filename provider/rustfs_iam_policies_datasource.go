@@ -8,20 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &IAMPoliciesDataSource{}
 
 type IAMPoliciesDataSource struct {
 	client *AllClient
-}
-
-type IAMPoliciesDataSourceModel struct {
-	Policies types.List `tfsdk:"policies"`
-}
-
-type iamPolicySummaryModel struct {
-	Name types.String `tfsdk:"name"`
 }
 
 func NewIAMPoliciesDataSource() datasource.DataSource {
@@ -69,7 +62,7 @@ func (d *IAMPoliciesDataSource) Configure(_ context.Context, req datasource.Conf
 }
 
 func (d *IAMPoliciesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config IAMPoliciesDataSourceModel
+	var config models.IAMPoliciesDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -84,9 +77,9 @@ func (d *IAMPoliciesDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	summaries := make([]iamPolicySummaryModel, 0, len(names))
+	summaries := make([]models.IamPolicySummaryModel, 0, len(names))
 	for _, name := range names {
-		summaries = append(summaries, iamPolicySummaryModel{Name: types.StringValue(name)})
+		summaries = append(summaries, models.IamPolicySummaryModel{Name: types.StringValue(name)})
 	}
 	policies, diags := types.ListValueFrom(ctx, types.ObjectType{
 		AttrTypes: map[string]attr.Type{

@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -22,14 +23,6 @@ var _ resource.ResourceWithImportState = &RustfsUserResource{}
 // ExampleResource defines the resource implementation.
 type RustfsUserResource struct {
 	client *AllClient
-}
-
-type RustfsUserResourceModel struct {
-	Name      types.String `tfsdk:"name"`
-	AccessKey types.String `tfsdk:"access_key"`
-	SecretKey types.String `tfsdk:"secret_key"`
-	Status    types.String `tfsdk:"status"`
-	Policy    types.String `tfsdk:"policy"`
 }
 
 func NewUserResource() resource.Resource {
@@ -96,7 +89,7 @@ func (r *RustfsUserResource) Configure(_ context.Context, req resource.Configure
 }
 func (r *RustfsUserResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan RustfsUserResourceModel
+	var plan models.RustfsUserResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 
 	resp.Diagnostics.Append(diags...)
@@ -126,7 +119,7 @@ func (r *RustfsUserResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *RustfsUserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state RustfsUserResourceModel
+	var state models.RustfsUserResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -161,7 +154,7 @@ func (r *RustfsUserResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 }
 func (r *RustfsUserResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan, state RustfsUserResourceModel
+	var plan, state models.RustfsUserResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -196,7 +189,7 @@ func (r *RustfsUserResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *RustfsUserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data RustfsUserResourceModel
+	var data models.RustfsUserResourceModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)

@@ -13,18 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
-
-type serviceAccountResourceModel struct {
-	AccessKey     types.String `tfsdk:"access_key"`
-	SecretKey     types.String `tfsdk:"secret_key"`
-	Name          types.String `tfsdk:"name"`
-	Description   types.String `tfsdk:"description"`
-	TargetUser    types.String `tfsdk:"user"`
-	Expiration    types.String `tfsdk:"expiration"`
-	Policy        types.String `tfsdk:"policy"`
-	ImpliedPolicy types.Bool   `tfsdk:"implied_policy"`
-}
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
@@ -116,7 +106,7 @@ func (r *ServiceAccountResource) Configure(_ context.Context, req resource.Confi
 // Create creates the resource and sets the initial Terraform state.
 func (r *ServiceAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from plan
-	var plan serviceAccountResourceModel
+	var plan models.ServiceAccountResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 
 	resp.Diagnostics.Append(diags...)
@@ -149,7 +139,7 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 
 // Read refreshes the Terraform state with the latest data.
 func (r *ServiceAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state serviceAccountResourceModel
+	var state models.ServiceAccountResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -192,7 +182,7 @@ func (r *ServiceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *ServiceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan serviceAccountResourceModel
+	var plan models.ServiceAccountResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -233,7 +223,7 @@ func (r *ServiceAccountResource) Update(ctx context.Context, req resource.Update
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *ServiceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data serviceAccountResourceModel
+	var data models.ServiceAccountResourceModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
