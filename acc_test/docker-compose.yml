@@ -38,7 +38,7 @@ services:
       - test
 
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:${RUSTFS_VERSION:-latest}
     ports:
       - "9000:9000"
       - "9001:9001"
