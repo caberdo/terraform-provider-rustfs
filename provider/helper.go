@@ -3,7 +3,6 @@ package provider
 import (
 	"os"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
@@ -32,11 +31,4 @@ func generateRustClientConfig(model RustfsProviderModel) *client.RustfsAdminConf
 		Insecure:     model.Insecure.ValueBool(),
 	}
 	return config
-}
-
-func stringFromPtr(s *string) types.String {
-	if s == nil {
-		return types.StringNull()
-	}
-	return types.StringValue(*s)
 }
