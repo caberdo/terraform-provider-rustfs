@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_ldap_service_account Resource - rustfs"
+page_title: "rustfs_ldap_service_account Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Create a service account scoped to an LDAP user

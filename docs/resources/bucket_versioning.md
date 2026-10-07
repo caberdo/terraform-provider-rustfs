@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_versioning Resource - rustfs"
+page_title: "rustfs_bucket_versioning Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS bucket versioning configuration

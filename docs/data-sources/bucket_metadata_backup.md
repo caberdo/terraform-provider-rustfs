@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_metadata_backup Data Source - rustfs"
+page_title: "rustfs_bucket_metadata_backup Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Export bucket metadata as a ZIP archive

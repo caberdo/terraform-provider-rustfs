@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_ilm_tier_stats Data Source - rustfs"
+page_title: "rustfs_ilm_tier_stats Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Exposes per-tier ILM storage statistics (object counts and sizes) from RustFS.

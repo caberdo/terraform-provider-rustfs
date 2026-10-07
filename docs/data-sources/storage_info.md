@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_storage_info Data Source - rustfs"
+page_title: "rustfs_storage_info Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Storage layout and health information for the RustFS cluster, including the storage backend and a per-drive breakdown.

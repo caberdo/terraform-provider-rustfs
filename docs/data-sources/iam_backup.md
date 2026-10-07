@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_iam_backup Data Source - rustfs"
+page_title: "rustfs_iam_backup Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Export all RustFS IAM entities (users, groups, policies, service accounts) as a base64-encoded ZIP archive

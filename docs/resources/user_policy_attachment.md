@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_user_policy_attachment Resource - rustfs"
+page_title: "rustfs_user_policy_attachment Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Attach a canned IAM policy to a user and detach it on destroy

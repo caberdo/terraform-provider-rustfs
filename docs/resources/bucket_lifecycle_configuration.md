@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_lifecycle_configuration Resource - rustfs"
+page_title: "rustfs_bucket_lifecycle_configuration Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage S3 bucket lifecycle configurations in rustfs

@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_group_policy_attachment Resource - rustfs"
+page_title: "rustfs_group_policy_attachment Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Attach a canned IAM policy to an IAM group and detach it on destroy

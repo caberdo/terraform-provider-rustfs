@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_object_lock Resource - rustfs"
+page_title: "rustfs_bucket_object_lock Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS bucket object lock configuration

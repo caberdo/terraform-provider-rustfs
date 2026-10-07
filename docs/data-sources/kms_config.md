@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_kms_config Data Source - rustfs"
+page_title: "rustfs_kms_config Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Fetch the current RustFS KMS backend configuration, including the backend type, cache settings, and default key ID.

@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_encryption Resource - rustfs"
+page_title: "rustfs_bucket_encryption Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS bucket server-side encryption configuration

@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_config Resource - rustfs"
+page_title: "rustfs_config Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage server sub-system configuration (config-kv), the mc admin config equivalent. Each resource manages one sub-system scope.
