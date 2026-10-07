@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_user Resource - rustfs"
+page_title: "rustfs_user Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS user

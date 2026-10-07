@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_audit_target Resource - rustfs"
+page_title: "rustfs_audit_target Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS audit-log webhook/HTTP targets

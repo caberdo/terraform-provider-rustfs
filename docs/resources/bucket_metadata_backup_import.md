@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_metadata_backup_import Resource - rustfs"
+page_title: "rustfs_bucket_metadata_backup_import Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Import bucket metadata from a ZIP archive

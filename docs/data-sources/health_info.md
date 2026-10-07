@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_health_info Data Source - rustfs"
+page_title: "rustfs_health_info Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Cluster health info and OBD diagnostics for RustFS

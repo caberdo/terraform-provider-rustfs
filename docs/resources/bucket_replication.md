@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_replication Resource - rustfs"
+page_title: "rustfs_bucket_replication Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS bucket replication configuration

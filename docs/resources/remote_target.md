@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_remote_target Resource - rustfs"
+page_title: "rustfs_remote_target Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage remote targets used as replication destinations or notification ARNs in rustfs

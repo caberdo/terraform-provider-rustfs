@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_rebalance Resource - rustfs"
+page_title: "rustfs_rebalance Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Triggers a pool rebalancing operation in RustFS

@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_replication_metrics Data Source - rustfs"
+page_title: "rustfs_replication_metrics Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Exposes replication transfer metrics (counts, bytes, queue backlog) for a bucket from RustFS.

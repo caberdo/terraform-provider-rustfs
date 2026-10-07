@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_durability Resource - rustfs"
+page_title: "rustfs_bucket_durability Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage the per-bucket durability override in rustfs

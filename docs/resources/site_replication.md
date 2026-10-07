@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_site_replication Resource - rustfs"
+page_title: "rustfs_site_replication Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage site-replication peers in rustfs

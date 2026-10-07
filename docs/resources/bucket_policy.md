@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_policy Resource - rustfs"
+page_title: "rustfs_bucket_policy Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage the raw S3 bucket policy document in rustfs

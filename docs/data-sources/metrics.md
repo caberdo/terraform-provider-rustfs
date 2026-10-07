@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_metrics Data Source - rustfs"
+page_title: "rustfs_metrics Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Metrics stream for RustFS server

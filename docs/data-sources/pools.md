@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_pools Data Source - rustfs"
+page_title: "rustfs_pools Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   List all RustFS storage pools and their status

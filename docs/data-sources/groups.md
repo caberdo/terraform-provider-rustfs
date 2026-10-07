@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_groups Data Source - rustfs"
+page_title: "rustfs_groups Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Lists all IAM groups for RustFS
