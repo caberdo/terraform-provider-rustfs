@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var _ datasource.DataSource = &ServerInfoDataSource{}
@@ -411,7 +411,7 @@ func driveObjectType() map[string]attr.Type {
 	}
 }
 
-func flattenPools(pools map[string]map[string]rustfs.PoolSetInfo) []serverInfoPoolModel {
+func flattenPools(pools map[string]map[string]client.PoolSetInfo) []serverInfoPoolModel {
 	var out []serverInfoPoolModel
 	var poolNumbers []int
 	for poolNumber := range pools {
@@ -452,7 +452,7 @@ func flattenPools(pools map[string]map[string]rustfs.PoolSetInfo) []serverInfoPo
 	return out
 }
 
-func flattenServers(servers []rustfs.ServerEntry) []serverInfoServerModel {
+func flattenServers(servers []client.ServerEntry) []serverInfoServerModel {
 	out := make([]serverInfoServerModel, 0, len(servers))
 	for _, s := range servers {
 		drives := make([]serverInfoDriveModel, 0, len(s.Drives))

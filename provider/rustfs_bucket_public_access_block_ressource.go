@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -112,7 +112,7 @@ func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resou
 		return
 	}
 
-	config := &rustfs.PublicAccessBlockConfiguration{
+	config := &client.PublicAccessBlockConfiguration{
 		BlockPublicAcls:       plan.BlockPublicAcls.ValueBool(),
 		IgnorePublicAcls:      plan.IgnorePublicAcls.ValueBool(),
 		BlockPublicPolicy:     plan.BlockPublicPolicy.ValueBool(),
@@ -173,7 +173,7 @@ func (r *bucketPublicAccessBlockRessource) Update(ctx context.Context, req resou
 		return
 	}
 
-	config := &rustfs.PublicAccessBlockConfiguration{
+	config := &client.PublicAccessBlockConfiguration{
 		BlockPublicAcls:       plan.BlockPublicAcls.ValueBool(),
 		IgnorePublicAcls:      plan.IgnorePublicAcls.ValueBool(),
 		BlockPublicPolicy:     plan.BlockPublicPolicy.ValueBool(),

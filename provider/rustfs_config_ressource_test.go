@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func TestAccConfigResource(t *testing.T) {
@@ -17,7 +17,7 @@ func TestAccConfigResource(t *testing.T) {
 	resourceName := "rustfs_config.test"
 
 	// Pre-cleanup in case a previous interrupted run left the target behind.
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	client := client.New(&client.RustfsAdminConfig{
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
@@ -67,7 +67,7 @@ func testAccCheckConfigDestroy(s *terraform.State) error {
 			continue
 		}
 		scope := rs.Primary.Attributes["sub_system"]
-		client := rustfs.New(&rustfs.RustfsAdminConfig{
+		client := client.New(&client.RustfsAdminConfig{
 			AccessKey:    os.Getenv("RUSTFS_USER"),
 			AccessSecret: os.Getenv("RUSTFS_SECRET"),
 			Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),

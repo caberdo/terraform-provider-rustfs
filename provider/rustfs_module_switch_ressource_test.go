@@ -8,19 +8,19 @@ import (
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 ) // originalModuleSwitch captures the server's module switch state before the
 // test mutates it, so the test can restore the original state afterwards.
-var originalModuleSwitch *rustfs.ModuleSwitchState
+var originalModuleSwitch *client.ModuleSwitchState
 
-func readModuleSwitchState(t *testing.T) *rustfs.ModuleSwitchState {
+func readModuleSwitchState(t *testing.T) *client.ModuleSwitchState {
 	t.Helper()
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	cl := client.New(&client.RustfsAdminConfig{
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 	})
-	state, err := client.GetModuleSwitches()
+	state, err := cl.GetModuleSwitches()
 	if err != nil {
 		t.Fatalf("failed to read original module switches: %v", err)
 	}
@@ -34,16 +34,16 @@ func TestAccModuleSwitchResource(t *testing.T) {
 			testAccPreCheck(t)
 			originalModuleSwitch = readModuleSwitchState(t)
 			t.Cleanup(func() {
-				client := rustfs.New(&rustfs.RustfsAdminConfig{
+				cl := client.New(&client.RustfsAdminConfig{
 					AccessKey:    os.Getenv("RUSTFS_USER"),
 					AccessSecret: os.Getenv("RUSTFS_SECRET"),
 					Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 				})
-				update := rustfs.ModuleSwitchUpdate{
+				update := client.ModuleSwitchUpdate{
 					NotifyEnabled: originalModuleSwitch.NotifyEnabled,
 					AuditEnabled:  originalModuleSwitch.AuditEnabled,
 				}
-				if _, err := client.SetModuleSwitches(update); err != nil {
+				if _, err := cl.SetModuleSwitches(update); err != nil {
 					t.Errorf("failed to restore original module switches: %v", err)
 				}
 			})

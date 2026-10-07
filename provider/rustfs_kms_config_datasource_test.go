@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 func TestKmsConfigDataSourceSchema(t *testing.T) {
@@ -63,7 +63,7 @@ data "rustfs_kms_config" "current" {}
 }
 
 func TestKmsConfigModelFromConfig(t *testing.T) {
-	kmsConfig := &rustfs.KmsConfig{
+	kmsConfig := &client.KmsConfig{
 		Backend:         "vault-kv2",
 		CacheEnabled:    true,
 		CacheMaxKeys:    1000,
@@ -93,7 +93,7 @@ func TestKmsConfigModelFromConfig(t *testing.T) {
 }
 
 func TestKmsConfigModelFromConfigNullDefaultKey(t *testing.T) {
-	kmsConfig := &rustfs.KmsConfig{Backend: "local"}
+	kmsConfig := &client.KmsConfig{Backend: "local"}
 
 	model, diags := kmsConfigModelFromConfig(kmsConfig)
 	if diags.HasError() {

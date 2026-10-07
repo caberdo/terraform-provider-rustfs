@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -77,20 +77,20 @@ func (r *ConfigRessource) Configure(_ context.Context, req resource.ConfigureReq
 	r.client = client
 }
 
-func configKVsFromSettings(settings types.Map) ([]rustfs.ConfigKV, error) {
+func configKVsFromSettings(settings types.Map) ([]client.ConfigKV, error) {
 	elements := settings.Elements()
-	kvs := make([]rustfs.ConfigKV, 0, len(elements))
+	kvs := make([]client.ConfigKV, 0, len(elements))
 	for key, value := range elements {
 		str, ok := value.(types.String)
 		if !ok {
 			return nil, fmt.Errorf("unexpected value type for setting %q: %T", key, value)
 		}
-		kvs = append(kvs, rustfs.ConfigKV{Key: key, Value: str.ValueString()})
+		kvs = append(kvs, client.ConfigKV{Key: key, Value: str.ValueString()})
 	}
 	return kvs, nil
 }
 
-func settingsFromConfigKVs(ctx context.Context, kvs []rustfs.ConfigKV) types.Map {
+func settingsFromConfigKVs(ctx context.Context, kvs []client.ConfigKV) types.Map {
 	settings := make(map[string]string, len(kvs))
 	for _, kv := range kvs {
 		settings[kv.Key] = kv.Value

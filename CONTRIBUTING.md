@@ -47,7 +47,7 @@ provider_installation {
 │   ├── rustfs_*_datasource.go # Data source implementations
 │   ├── *_test.go            # Tests
 │   └── provider_test.go     # Test infrastructure
-├── pkg/rustfs/              # RustFS API client library
+├── internal/client/         # RustFS API client library
 │   ├── admin_client.go      # HTTP client with AWS SigV4 signing
 │   └── *.go                 # Per-resource API methods
 ├── examples/                # Example Terraform configurations
@@ -83,7 +83,7 @@ func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportSt
 
 ### Adding New Resources
 
-1. Create API client methods in `pkg/rustfs/<name>.go`
+1. Create API client methods in `internal/client/<name>.go`
 2. Create resource file in `provider/rustfs_<name>_resource.go`
 3. Register in `provider/provider.go` Resources list
 4. Add documentation in `docs/resources/<name>.md`
@@ -94,7 +94,7 @@ func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportSt
 ### Unit Tests
 
 ```bash
-go test ./pkg/rustfs/... -v
+go test ./internal/client/... -v
 go test ./provider/... -v -run "^[^T]"
 ```
 

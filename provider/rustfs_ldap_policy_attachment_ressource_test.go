@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 const (
@@ -34,18 +34,18 @@ func testAccLdapPolicyGroupTarget() string {
 // fails with a "not exist" error, in which case the test skips gracefully.
 func testAccLdapPolicyPreCheck(t *testing.T, target string, isGroup bool) {
 	testAccPreCheck(t)
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	cl := client.New(&client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		Ssl:          false,
 	})
-	req := rustfs.LDAPPolicyAttachment{
+	req := client.LDAPPolicyAttachment{
 		UserOrGroup: target,
 		PolicyName:  "readwrite",
 		IsGroup:     isGroup,
 	}
-	if err := client.AttachLDAPPolicy(req); err != nil {
+	if err := cl.AttachLDAPPolicy(req); err != nil {
 		if strings.Contains(err.Error(), "not exist") || strings.Contains(err.Error(), "does not exist") {
 			t.Skipf("no LDAP identity provider configured (or target %q does not exist); "+
 				"skipping LDAP policy attachment acceptance test. See docs/resources/ldap_policy_attachment.md "+
@@ -54,7 +54,7 @@ func testAccLdapPolicyPreCheck(t *testing.T, target string, isGroup bool) {
 		}
 		t.Fatalf("unexpected error probing LDAP policy attachment: %v", err)
 	}
-	if err := client.DetachLDAPPolicy(req); err != nil {
+	if err := cl.DetachLDAPPolicy(req); err != nil {
 		t.Fatalf("failed to clean up LDAP policy probe: %v", err)
 	}
 }

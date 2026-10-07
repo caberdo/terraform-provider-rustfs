@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var _ datasource.DataSource = &KmsConfigDataSource{}
@@ -102,7 +102,7 @@ func (d *KmsConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func kmsConfigModelFromConfig(kmsConfig *rustfs.KmsConfig) (KmsConfigDataSourceModel, diag.Diagnostics) {
+func kmsConfigModelFromConfig(kmsConfig *client.KmsConfig) (KmsConfigDataSourceModel, diag.Diagnostics) {
 	var config KmsConfigDataSourceModel
 	config.Backend = types.StringValue(kmsConfig.Backend)
 	config.CacheEnabled = types.BoolValue(kmsConfig.CacheEnabled)

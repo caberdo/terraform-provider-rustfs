@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 var (
@@ -138,14 +138,14 @@ func (r *ModuleSwitchRessource) ImportState(ctx context.Context, req resource.Im
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func moduleSwitchUpdateFromModel(model ModuleSwitchRessourceModel) rustfs.ModuleSwitchUpdate {
-	return rustfs.ModuleSwitchUpdate{
+func moduleSwitchUpdateFromModel(model ModuleSwitchRessourceModel) client.ModuleSwitchUpdate {
+	return client.ModuleSwitchUpdate{
 		NotifyEnabled: model.NotifyEnabled.ValueBool(),
 		AuditEnabled:  model.AuditEnabled.ValueBool(),
 	}
 }
 
-func applyModuleSwitchState(model *ModuleSwitchRessourceModel, state *rustfs.ModuleSwitchState) {
+func applyModuleSwitchState(model *ModuleSwitchRessourceModel, state *client.ModuleSwitchState) {
 	model.NotifyEnabled = types.BoolValue(state.NotifyEnabled)
 	model.AuditEnabled = types.BoolValue(state.AuditEnabled)
 }

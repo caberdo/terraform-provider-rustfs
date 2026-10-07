@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 type serviceAccountResourceModel struct {
@@ -124,7 +124,7 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		Name:        plan.Name.ValueString(),
 		AccessKey:   plan.AccessKey.ValueString(),
 		SecretKey:   plan.SecretKey.ValueString(),
@@ -199,7 +199,7 @@ func (r *ServiceAccountResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		Name:        plan.Name.ValueString(),
 		AccessKey:   plan.AccessKey.ValueString(),
 		SecretKey:   plan.SecretKey.ValueString(),
@@ -241,7 +241,7 @@ func (r *ServiceAccountResource) Delete(ctx context.Context, req resource.Delete
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	account := rustfs.ServiceAccount{
+	account := client.ServiceAccount{
 		Name:        data.Name.ValueString(),
 		AccessKey:   data.AccessKey.ValueString(),
 		SecretKey:   data.SecretKey.ValueString(),

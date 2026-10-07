@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // Data models.
@@ -110,17 +110,17 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	statements := []rustfs.PolicyStatement{}
+	statements := []client.PolicyStatement{}
 	for _, i := range plan.Statement {
 		statements = append(statements,
-			rustfs.PolicyStatement{
+			client.PolicyStatement{
 				Effect:   i.Effect,
 				Action:   i.Action,
 				Resource: i.Resource,
 			},
 		)
 	}
-	policy := rustfs.Policy{
+	policy := client.Policy{
 		Version:   plan.Version.ValueString(),
 		Name:      plan.Name.ValueString(),
 		Statement: statements,
@@ -191,17 +191,17 @@ func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	statements := []rustfs.PolicyStatement{}
+	statements := []client.PolicyStatement{}
 	for _, i := range plan.Statement {
 		statements = append(statements,
-			rustfs.PolicyStatement{
+			client.PolicyStatement{
 				Effect:   i.Effect,
 				Action:   i.Action,
 				Resource: i.Resource,
 			},
 		)
 	}
-	policy := rustfs.Policy{
+	policy := client.Policy{
 		Version:   plan.Version.ValueString(),
 		Name:      plan.Name.ValueString(),
 		Statement: statements,

@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 )
 
 // TestAccLdapServiceAccount creates a service account scoped to an LDAP user.
@@ -24,7 +24,7 @@ func TestAccLdapServiceAccount(t *testing.T) {
 	resourceName := "rustfs_ldap_service_account.test"
 	dn := envOrDefault("RUSTFS_LDAP_TEST_USER_DN", "uid=alice,ou=people,dc=example,dc=com")
 
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	cl := client.New(&client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
@@ -34,7 +34,7 @@ func TestAccLdapServiceAccount(t *testing.T) {
 	// rejects the create with "target user not exist". Skip in that case so
 	// the acceptance run stays green on clusters without an LDAP IdP.
 	probeKey := accessKey + "-probe"
-	err := client.CreateLDAPServiceAccount(rustfs.ServiceAccount{
+	err := cl.CreateLDAPServiceAccount(client.ServiceAccount{
 		AccessKey:  probeKey,
 		SecretKey:  "probeSecret",
 		Name:       "ldap-probe",
@@ -43,7 +43,7 @@ func TestAccLdapServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Skipf("skipping: no LDAP IdP configured or LDAP user %q missing on the cluster: %v", dn, err)
 	}
-	if delErr := client.DeleteServiceAccount(rustfs.ServiceAccount{AccessKey: probeKey}); delErr != nil {
+	if delErr := cl.DeleteServiceAccount(client.ServiceAccount{AccessKey: probeKey}); delErr != nil {
 		t.Fatalf("could not clean up probe service account: %v", delErr)
 	}
 
@@ -90,7 +90,7 @@ resource "rustfs_ldap_service_account" "test" {
 }
 
 func testAccCheckLdapServiceAccountDestroy(s *terraform.State) error {
-	client := rustfs.New(&rustfs.RustfsAdminConfig{
+	cl := client.New(&client.RustfsAdminConfig{
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		AccessKey:    os.Getenv("RUSTFS_USER"),
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
@@ -103,7 +103,7 @@ func testAccCheckLdapServiceAccountDestroy(s *terraform.State) error {
 		if accessKey == "" {
 			continue
 		}
-		_, err := client.ReadServiceAccount(accessKey)
+		_, err := cl.ReadServiceAccount(accessKey)
 		if err == nil {
 			return fmt.Errorf("service account %s still exists", accessKey)
 		}
