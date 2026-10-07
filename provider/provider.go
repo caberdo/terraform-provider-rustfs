@@ -32,6 +32,38 @@ import (
 	dsstorageinfo "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/storage_info"
 	dsusermfa "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/user_mfa"
 	dsusers "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/users"
+
+	rsaudittarget "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/audit_target"
+	rsbucket "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket"
+	rsbucketcors "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_cors"
+	rsbucketdurability "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_durability"
+	rsbucketencryption "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_encryption"
+	rsbucketlifecycleconfiguration "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_lifecycle_configuration"
+	rsbucketmetadatabackupimport "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_metadata_backup_import"
+	rsbucketnotification "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_notification"
+	rsbucketobjectlock "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_object_lock"
+	rsbucketpolicy "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_policy"
+	rsbucketpublicaccessblock "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_public_access_block"
+	rsbucketreplication "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_replication"
+	rsbuckettags "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_tags"
+	rsbucketversioning "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/bucket_versioning"
+	rsconfig "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/config"
+	rsgroup "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/group"
+	rsgrouppolicyattachment "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/group_policy_attachment"
+	rsiambackupimport "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/iam_backup_import"
+	rskmskey "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/kms_key"
+	rsldappolicyattachment "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/ldap_policy_attachment"
+	rsldapserviceaccount "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/ldap_service_account"
+	rsmoduleswitch "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/module_switch"
+	rspolicy "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/policy"
+	rsquota "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/quota"
+	rsrebalance "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/rebalance"
+	rsremotetarget "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/remote_target"
+	rsserviceaccount "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/service_account"
+	rssitereplication "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/site_replication"
+	rstier "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/tier"
+	rsuser "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/user"
+	rsuserpolicyattachment "github.com/weinmann-emt/terraform-provider-rustfs/internal/resources/user_policy_attachment"
 )
 
 // Ensure RustfsProvider satisfies various provider interfaces.
@@ -146,37 +178,37 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 
 func (p *RustfsProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewUserResource,
-		NewPolicyResource,
-		NewServiceAccountResource,
-		NewLDAPServiceAccountResource,
-		NewBucketResource,
-		NewquotaResource,
-		NewUserPolicyAttachmentRessource,
-		NewBucketPolicyRessource,
-		NewIamBackupImportResource,
-		NewBucketMetadataBackupImportResource,
-		NewGroupResource,
-		NewGroupPolicyAttachmentResource,
-		NewBucketLifecycleConfigurationResource,
-		NewTierResource,
-		NewBucketObjectLockResource,
-		NewBucketNotificationResource,
-		NewRebalanceResource,
-		NewBucketReplicationResource,
-		NewBucketEncryptionResource,
-		NewBucketVersioningResource,
-		NewAuditTargetRessource,
-		NewModuleSwitchRessource,
-		NewKmsKeyRessource,
-		NewConfigRessource,
-		NewBucketDurabilityRessource,
-		NewSiteReplicationRessource,
-		NewRemoteTargetRessource,
-		NewBucketPublicAccessBlockRessource,
-		NewBucketTagsRessource,
-		NewBucketCorsRessource,
-		NewLDAPPolicyAttachmentRessource,
+		rsuser.NewUserResource,
+		rspolicy.NewPolicyResource,
+		rsserviceaccount.NewServiceAccountResource,
+		rsldapserviceaccount.NewLDAPServiceAccountResource,
+		rsbucket.NewBucketResource,
+		rsquota.NewQuotaResource,
+		rsuserpolicyattachment.NewUserPolicyAttachmentResource,
+		rsbucketpolicy.NewBucketPolicyResource,
+		rsiambackupimport.NewIamBackupImportResource,
+		rsbucketmetadatabackupimport.NewBucketMetadataBackupImportResource,
+		rsgroup.NewGroupResource,
+		rsgrouppolicyattachment.NewGroupPolicyAttachmentResource,
+		rsbucketlifecycleconfiguration.NewBucketLifecycleConfigurationResource,
+		rstier.NewTierResource,
+		rsbucketobjectlock.NewBucketObjectLockResource,
+		rsbucketnotification.NewBucketNotificationResource,
+		rsrebalance.NewRebalanceResource,
+		rsbucketreplication.NewBucketReplicationResource,
+		rsbucketencryption.NewBucketEncryptionResource,
+		rsbucketversioning.NewBucketVersioningResource,
+		rsaudittarget.NewAuditTargetResource,
+		rsmoduleswitch.NewModuleSwitchResource,
+		rskmskey.NewKmsKeyResource,
+		rsconfig.NewConfigResource,
+		rsbucketdurability.NewBucketDurabilityResource,
+		rssitereplication.NewSiteReplicationResource,
+		rsremotetarget.NewRemoteTargetResource,
+		rsbucketpublicaccessblock.NewBucketPublicAccessBlockResource,
+		rsbuckettags.NewBucketTagsResource,
+		rsbucketcors.NewBucketCorsResource,
+		rsldappolicyattachment.NewLDAPPolicyAttachmentResource,
 	}
 }
 

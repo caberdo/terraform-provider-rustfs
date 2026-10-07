@@ -26,13 +26,17 @@ func getClient() client.RustfsAdmin {
 	return dut
 }
 
-func randomString(length int) string {
+func randomString() string {
+	const length = 8
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	const charset = letters + "0123456789"
 	result := make([]byte, length)
 
-	for i := range result {
+	// Access keys and names must start with a letter.
+	result[0] = letters[rng.Intn(len(letters))]
+	for i := 1; i < length; i++ {
 		result[i] = charset[rng.Intn(len(charset))]
 	}
 
@@ -42,9 +46,9 @@ func randomString(length int) string {
 func TestCreateServiceAccount(t *testing.T) {
 
 	account := client.ServiceAccount{
-		AccessKey: randomString(8),
+		AccessKey: randomString(),
 		SecretKey: "someSuperS3cret",
-		Name:      randomString(8),
+		Name:      randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateServiceAccount(account)
@@ -56,9 +60,9 @@ func TestCreateServiceAccount(t *testing.T) {
 func TestCreateAndDeleteServiceAccount(t *testing.T) {
 
 	account := client.ServiceAccount{
-		AccessKey: randomString(8),
+		AccessKey: randomString(),
 		SecretKey: "someSuperS3cret",
-		Name:      randomString(8),
+		Name:      randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateServiceAccount(account)
@@ -73,9 +77,9 @@ func TestCreateAndDeleteServiceAccount(t *testing.T) {
 func TestCreateUpdateAndDeleteServiceAccount(t *testing.T) {
 
 	account := client.ServiceAccount{
-		AccessKey: randomString(8),
+		AccessKey: randomString(),
 		SecretKey: "someSuperS3cret",
-		Name:      randomString(8),
+		Name:      randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateServiceAccount(account)
@@ -95,9 +99,9 @@ func TestCreateUpdateAndDeleteServiceAccount(t *testing.T) {
 func TestCreateReadAndDeleteServiceAccount(t *testing.T) {
 
 	account := client.ServiceAccount{
-		AccessKey: randomString(8),
+		AccessKey: randomString(),
 		SecretKey: "someSuperS3cret",
-		Name:      randomString(8),
+		Name:      randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateServiceAccount(account)

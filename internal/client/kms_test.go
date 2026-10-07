@@ -19,7 +19,7 @@ func TestGetKmsStatus(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"backend_type": "local",
 			"backend_status": "healthy",
 			"cache_enabled": true,
@@ -98,7 +98,7 @@ func TestGetKmsStatusOptionalFieldsAbsent(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"backend_type": "aws",
 			"backend_status": "error",
 			"cache_enabled": false,
@@ -151,7 +151,7 @@ func TestGetKmsConfig(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"backend": "vault-kv2",
 			"cache_enabled": true,
 			"cache_max_keys": 1000,
@@ -192,7 +192,7 @@ func TestGetKmsConfigNullDefaultKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
+		_, _ = w.Write([]byte(`{
 			"backend": "local",
 			"cache_enabled": false,
 			"cache_max_keys": 0,
@@ -220,7 +220,7 @@ func TestGetKmsConfigNullDefaultKey(t *testing.T) {
 func TestGetKmsStatusError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("KMS status not available"))
+		_, _ = w.Write([]byte("KMS status not available"))
 	}))
 	defer server.Close()
 
@@ -240,7 +240,7 @@ func TestGetKmsStatusError(t *testing.T) {
 func TestGetKmsConfigError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("KMS config not available"))
+		_, _ = w.Write([]byte("KMS config not available"))
 	}))
 	defer server.Close()
 

@@ -1,0 +1,146 @@
+package bucket_durability
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
+)
+
+var (
+	_ resource.Resource                = &BucketDurabilityResource{}
+	_ resource.ResourceWithImportState = &BucketDurabilityResource{}
+)
+
+func NewBucketDurabilityResource() resource.Resource {
+	return &BucketDurabilityResource{}
+}
+
+type BucketDurabilityResource struct {
+	client *client.AllClient
+}
+
+func (r *BucketDurabilityResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_bucket_durability"
+}
+
+func (r *BucketDurabilityResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Description:         "Manage per-bucket durability settings in rustfs",
+		MarkdownDescription: "Manage the per-bucket durability override in rustfs",
+		Attributes: map[string]schema.Attribute{
+			"bucket": schema.StringAttribute{
+				Required:    true,
+				Description: "Name of the bucket.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
+			"mode": schema.StringAttribute{
+				Required:    true,
+				Description: "Durability override for the bucket: strict, relaxed or none. When unset the bucket inherits the process-wide durability mode.",
+				Validators: []validator.String{
+					stringvalidator.OneOf("strict", "relaxed", "none"),
+				},
+			},
+		},
+	}
+}
+
+func (r *BucketDurabilityResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+	client, ok := req.ProviderData.(*client.AllClient)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *client.AllClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+	r.client = client
+}
+
+func (r *BucketDurabilityResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan models.BucketDurabilityRessourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	d := client.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
+	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating bucket durability",
+			"Could not set bucket durability, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	plan.Mode = types.StringValue(read.Mode)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *BucketDurabilityResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var state models.BucketDurabilityRessourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	read, err := r.client.RustClient.GetBucketDurability(state.Bucket.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading bucket durability",
+			"Could not read bucket durability, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	state.Mode = types.StringValue(read.Mode)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+func (r *BucketDurabilityResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan models.BucketDurabilityRessourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	d := client.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
+	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating bucket durability",
+			"Could not update bucket durability, unexpected error: "+err.Error(),
+		)
+		return
+	}
+	plan.Mode = types.StringValue(read.Mode)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func (r *BucketDurabilityResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data models.BucketDurabilityRessourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if err := r.client.RustClient.DeleteBucketDurability(data.Bucket.ValueString()); err != nil {
+		resp.Diagnostics.AddError(
+			"Error deleting bucket durability",
+			"Could not delete bucket durability, unexpected error: "+err.Error(),
+		)
+	}
+}
+
+func (r *BucketDurabilityResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
+}

@@ -1,10 +1,11 @@
 // Package acceptance provides the shared harness for the provider's live
 // acceptance tests. It lives outside the provider package so tests in
-// internal/datasources/<name> (and, once #10 lands, internal/resources/<name>)
-// can configure the provider without an import cycle.
+// internal/datasources/<name> and internal/resources/<name> can configure the
+// provider without an import cycle.
 package acceptance
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 	"github.com/weinmann-emt/terraform-provider-rustfs/provider"
@@ -93,4 +97,63 @@ func UniqueName(prefix string) string {
 		panic(err)
 	}
 	return fmt.Sprintf("acc_%s_%s", prefix, hex.EncodeToString(b))
+}
+
+// EnvOrDefault returns the value of the environment variable envKey, or
+// defaultValue when it is unset.
+func EnvOrDefault(envKey, defaultValue string) string {
+	if v := os.Getenv(envKey); v != "" {
+		return v
+	}
+	return defaultValue
+}
+
+// MinioClient builds an S3 client from the acceptance environment.
+func MinioClient() (*minio.Client, error) {
+	return minio.New(os.Getenv("RUSTFS_ENDPOINT"), &minio.Options{
+		Creds:  credentials.NewStaticV4(os.Getenv("RUSTFS_USER"), os.Getenv("RUSTFS_SECRET"), ""),
+		Secure: false,
+	})
+}
+
+// RustClient builds a RustFS admin client from the acceptance environment.
+func RustClient() client.RustfsAdmin {
+	return client.New(&client.RustfsAdminConfig{
+		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
+		AccessKey:    os.Getenv("RUSTFS_USER"),
+		AccessSecret: os.Getenv("RUSTFS_SECRET"),
+	})
+}
+
+// CheckBucketDestroy asserts that every rustfs_bucket in state no longer
+// exists in the S3 API.
+func CheckBucketDestroy(s *terraform.State) error {
+	c, err := MinioClient()
+	if err != nil {
+		return err
+	}
+
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "rustfs_bucket" {
+			continue
+		}
+
+		bucketName := rs.Primary.Attributes["name"]
+		if bucketName == "" {
+			continue
+		}
+
+		exists, err := c.BucketExists(context.Background(), bucketName)
+		if err != nil {
+			minioErr, ok := err.(minio.ErrorResponse)
+			if ok && (strings.Contains(minioErr.Code, "NotFound") || minioErr.StatusCode == 404) {
+				continue
+			}
+			return fmt.Errorf("error checking bucket destruction: %s", err)
+		}
+		if exists {
+			return fmt.Errorf("bucket %s still exists", bucketName)
+		}
+	}
+	return nil
 }

@@ -9,13 +9,13 @@ import (
 )
 
 func TestReadQuota(t *testing.T) {
-	name := randomString(8)
+	name := randomString()
 	dut := getClient()
 	name = strings.ToLower(name)
 	if err := dut.CreateBucket(name); err != nil {
 		t.Fatal(err)
 	}
-	resp, err := dut.ReadQuota(name)
+	resp, err := readQuotaWithRetry(t, dut, name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -28,7 +28,7 @@ func TestReadQuota(t *testing.T) {
 }
 
 func TestCRDQuota(t *testing.T) {
-	name := randomString(8)
+	name := randomString()
 	name = strings.ToLower(name)
 	quota := client.Quota{
 		Bucket: name,
@@ -38,7 +38,7 @@ func TestCRDQuota(t *testing.T) {
 	if err := dut.CreateBucket(name); err != nil {
 		t.Fatal(err)
 	}
-	_, err := dut.ReadQuota(name)
+	_, err := readQuotaWithRetry(t, dut, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestCRDQuota(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	resp, err = dut.ReadQuota(name)
+	resp, err = readQuotaWithRetry(t, dut, name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,4 +58,23 @@ func TestCRDQuota(t *testing.T) {
 	if err := dut.DeletQuota(name); err != nil {
 		t.Error("error during quota remove")
 	}
+}
+
+// readQuotaWithRetry tolerates the fresh-server ServiceUnavailable response
+// while the scanner computes the bucket's authoritative usage.
+func readQuotaWithRetry(t *testing.T, dut client.RustfsAdmin, bucket string) (client.Quota, error) {
+	t.Helper()
+	var lastErr error
+	for attempt := 0; attempt < 30; attempt++ {
+		q, err := dut.ReadQuota(bucket)
+		if err == nil {
+			return q, nil
+		}
+		lastErr = err
+		if !strings.Contains(err.Error(), "authoritative bucket usage") {
+			return client.Quota{}, err
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return client.Quota{}, lastErr
 }
