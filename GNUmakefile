@@ -25,8 +25,8 @@ vet:
 	go vet ./...
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/weinmann-emt/rustfs/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
-	cp bin/$(BINARY_NAME) ~/.terraform.d/plugins/registry.terraform.io/weinmann-emt/rustfs/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(BINARY_NAME)
+	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/caberdo/rustfs/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
+	cp bin/$(BINARY_NAME) ~/.terraform.d/plugins/registry.terraform.io/caberdo/rustfs/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(BINARY_NAME)
 
 testacc-docker:
 	docker compose -f acc_test/docker-compose.yml --profile test run --rm test

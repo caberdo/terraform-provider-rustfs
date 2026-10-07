@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 func TestIsTransientQuotaError(t *testing.T) {

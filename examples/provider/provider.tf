@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     rustfs = {
-      source = "weinmann-emt/rustfs"
+      source = "caberdo/rustfs"
     }
   }
 }

@@ -8,7 +8,7 @@ import (
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 ) // originalModuleSwitch captures the server's module switch state before the
 // test mutates it, so the test can restore the original state afterwards.
 var originalModuleSwitch *rustfs.ModuleSwitchState
