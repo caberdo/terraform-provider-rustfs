@@ -12,7 +12,7 @@ import (
 )
 
 func TestBucketLifecycleConfigurationRessourceExpandedSchema(t *testing.T) {
-	r := NewBucketLifecycleConfigurationRessource()
+	r := NewBucketLifecycleConfigurationResource()
 	req := frameworkresource.SchemaRequest{}
 	resp := frameworkresource.SchemaResponse{}
 	r.Schema(context.Background(), req, &resp)

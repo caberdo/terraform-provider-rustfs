@@ -22,12 +22,12 @@ type AdminDiscovery struct {
 
 // StorageInfoDetails holds the backend and per-drive breakdown.
 type StorageInfoDetails struct {
-	Backend *BackendInfo `json:"backend,omitempty"`
-	Disks   []DiskInfo   `json:"disks,omitempty"`
+	Backend *StorageBackendInfo `json:"backend,omitempty"`
+	Disks   []DiskInfo          `json:"disks,omitempty"`
 }
 
-// BackendInfo describes the storage backend layout.
-type BackendInfo struct {
+// StorageBackendInfo describes the storage backend layout.
+type StorageBackendInfo struct {
 	BackendType        string `json:"BackendType,omitempty"`
 	DrivesPerSet       []int  `json:"DrivesPerSet,omitempty"`
 	OfflineDisks       any    `json:"OfflineDisks,omitempty"`

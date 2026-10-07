@@ -25,13 +25,13 @@ type BucketReplicationResource struct {
 }
 
 type bucketReplicationResourceModel struct {
-	Bucket                 types.String `tfsdk:"bucket"`
-	Role                   types.String `tfsdk:"role"`
-	DestinationBucket      types.String `tfsdk:"destination_bucket"`
-	Priority               types.Int64  `tfsdk:"priority"`
-	Status                 types.String `tfsdk:"status"`
+	Bucket                  types.String `tfsdk:"bucket"`
+	Role                    types.String `tfsdk:"role"`
+	DestinationBucket       types.String `tfsdk:"destination_bucket"`
+	Priority                types.Int64  `tfsdk:"priority"`
+	Status                  types.String `tfsdk:"status"`
 	DeleteMarkerReplication types.String `tfsdk:"delete_marker_replication"`
-	DeleteReplication      types.String `tfsdk:"delete_replication"`
+	DeleteReplication       types.String `tfsdk:"delete_replication"`
 }
 
 func NewBucketReplicationResource() resource.Resource {
@@ -48,8 +48,8 @@ func (r *BucketReplicationResource) Schema(_ context.Context, _ resource.SchemaR
 		MarkdownDescription: "Manage RustFS bucket replication configuration",
 		Attributes: map[string]schema.Attribute{
 			"bucket": schema.StringAttribute{
-				Required:    true,
-				Description: "Name of the source bucket.",
+				Required:      true,
+				Description:   "Name of the source bucket.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"role": schema.StringAttribute{

@@ -3,7 +3,7 @@ package rustfs
 import (
 	"context"
 	"encoding/json"
-<<<<<<< HEAD
+	"errors"
 )
 
 // KmsCacheStats holds KMS key cache counters reported by /kms/status.
@@ -52,9 +52,42 @@ func (c *RustfsAdmin) GetKmsStatus() (*KmsStatus, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/status",
-=======
-	"errors"
-)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var status KmsStatus
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+// GetKmsConfig returns the current KMS backend configuration.
+func (c *RustfsAdmin) GetKmsConfig() (*KmsConfig, error) {
+	reqData := RequestData{
+		Method:  "GET",
+		RelPath: "kms/config",
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var config KmsConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
 
 // KmsKey describes a KMS master key as returned by the KMS admin API.
 //
@@ -177,7 +210,6 @@ func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/keys",
->>>>>>> refs/remotes/caberdo/feat/kms-key
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -186,21 +218,6 @@ func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-<<<<<<< HEAD
-
-	var status KmsStatus
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		return nil, err
-	}
-	return &status, nil
-}
-
-// GetKmsConfig returns the current KMS backend configuration.
-func (c *RustfsAdmin) GetKmsConfig() (*KmsConfig, error) {
-	reqData := RequestData{
-		Method:  "GET",
-		RelPath: "kms/config",
-=======
 	var out kmsListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err
@@ -231,23 +248,11 @@ func (c *RustfsAdmin) setKmsKeyState(keyID, relPath string) error {
 		Method:  "POST",
 		RelPath: relPath,
 		Content: bytes,
->>>>>>> refs/remotes/caberdo/feat/kms-key
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var config KmsConfig
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, err
-	}
-	return &config, nil
-=======
 		return err
 	}
 	defer resp.Body.Close()
@@ -326,5 +331,4 @@ func (c *RustfsAdmin) DeleteKmsKey(keyID string) error {
 	}
 	defer resp.Body.Close()
 	return nil
->>>>>>> refs/remotes/caberdo/feat/kms-key
 }

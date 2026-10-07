@@ -15,6 +15,9 @@ import (
 )
 
 func TestAccGroupsDataSource(t *testing.T) {
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("TF_ACC must be set for acceptance tests")
+	}
 	groupName := fmt.Sprintf("tf-acc-groups-%d", time.Now().UnixNano())
 	createAccTestGroup(t, groupName)
 	defer deleteAccTestGroup(t, groupName)

@@ -42,13 +42,13 @@ func (r *TierResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 		MarkdownDescription: "Manage RustFS storage tiers for data transition to external backends",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				Required:    true,
-				Description: "Tier name (must be uppercase). Changing this forces recreation.",
+				Required:      true,
+				Description:   "Tier name (must be uppercase). Changing this forces recreation.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"tier_type": schema.StringAttribute{
-				Required:    true,
-				Description: "Tier type: s3, minio, azure, gcs, aliyun, tencent, huaweicloud, r2, or rustfs.",
+				Required:      true,
+				Description:   "Tier type: s3, minio, azure, gcs, aliyun, tencent, huaweicloud, r2, or rustfs.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"config_json": schema.StringAttribute{

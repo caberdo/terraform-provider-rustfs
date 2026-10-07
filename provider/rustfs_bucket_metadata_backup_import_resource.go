@@ -35,9 +35,9 @@ func (r *BucketMetadataBackupImportResource) Schema(_ context.Context, _ resourc
 		Description: "Import bucket metadata from a ZIP archive",
 		Attributes: map[string]schema.Attribute{
 			"content_base64": schema.StringAttribute{
-				Required:    true,
-				Sensitive:   true,
-				Description: "Base64-encoded ZIP archive with bucket metadata.",
+				Required:      true,
+				Sensitive:     true,
+				Description:   "Base64-encoded ZIP archive with bucket metadata.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},

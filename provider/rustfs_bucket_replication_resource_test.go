@@ -33,13 +33,13 @@ func TestBuildReplicationConfig_basic(t *testing.T) {
 
 func TestBuildReplicationConfig_deleteReplication(t *testing.T) {
 	plan := bucketReplicationResourceModel{
-		Bucket:                 types.StringValue("source"),
-		Role:                   types.StringValue("arn:minio:replication::id:src"),
-		DestinationBucket:      types.StringValue("arn:aws:s3:::dest"),
-		Priority:               types.Int64Value(1),
-		Status:                 types.StringValue("Enabled"),
+		Bucket:                  types.StringValue("source"),
+		Role:                    types.StringValue("arn:minio:replication::id:src"),
+		DestinationBucket:       types.StringValue("arn:aws:s3:::dest"),
+		Priority:                types.Int64Value(1),
+		Status:                  types.StringValue("Enabled"),
 		DeleteMarkerReplication: types.StringValue("Enabled"),
-		DeleteReplication:      types.StringValue("Disabled"),
+		DeleteReplication:       types.StringValue("Disabled"),
 	}
 
 	cfg := buildReplicationConfig(plan)

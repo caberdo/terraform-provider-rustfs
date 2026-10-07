@@ -13,7 +13,7 @@ func TestSiteReplicationAdd(t *testing.T) {
 	var gotPath, gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		gotBody = readBody(r)
+		gotBody = readRequestBody(r)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -51,7 +51,7 @@ func TestSiteReplicationEdit(t *testing.T) {
 	var gotPath, gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		gotBody = readBody(r)
+		gotBody = readRequestBody(r)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -80,7 +80,7 @@ func TestSiteReplicationRemove(t *testing.T) {
 	var gotPath, gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		gotBody = readBody(r)
+		gotBody = readRequestBody(r)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -160,7 +160,7 @@ func testSiteReplicationClient(server *httptest.Server) RustfsAdmin {
 	return c
 }
 
-func readBody(r *http.Request) string {
+func readRequestBody(r *http.Request) string {
 	b, _ := io.ReadAll(r.Body)
 	return string(b)
 }

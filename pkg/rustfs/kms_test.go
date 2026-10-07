@@ -1,7 +1,8 @@
 package rustfs
 
 import (
-<<<<<<< HEAD
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -253,13 +254,8 @@ func TestGetKmsConfigError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	} else if !strings.Contains(err.Error(), "KMS config not available") {
 		t.Errorf("expected error containing 'KMS config not available', got %v", err)
-=======
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-)
+	}
+}
 
 func newKmsTestClient(t *testing.T, handler http.HandlerFunc) *RustfsAdmin {
 	t.Helper()
@@ -481,6 +477,5 @@ func TestDeleteKmsKey(t *testing.T) {
 
 	if err := client.DeleteKmsKey("mykey"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
->>>>>>> refs/remotes/caberdo/feat/kms-key
 	}
 }
