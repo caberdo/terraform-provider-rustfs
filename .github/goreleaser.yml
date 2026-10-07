@@ -1,5 +1,7 @@
 # Visit https://goreleaser.com for documentation on how to customize this
 # behavior.
+version: 2
+
 before:
   hooks:
     # this is just an example and not a requirement for provider building/publishing
@@ -14,7 +16,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - '-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}'
+      - '-s -w -X main.version={{.Version}}'
     goos:
       - freebsd
       - windows
@@ -34,11 +36,17 @@ builds:
         goarch: arm64
     binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
-  - format: zip
+  - formats:
+      - zip
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
   algorithm: sha256
+  # The Terraform Registry reads protocol_versions from this asset; without it the
+  # released version cannot be published.
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
 signs:
   - artifacts: checksum
     args:
@@ -52,7 +60,11 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
-# If you want to manually examine the release before its live, uncomment this line:
-# draft: true
+  mode: replace
+  # The registry manifest has to be uploaded as a release asset as well, otherwise the
+  # Terraform Registry cannot publish the version.
+  extra_files:
+    - glob: 'terraform-registry-manifest.json'
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
 changelog:
-  skip: true
+  use: github-native
