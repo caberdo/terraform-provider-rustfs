@@ -1,7 +1,7 @@
 # Terraform Provider for RustFS
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/weinmann-emt/terraform-provider-rustfs)](https://golang.org/doc/devel/release.html)
-[![CI](https://img.shields.io/github/actions/workflow/status/weinmann-emt/terraform-provider-rustfs/main.yml?branch=main)](https://github.com/weinmann-emt/terraform-provider-rustfs/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/weinmann-emt/terraform-provider-rustfs/test.yml?branch=main)](https://github.com/weinmann-emt/terraform-provider-rustfs/actions)
 
 Terraform provider for managing [RustFS](https://github.com/rustfs/rustfs) — an S3-compatible object storage system. Manage buckets, IAM users, policies, service accounts, quotas, lifecycle rules, encryption, versioning, and more.
 
