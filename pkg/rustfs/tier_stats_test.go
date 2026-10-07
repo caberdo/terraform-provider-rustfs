@@ -16,7 +16,7 @@ func TestTierStats(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"WARM":{"total_size":15,"num_versions":3,"num_objects":1},"ARCHIVE":{"total_size":9,"num_versions":1,"num_objects":1}}`))
+		_, _ = w.Write([]byte(`{"contractVersion":2,"inventory":{"status":"accounted"},"activity":{"status":"complete","nodesReporting":1,"nodesExpected":1,"unavailableNodes":[]},"tiers":[{"name":"WARM","inventory":{"totalSize":15,"numVersions":3,"numObjects":1},"transitionsLast24h":{"totalSize":0,"numVersions":0,"numObjects":0}},{"name":"ARCHIVE","inventory":{"totalSize":9,"numVersions":1,"numObjects":1},"transitionsLast24h":{"totalSize":0,"numVersions":0,"numObjects":0}}]}`))
 	}))
 	defer server.Close()
 
@@ -52,7 +52,7 @@ func TestTierStats(t *testing.T) {
 func TestTierStatsEmpty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{"contractVersion":2,"inventory":{"status":"not-accounted"},"activity":{"status":"complete","nodesReporting":1,"nodesExpected":1,"unavailableNodes":[]},"tiers":[]}`))
 	}))
 	defer server.Close()
 
@@ -68,5 +68,31 @@ func TestTierStatsEmpty(t *testing.T) {
 	}
 	if len(stats) != 0 {
 		t.Fatalf("expected no tiers, got %v", stats)
+	}
+}
+
+func TestTierStatsFallsBackToActivity(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"contractVersion":2,"inventory":{"status":"not-accounted"},"activity":{"status":"complete","nodesReporting":1,"nodesExpected":1,"unavailableNodes":[]},"tiers":[{"name":"COLD","transitionsLast24h":{"totalSize":42,"numVersions":2,"numObjects":1}}]}`))
+	}))
+	defer server.Close()
+
+	client := New(&RustfsAdminConfig{
+		Endpoint:  server.Listener.Addr().String(),
+		AccessKey: "admin",
+	})
+	client.accessSecret = "secret"
+
+	stats, err := client.TierStats()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	cold, ok := stats["COLD"]
+	if !ok {
+		t.Fatalf("expected COLD tier, got %v", stats)
+	}
+	if cold.TotalSize != 42 || cold.NumVersions != 2 || cold.NumObjects != 1 {
+		t.Errorf("unexpected COLD stats: %+v", cold)
 	}
 }
