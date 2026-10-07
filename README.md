@@ -5,6 +5,18 @@
 
 Terraform provider for managing [RustFS](https://github.com/rustfs/rustfs) — an S3-compatible object storage system. Manage buckets, IAM users, policies, service accounts, quotas, lifecycle rules, encryption, versioning, and more.
 
+## Requirements
+
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
+- [Go](https://golang.org/doc/install) >= 1.25 (to build from source)
+
+## Support and compatibility
+
+The provider talks to both the S3 API and the RustFS admin API (`/rustfs/admin/v3`). Features
+that depend on server-side sub-systems — KMS, LDAP, storage tiers and ILM, audit and
+notification targets — work once the matching RustFS sub-system is enabled and configured. See
+[`docs/index.md`](./docs/index.md) for details.
+
 ## Resources
 
 | Resource | Description |
@@ -169,6 +181,18 @@ podman-compose -f acc_test/docker-compose.yml down
 ## Documentation
 
 Full resource documentation is available in the [`docs/`](./docs/) directory or on the [Terraform Registry](https://registry.terraform.io/providers/weinmann-emt/rustfs).
+
+Regenerate it from the schema and examples with:
+
+```bash
+make generate
+```
+
+Check that every example still matches the provider schema with:
+
+```bash
+make validate-examples
+```
 
 ## License
 

@@ -47,3 +47,7 @@ dev.tfrc
 *.pfx
 *.crt
 *.keytab
+
+# Python
+__pycache__/
+*.pyc

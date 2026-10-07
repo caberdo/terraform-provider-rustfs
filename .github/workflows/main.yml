@@ -36,6 +36,28 @@ jobs:
         with:
           args: ./...
 
+  validate-examples:
+    name: Validate Examples
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    env:
+      GOARCH: amd64
+      GOOS: linux
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Validate examples
+        run: ./scripts/validate-examples.sh
+
   test:
     name: Acceptance Tests
     runs-on: ubuntu-latest
