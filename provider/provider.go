@@ -162,6 +162,7 @@ func (p *RustfsProvider) Resources(ctx context.Context) []func() resource.Resour
 		NewBucketPublicAccessBlockRessource,
 		NewBucketTagsRessource,
 		NewBucketCorsRessource,
+		NewLDAPPolicyAttachmentRessource,
 	}
 }
 
