@@ -1,38 +1,49 @@
-*.dll
+# Binaries
 *.exe
-.DS_Store
-example.tf
-terraform.tfplan
-terraform.tfstate
+*.exe~
+*.dll
+*.so
+*.dylib
+terraform-provider-rustfs
 bin/
 dist/
-modules-dev/
 
-website/.vagrant
-website/.bundle
-website/build
-website/node_modules
-.vagrant/
-*.backup
-./*.tfstate
-.terraform/
-*.log
-*.bak
-*~
-.*.swp
-.idea
-*.iml
+# Test binary
 *.test
-*.iml
 
-website/vendor
+# Output of go coverage
+*.out
 
-# Test exclusions
-!command/test-fixtures/**/*.tfstate
-!command/test-fixtures/**/.terraform/
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-# Keep windows files with windows line endings
-*.winfile eol=crlf
-.env
-terraform-provider-rustfs
-docs/superpowers/
+# OS
+.DS_Store
+Thumbs.db
+
+# Go vendor
+vendor/
+
+# Terraform
+**/.terraform/*
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform-provider-*
+plan.bin
+*.tfvars
+*.log
+*.env
+dev.tfrc
+
+# Secrets / key material
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.keytab

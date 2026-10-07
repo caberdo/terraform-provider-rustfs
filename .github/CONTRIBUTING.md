@@ -95,7 +95,7 @@ func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportSt
 
 ```bash
 go test ./pkg/rustfs/... -v
-go test ./provider/... -v -run "^[^T]"
+go test ./provider/... -v -skip '^TestAcc'
 ```
 
 ### Acceptance Tests
