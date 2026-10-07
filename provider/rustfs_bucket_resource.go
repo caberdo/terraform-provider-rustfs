@@ -2,8 +2,13 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -11,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/minio/minio-go/v7"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -82,7 +86,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	exists, err := r.client.Minio.BucketExists(ctx, plan.Name.ValueString())
+	exists, err := bucketExists(ctx, r.client.S3, plan.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error checking bucket",
@@ -98,8 +102,8 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	err = r.client.Minio.MakeBucket(ctx, plan.Name.ValueString(), minio.MakeBucketOptions{
-		Region: "us-east-1",
+	_, err = r.client.S3.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(plan.Name.ValueString()),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -159,7 +163,9 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.Minio.RemoveBucket(ctx, data.Name.ValueString())
+	_, err := r.client.S3.DeleteBucket(ctx, &s3.DeleteBucketInput{
+		Bucket: aws.String(data.Name.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error deleting bucket",
@@ -170,4 +176,34 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 
 func (r *bucketResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+}
+
+func bucketExists(ctx context.Context, client *s3.Client, bucket string) (bool, error) {
+	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
+	if err == nil {
+		return true, nil
+	}
+	if isBucketNotFound(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func isBucketNotFound(err error) bool {
+	var notFound *s3types.NotFound
+	if errors.As(err, &notFound) {
+		return true
+	}
+	var noSuchBucket *s3types.NoSuchBucket
+	if errors.As(err, &noSuchBucket) {
+		return true
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "NotFound", "NoSuchBucket", "404":
+			return true
+		}
+	}
+	return false
 }

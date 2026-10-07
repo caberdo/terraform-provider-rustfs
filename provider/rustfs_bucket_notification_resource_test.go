@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -21,15 +23,15 @@ func TestBuildNotificationConfig_SingleQueue(t *testing.T) {
 		},
 	}
 
-	config := buildNotificationConfig(plan)
+	config := buildNotificationConfig(context.Background(), plan)
 
-	if len(config.QueueConfigs) != 1 {
-		t.Fatalf("expected 1 queue config, got %d", len(config.QueueConfigs))
+	if len(config.QueueConfigurations) != 1 {
+		t.Fatalf("expected 1 queue config, got %d", len(config.QueueConfigurations))
 	}
 
-	q := config.QueueConfigs[0]
-	if q.Queue != "arn:minio:sqs::PRIMARY:amqp" {
-		t.Errorf("unexpected queue ARN: %s", q.Queue)
+	q := config.QueueConfigurations[0]
+	if aws.ToString(q.QueueArn) != "arn:minio:sqs::PRIMARY:amqp" {
+		t.Errorf("unexpected queue ARN: %s", aws.ToString(q.QueueArn))
 	}
 	if len(q.Events) != 2 {
 		t.Errorf("expected 2 events, got %d", len(q.Events))
@@ -39,17 +41,17 @@ func TestBuildNotificationConfig_SingleQueue(t *testing.T) {
 		t.Fatal("expected non-nil filter")
 	}
 
-	rules := q.Filter.S3Key.FilterRules
+	rules := q.Filter.Key.FilterRules
 	if len(rules) != 2 {
 		t.Fatalf("expected 2 filter rules, got %d", len(rules))
 	}
 
 	foundPrefix, foundSuffix := false, false
 	for _, r := range rules {
-		if r.Name == "prefix" && r.Value == "uploads/" {
+		if r.Name == s3types.FilterRuleNamePrefix && aws.ToString(r.Value) == "uploads/" {
 			foundPrefix = true
 		}
-		if r.Name == "suffix" && r.Value == ".jpg" {
+		if r.Name == s3types.FilterRuleNameSuffix && aws.ToString(r.Value) == ".jpg" {
 			foundSuffix = true
 		}
 	}
@@ -73,11 +75,11 @@ func TestBuildNotificationConfig_NoFilter(t *testing.T) {
 		},
 	}
 
-	config := buildNotificationConfig(plan)
-	if len(config.QueueConfigs) != 1 {
-		t.Fatalf("expected 1 queue config, got %d", len(config.QueueConfigs))
+	config := buildNotificationConfig(context.Background(), plan)
+	if len(config.QueueConfigurations) != 1 {
+		t.Fatalf("expected 1 queue config, got %d", len(config.QueueConfigurations))
 	}
-	if config.QueueConfigs[0].Filter != nil {
+	if config.QueueConfigurations[0].Filter != nil {
 		t.Error("expected nil filter when no prefix/suffix")
 	}
 }
@@ -93,8 +95,8 @@ func TestBuildNotificationConfig_MultipleQueues(t *testing.T) {
 		},
 	}
 
-	config := buildNotificationConfig(plan)
-	if len(config.QueueConfigs) != 2 {
-		t.Fatalf("expected 2 queue configs, got %d", len(config.QueueConfigs))
+	config := buildNotificationConfig(context.Background(), plan)
+	if len(config.QueueConfigurations) != 2 {
+		t.Fatalf("expected 2 queue configs, got %d", len(config.QueueConfigurations))
 	}
 }

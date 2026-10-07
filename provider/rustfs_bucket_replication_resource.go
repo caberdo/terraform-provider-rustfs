@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,7 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/minio/minio-go/v7/pkg/replication"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -103,13 +106,24 @@ func (r *BucketReplicationResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	warnUnsupportedDeleteReplication(ctx, plan)
+
 	cfg := buildReplicationConfig(plan)
-	if err := r.client.Minio.SetBucketReplication(ctx, plan.Bucket.ValueString(), cfg); err != nil {
+	if _, err := r.client.S3.PutBucketReplication(ctx, &s3.PutBucketReplicationInput{
+		Bucket:                   aws.String(plan.Bucket.ValueString()),
+		ReplicationConfiguration: cfg,
+	}); err != nil {
 		resp.Diagnostics.AddError("Error setting bucket replication", "Could not set replication: "+err.Error())
 		return
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+func warnUnsupportedDeleteReplication(ctx context.Context, plan bucketReplicationResourceModel) {
+	if plan.DeleteReplication.ValueString() != "" {
+		tflog.Warn(ctx, "delete_replication is a MinIO extension that the AWS SDK S3 client cannot express; the value is kept in state but not applied")
+	}
 }
 
 func (r *BucketReplicationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -119,21 +133,30 @@ func (r *BucketReplicationResource) Read(ctx context.Context, req resource.ReadR
 		return
 	}
 
-	cfg, err := r.client.Minio.GetBucketReplication(ctx, state.Bucket.ValueString())
+	cfg, err := r.client.S3.GetBucketReplication(ctx, &s3.GetBucketReplicationInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading bucket replication", "Could not read: "+err.Error())
 		return
 	}
 
-	state.Role = types.StringValue(cfg.Role)
-	if len(cfg.Rules) > 0 {
-		rule := cfg.Rules[0]
-		state.Status = types.StringValue(string(rule.Status))
-		state.Priority = types.Int64Value(int64(rule.Priority))
-		state.DeleteMarkerReplication = types.StringValue(string(rule.DeleteMarkerReplication.Status))
-		state.DeleteReplication = types.StringValue(string(rule.DeleteReplication.Status))
-		if rule.Destination.Bucket != "" {
-			state.DestinationBucket = types.StringValue(rule.Destination.Bucket)
+	if config := cfg.ReplicationConfiguration; config != nil {
+		state.Role = types.StringValue(aws.ToString(config.Role))
+		if len(config.Rules) > 0 {
+			rule := config.Rules[0]
+			state.Status = types.StringValue(string(rule.Status))
+			if rule.Priority != nil {
+				state.Priority = types.Int64Value(int64(*rule.Priority))
+			}
+			if rule.DeleteMarkerReplication != nil {
+				state.DeleteMarkerReplication = types.StringValue(string(rule.DeleteMarkerReplication.Status))
+			} else {
+				state.DeleteMarkerReplication = types.StringValue("")
+			}
+			if rule.Destination != nil && aws.ToString(rule.Destination.Bucket) != "" {
+				state.DestinationBucket = types.StringValue(aws.ToString(rule.Destination.Bucket))
+			}
 		}
 	}
 
@@ -147,8 +170,13 @@ func (r *BucketReplicationResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	warnUnsupportedDeleteReplication(ctx, plan)
+
 	cfg := buildReplicationConfig(plan)
-	if err := r.client.Minio.SetBucketReplication(ctx, plan.Bucket.ValueString(), cfg); err != nil {
+	if _, err := r.client.S3.PutBucketReplication(ctx, &s3.PutBucketReplicationInput{
+		Bucket:                   aws.String(plan.Bucket.ValueString()),
+		ReplicationConfiguration: cfg,
+	}); err != nil {
 		resp.Diagnostics.AddError("Error updating bucket replication", "Could not update: "+err.Error())
 		return
 	}
@@ -163,7 +191,9 @@ func (r *BucketReplicationResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	if err := r.client.Minio.RemoveBucketReplication(ctx, data.Bucket.ValueString()); err != nil {
+	if _, err := r.client.S3.DeleteBucketReplication(ctx, &s3.DeleteBucketReplicationInput{
+		Bucket: aws.String(data.Bucket.ValueString()),
+	}); err != nil {
 		resp.Diagnostics.AddError("Error removing bucket replication", "Could not remove: "+err.Error())
 		return
 	}
@@ -173,33 +203,24 @@ func (r *BucketReplicationResource) ImportState(ctx context.Context, req resourc
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func buildReplicationConfig(plan bucketReplicationResourceModel) replication.Config {
-	var rules []replication.Rule
-
-	rule := replication.Rule{
-		ID:       "rule-1",
-		Status:   replication.Status(plan.Status.ValueString()),
-		Priority: int(plan.Priority.ValueInt64()),
-		Destination: replication.Destination{
-			Bucket: plan.DestinationBucket.ValueString(),
+func buildReplicationConfig(plan bucketReplicationResourceModel) *s3types.ReplicationConfiguration {
+	rule := s3types.ReplicationRule{
+		ID:       aws.String("rule-1"),
+		Status:   s3types.ReplicationRuleStatus(plan.Status.ValueString()),
+		Priority: aws.Int32(int32(plan.Priority.ValueInt64())), // #nosec G115
+		Destination: &s3types.Destination{
+			Bucket: aws.String(plan.DestinationBucket.ValueString()),
 		},
 	}
 
-	if plan.DeleteMarkerReplication.ValueString() != "" {
-		rule.DeleteMarkerReplication = replication.DeleteMarkerReplication{
-			Status: replication.Status(plan.DeleteMarkerReplication.ValueString()),
-		}
-	}
-	if plan.DeleteReplication.ValueString() != "" {
-		rule.DeleteReplication = replication.DeleteReplication{
-			Status: replication.Status(plan.DeleteReplication.ValueString()),
+	if v := plan.DeleteMarkerReplication.ValueString(); v != "" {
+		rule.DeleteMarkerReplication = &s3types.DeleteMarkerReplication{
+			Status: s3types.DeleteMarkerReplicationStatus(v),
 		}
 	}
 
-	rules = append(rules, rule)
-
-	return replication.Config{
-		Role:  plan.Role.ValueString(),
-		Rules: rules,
+	return &s3types.ReplicationConfiguration{
+		Role:  aws.String(plan.Role.ValueString()),
+		Rules: []s3types.ReplicationRule{rule},
 	}
 }

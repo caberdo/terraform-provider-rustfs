@@ -11,13 +11,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"github.com/minio/minio-go/v7/pkg/s3utils"
-	"github.com/minio/minio-go/v7/pkg/signer"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 )
 
 const (
-	rustfsApiVersion = "v3"
+	rustfsApiVersion    = "v3"
+	adminSigningRegion  = "us-east-01"
+	adminSigningService = "s3"
 )
 
 type RustfsAdminConfig struct {
@@ -95,7 +98,7 @@ func (c *RustfsAdmin) createEndpointUrl(endpoint string, secure bool) string {
 		scheme = "http"
 	}
 
-	// https://github.com/minio/madmin-go/blob/main/utils.go#L66
+	// Strip the default port so the endpoint URL stays canonical.
 	if secure && strings.HasSuffix(endpoint, ":443") {
 		endpoint = strings.TrimSuffix(endpoint, ":443")
 	}
@@ -111,7 +114,7 @@ func (c *RustfsAdmin) createRequest(ctx context.Context, request RequestData) (*
 	urlStr := c.endpointURL + "/" + request.RelPath
 	// If there are any query values, add them to the end.
 	if len(request.QueryValues) > 0 {
-		urlStr = urlStr + "?" + s3utils.QueryEncode(request.QueryValues)
+		urlStr = urlStr + "?" + queryEncode(request.QueryValues)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, request.Method, urlStr, bytes.NewReader(request.Content))
@@ -121,33 +124,46 @@ func (c *RustfsAdmin) createRequest(ctx context.Context, request RequestData) (*
 	if length := len(request.Content); length > 0 {
 		req.ContentLength = int64(length)
 	}
-	sum := sha256.Sum256(request.Content)
-	req.Header.Set("X-Amz-Content-Sha256", hex.EncodeToString(sum[:]))
-
-	// sign using minio go (too stupid to get it done self)
-	req = signer.SignV4(*req, c.accessKey, c.accessSecret, "", "us-east-01")
+	if err := c.signRequest(ctx, req, request.Content); err != nil {
+		return nil, err
+	}
 	return req, nil
+}
+
+func queryEncode(values url.Values) string {
+	return strings.ReplaceAll(values.Encode(), "+", "%20")
+}
+
+func (c *RustfsAdmin) signRequest(ctx context.Context, req *http.Request, content []byte) error {
+	sum := sha256.Sum256(content)
+	payloadHash := hex.EncodeToString(sum[:])
+	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
+
+	credentials := aws.Credentials{
+		AccessKeyID:     c.accessKey,
+		SecretAccessKey: c.accessSecret,
+	}
+	signer := v4.NewSigner()
+	return signer.SignHTTP(ctx, credentials, req, payloadHash, adminSigningService, adminSigningRegion, time.Now().UTC())
 }
 
 func (c *RustfsAdmin) DoDirectRequest(ctx context.Context, request RequestData) (res *http.Response, err error) {
 	urlStr := strings.Replace(c.endpointURL, "/rustfs/admin/"+rustfsApiVersion, "", 1) + "/" + request.RelPath
 	// If there are any query values, add them to the end.
 	if len(request.QueryValues) > 0 {
-		urlStr = urlStr + "?" + s3utils.QueryEncode(request.QueryValues)
+		urlStr = urlStr + "?" + queryEncode(request.QueryValues)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, request.Method, urlStr, bytes.NewReader(request.Content))
 	if err != nil {
-		return nil, err
+		return
 	}
 	if length := len(request.Content); length > 0 {
 		req.ContentLength = int64(length)
 	}
-	sum := sha256.Sum256(request.Content)
-	req.Header.Set("X-Amz-Content-Sha256", hex.EncodeToString(sum[:]))
-
-	// sign using minio go (too stupid to get it done self)
-	req = signer.SignV4(*req, c.accessKey, c.accessSecret, "", "us-east-01")
+	if err := c.signRequest(ctx, req, request.Content); err != nil {
+		return nil, err
+	}
 
 	res, err = c.httpClient.Do(req)
 	if err != nil {

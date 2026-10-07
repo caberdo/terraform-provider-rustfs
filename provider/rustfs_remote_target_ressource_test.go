@@ -6,12 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 // remoteTargetPeer returns the peer connection settings required to exercise
@@ -68,30 +69,37 @@ func TestAccRemoteTargetResource(t *testing.T) {
 	srcBucket := fmt.Sprintf("tf-rt-src-%d", acctest.RandInt())
 	dstBucket := fmt.Sprintf("tf-rt-dst-%d", acctest.RandInt())
 
-	srcClient, err := testAccMinioClient()
+	srcClient, err := testAccS3Client()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := srcClient.MakeBucket(context.Background(), srcBucket, minio.MakeBucketOptions{}); err != nil {
+	if _, err := srcClient.CreateBucket(context.Background(), &s3.CreateBucketInput{Bucket: aws.String(srcBucket)}); err != nil {
 		t.Fatalf("creating source bucket: %v", err)
 	}
-	t.Cleanup(func() { _ = srcClient.RemoveBucket(context.Background(), srcBucket) })
-	if err := srcClient.SetBucketVersioning(context.Background(), srcBucket, minio.BucketVersioningConfiguration{Status: "Enabled"}); err != nil {
+	t.Cleanup(func() {
+		_, _ = srcClient.DeleteBucket(context.Background(), &s3.DeleteBucketInput{Bucket: aws.String(srcBucket)})
+	})
+	if _, err := srcClient.PutBucketVersioning(context.Background(), &s3.PutBucketVersioningInput{
+		Bucket:                  aws.String(srcBucket),
+		VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled},
+	}); err != nil {
 		t.Fatalf("enabling versioning on source bucket: %v", err)
 	}
 
-	peerClient, err := minio.New(peer.s3Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(peer.accessKey, peer.secretKey, ""),
-		Secure: false,
-	})
+	peerClient, err := newTestS3Client(peer.s3Endpoint, peer.accessKey, peer.secretKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := peerClient.MakeBucket(context.Background(), dstBucket, minio.MakeBucketOptions{}); err != nil {
+	if _, err := peerClient.CreateBucket(context.Background(), &s3.CreateBucketInput{Bucket: aws.String(dstBucket)}); err != nil {
 		t.Fatalf("creating destination bucket on peer: %v", err)
 	}
-	t.Cleanup(func() { _ = peerClient.RemoveBucket(context.Background(), dstBucket) })
-	if err := peerClient.SetBucketVersioning(context.Background(), dstBucket, minio.BucketVersioningConfiguration{Status: "Enabled"}); err != nil {
+	t.Cleanup(func() {
+		_, _ = peerClient.DeleteBucket(context.Background(), &s3.DeleteBucketInput{Bucket: aws.String(dstBucket)})
+	})
+	if _, err := peerClient.PutBucketVersioning(context.Background(), &s3.PutBucketVersioningInput{
+		Bucket:                  aws.String(dstBucket),
+		VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled},
+	}); err != nil {
 		t.Fatalf("enabling versioning on destination bucket: %v", err)
 	}
 

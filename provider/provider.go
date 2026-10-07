@@ -5,15 +5,24 @@ package provider
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"net"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 // Ensure RustfsProvider satisfies various provider interfaces.
@@ -102,28 +111,72 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	secretKey := envOrDefault("RUSTFS_SECRET", config.secretKey())
 
 	// Example client configuration for data sources and resources
-	tr, err := minio.DefaultTransport(config.Ssl.ValueBool())
+	tr := newHTTPTransport(config.Ssl.ValueBool())
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion("us-east-1"),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+		awsconfig.WithHTTPClient(&http.Client{Transport: tr}),
+	)
 	if err != nil {
 		resp.Diagnostics.AddError(err.Error(), err.Error())
 		return
 	}
-	usEast01 := "us-east-1"
-	minio_client, err := minio.New(endpoint, &minio.Options{
-		Secure:    config.Ssl.ValueBool(),
-		Creds:     credentials.NewStaticV4(accessKey, secretKey, ""),
-		Transport: tr,
-		Region:    usEast01,
+
+	scheme := "http"
+	if config.Ssl.ValueBool() {
+		scheme = "https"
+	}
+	endpointURL := endpoint
+	if !strings.Contains(endpointURL, "://") {
+		endpointURL = scheme + "://" + endpointURL
+	}
+
+	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpointURL)
+		o.UsePathStyle = true
 	})
-	if err != nil {
-		resp.Diagnostics.AddError(err.Error(), err.Error())
-		return
-	}
+
 	client := &AllClient{
-		Minio:      minio_client,
+		S3:         s3Client,
 		RustClient: rustfs.New(generatedConfig),
 	}
 	resp.DataSourceData = client
 	resp.ResourceData = client
+}
+
+func newHTTPTransport(secure bool) *http.Transport {
+	tr := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          256,
+		MaxIdleConnsPerHost:   16,
+		ResponseHeaderTimeout: time.Minute,
+		IdleConnTimeout:       time.Minute,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 10 * time.Second,
+		DisableCompression:    true,
+	}
+
+	if secure {
+		tr.TLSClientConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+		if f := os.Getenv("SSL_CERT_FILE"); f != "" {
+			rootCAs, err := x509.SystemCertPool()
+			if err != nil {
+				rootCAs = x509.NewCertPool()
+			}
+			if data, err := os.ReadFile(f); err == nil {
+				rootCAs.AppendCertsFromPEM(data)
+			}
+			tr.TLSClientConfig.RootCAs = rootCAs
+		}
+	}
+
+	return tr
 }
 
 func (p *RustfsProvider) Resources(ctx context.Context) []func() resource.Resource {
