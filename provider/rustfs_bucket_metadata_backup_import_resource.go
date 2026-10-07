@@ -9,17 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ resource.Resource = &BucketMetadataBackupImportResource{}
 
 type BucketMetadataBackupImportResource struct {
 	client *AllClient
-}
-
-type BucketMetadataBackupImportResourceModel struct {
-	ContentBase64 types.String `tfsdk:"content_base64"`
 }
 
 func NewBucketMetadataBackupImportResource() resource.Resource {
@@ -57,7 +53,7 @@ func (r *BucketMetadataBackupImportResource) Configure(_ context.Context, req re
 }
 
 func (r *BucketMetadataBackupImportResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan BucketMetadataBackupImportResourceModel
+	var plan models.BucketMetadataBackupImportResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -78,13 +74,13 @@ func (r *BucketMetadataBackupImportResource) Create(ctx context.Context, req res
 }
 
 func (r *BucketMetadataBackupImportResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state BucketMetadataBackupImportResourceModel
+	var state models.BucketMetadataBackupImportResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *BucketMetadataBackupImportResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BucketMetadataBackupImportResourceModel
+	var plan models.BucketMetadataBackupImportResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return

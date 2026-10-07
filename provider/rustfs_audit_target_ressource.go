@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -34,23 +35,6 @@ func NewAuditTargetRessource() resource.Resource {
 // auditTargetRessource is the resource implementation.
 type auditTargetRessource struct {
 	client *AllClient
-}
-
-type auditTargetRessourceModel struct {
-	TargetType    types.String `tfsdk:"target_type"`
-	TargetName    types.String `tfsdk:"target_name"`
-	Endpoint      types.String `tfsdk:"endpoint"`
-	AuthToken     types.String `tfsdk:"auth_token"`
-	Comment       types.String `tfsdk:"comment"`
-	QueueLimit    types.Int64  `tfsdk:"queue_limit"`
-	QueueDir      types.String `tfsdk:"queue_dir"`
-	ClientCert    types.String `tfsdk:"client_cert"`
-	ClientKey     types.String `tfsdk:"client_key"`
-	ClientCA      types.String `tfsdk:"client_ca"`
-	SkipTLSVerify types.Bool   `tfsdk:"skip_tls_verify"`
-	HealthState   types.String `tfsdk:"health_state"`
-	HealthReason  types.String `tfsdk:"health_reason"`
-	Status        types.String `tfsdk:"status"`
 }
 
 // Metadata returns the resource type name.
@@ -161,7 +145,7 @@ func (r *auditTargetRessource) Configure(_ context.Context, req resource.Configu
 
 // auditTargetKeyValues builds the key/value config body from the resource model,
 // including only the fields the user has actually set.
-func (r *auditTargetRessource) auditTargetKeyValues(plan *auditTargetRessourceModel) []client.AuditTargetKeyValue {
+func (r *auditTargetRessource) auditTargetKeyValues(plan *models.AuditTargetRessourceModel) []client.AuditTargetKeyValue {
 	var kvs []client.AuditTargetKeyValue
 	add := func(key string, value string) {
 		if value != "" {
@@ -192,7 +176,7 @@ func serviceForType(targetType string) string {
 
 // Create adds the audit target and sets the initial Terraform state.
 func (r *auditTargetRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan auditTargetRessourceModel
+	var plan models.AuditTargetRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -222,7 +206,7 @@ func (r *auditTargetRessource) Create(ctx context.Context, req resource.CreateRe
 
 // refreshHealth lists the audit targets and populates the computed health
 // metadata on the model when the target is present.
-func (r *auditTargetRessource) refreshHealth(model *auditTargetRessourceModel) error {
+func (r *auditTargetRessource) refreshHealth(model *models.AuditTargetRessourceModel) error {
 	targets, err := r.client.RustClient.ListAuditTargets()
 	if err != nil {
 		return err
@@ -247,7 +231,7 @@ func (r *auditTargetRessource) refreshHealth(model *auditTargetRessourceModel) e
 // only identity and health metadata, so the config fields are preserved from
 // the prior state and only the health/computed metadata is refreshed.
 func (r *auditTargetRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state auditTargetRessourceModel
+	var state models.AuditTargetRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -287,7 +271,7 @@ func (r *auditTargetRessource) Read(ctx context.Context, req resource.ReadReques
 
 // Update edits the audit target and updates the Terraform state on success.
 func (r *auditTargetRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan auditTargetRessourceModel
+	var plan models.AuditTargetRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -318,7 +302,7 @@ func (r *auditTargetRessource) Update(ctx context.Context, req resource.UpdateRe
 // Terraform state. The admin API exposes no plain delete for targets, so
 // destroy goes through the reset endpoint.
 func (r *auditTargetRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var state auditTargetRessourceModel
+	var state models.AuditTargetRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return

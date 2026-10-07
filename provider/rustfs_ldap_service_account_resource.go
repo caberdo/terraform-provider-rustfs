@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -28,15 +29,6 @@ func NewLDAPServiceAccountResource() resource.Resource {
 // LDAPServiceAccountResource is the resource implementation.
 type LDAPServiceAccountResource struct {
 	client *AllClient
-}
-
-type LDAPServiceAccountResourceModel struct {
-	AccessKey   types.String `tfsdk:"access_key"`
-	SecretKey   types.String `tfsdk:"secret_key"`
-	Name        types.String `tfsdk:"name"`
-	Description types.String `tfsdk:"description"`
-	User        types.String `tfsdk:"user"`
-	Policy      types.String `tfsdk:"policy"`
 }
 
 // Metadata returns the resource type name.
@@ -106,7 +98,7 @@ func (r *LDAPServiceAccountResource) Configure(_ context.Context, req resource.C
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *LDAPServiceAccountResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan LDAPServiceAccountResourceModel
+	var plan models.LDAPServiceAccountResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -135,7 +127,7 @@ func (r *LDAPServiceAccountResource) Create(ctx context.Context, req resource.Cr
 
 // Read refreshes the Terraform state with the latest data.
 func (r *LDAPServiceAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state LDAPServiceAccountResourceModel
+	var state models.LDAPServiceAccountResourceModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -173,7 +165,7 @@ func (r *LDAPServiceAccountResource) Read(ctx context.Context, req resource.Read
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *LDAPServiceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan LDAPServiceAccountResourceModel
+	var plan models.LDAPServiceAccountResourceModel
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -204,7 +196,7 @@ func (r *LDAPServiceAccountResource) Update(ctx context.Context, req resource.Up
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *LDAPServiceAccountResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data LDAPServiceAccountResourceModel
+	var data models.LDAPServiceAccountResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

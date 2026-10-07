@@ -7,16 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &GroupsDataSource{}
 
 type GroupsDataSource struct {
 	client *AllClient
-}
-
-type GroupsDataSourceModel struct {
-	Groups types.Set `tfsdk:"groups"`
 }
 
 func NewGroupsDataSource() datasource.DataSource {
@@ -71,7 +68,7 @@ func (d *GroupsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state := GroupsDataSourceModel{
+	state := models.GroupsDataSourceModel{
 		Groups: set,
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

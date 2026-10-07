@@ -12,72 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &ServerInfoDataSource{}
 
 type ServerInfoDataSource struct {
 	client *AllClient
-}
-
-type ServerInfoDataSourceModel struct {
-	Mode              types.String `tfsdk:"mode"`
-	DeploymentID      types.String `tfsdk:"deployment_id"`
-	Region            types.String `tfsdk:"region"`
-	BitrotSelftest    types.String `tfsdk:"bitrot_selftest"`
-	BackendType       types.String `tfsdk:"backend_type"`
-	OfflineDisks      types.Int64  `tfsdk:"offline_disks"`
-	OnlineDisks       types.Int64  `tfsdk:"online_disks"`
-	TotalDrivesPerSet types.List   `tfsdk:"total_drives_per_set"`
-	TotalSets         types.List   `tfsdk:"total_sets"`
-	BucketCount       types.Int64  `tfsdk:"bucket_count"`
-	ObjectCount       types.Int64  `tfsdk:"object_count"`
-	VersionCount      types.Int64  `tfsdk:"version_count"`
-	DeleteMarkerCount types.Int64  `tfsdk:"delete_marker_count"`
-	UsageSize         types.Int64  `tfsdk:"usage_size"`
-	PoolCount         types.Int64  `tfsdk:"pool_count"`
-	Pools             types.List   `tfsdk:"pools"`
-	Servers           types.List   `tfsdk:"servers"`
-	RawJSON           types.String `tfsdk:"raw_json"`
-}
-
-type serverInfoPoolModel struct {
-	PoolNumber         types.Int64 `tfsdk:"pool_number"`
-	SetNumber          types.Int64 `tfsdk:"set_number"`
-	ID                 types.Int64 `tfsdk:"id"`
-	RawCapacity        types.Int64 `tfsdk:"raw_capacity"`
-	RawUsage           types.Int64 `tfsdk:"raw_usage"`
-	Usage              types.Int64 `tfsdk:"usage"`
-	ObjectsCount       types.Int64 `tfsdk:"objects_count"`
-	VersionsCount      types.Int64 `tfsdk:"versions_count"`
-	DeleteMarkersCount types.Int64 `tfsdk:"delete_markers_count"`
-	HealDisks          types.Int64 `tfsdk:"heal_disks"`
-}
-
-type serverInfoDriveModel struct {
-	Endpoint     types.String  `tfsdk:"endpoint"`
-	Path         types.String  `tfsdk:"path"`
-	State        types.String  `tfsdk:"state"`
-	RuntimeState types.String  `tfsdk:"runtime_state"`
-	Healing      types.Bool    `tfsdk:"healing"`
-	Local        types.Bool    `tfsdk:"local"`
-	UUID         types.String  `tfsdk:"uuid"`
-	Totalspace   types.Int64   `tfsdk:"totalspace"`
-	Usedspace    types.Int64   `tfsdk:"usedspace"`
-	Availspace   types.Int64   `tfsdk:"availspace"`
-	Utilization  types.Float64 `tfsdk:"utilization"`
-}
-
-type serverInfoServerModel struct {
-	Endpoint      types.String           `tfsdk:"endpoint"`
-	State         types.String           `tfsdk:"state"`
-	Version       types.String           `tfsdk:"version"`
-	Uptime        types.Int64            `tfsdk:"uptime"`
-	NumCPU        types.Int64            `tfsdk:"num_cpu"`
-	MaxProcs      types.Int64            `tfsdk:"max_procs"`
-	MemAlloc      types.Int64            `tfsdk:"mem_alloc"`
-	MemTotalAlloc types.Int64            `tfsdk:"mem_total_alloc"`
-	Drives        []serverInfoDriveModel `tfsdk:"drives"`
 }
 
 func NewServerInfoDataSource() datasource.DataSource {
@@ -300,7 +241,7 @@ func (d *ServerInfoDataSource) Read(ctx context.Context, _ datasource.ReadReques
 		return
 	}
 
-	state := ServerInfoDataSourceModel{
+	state := models.ServerInfoDataSourceModel{
 		Mode:              types.StringValue(info.Info.Mode),
 		DeploymentID:      types.StringValue(info.Info.DeploymentID),
 		Region:            optionalString(info.Info.Region),
@@ -411,8 +352,8 @@ func driveObjectType() map[string]attr.Type {
 	}
 }
 
-func flattenPools(pools map[string]map[string]client.PoolSetInfo) []serverInfoPoolModel {
-	var out []serverInfoPoolModel
+func flattenPools(pools map[string]map[string]client.PoolSetInfo) []models.ServerInfoPoolModel {
+	var out []models.ServerInfoPoolModel
 	var poolNumbers []int
 	for poolNumber := range pools {
 		n, err := strconv.Atoi(poolNumber)
@@ -435,7 +376,7 @@ func flattenPools(pools map[string]map[string]client.PoolSetInfo) []serverInfoPo
 		sort.Ints(setNumbers)
 		for _, setNumber := range setNumbers {
 			p := sets[strconv.Itoa(setNumber)]
-			out = append(out, serverInfoPoolModel{
+			out = append(out, models.ServerInfoPoolModel{
 				PoolNumber:         types.Int64Value(int64(poolNumber)),
 				SetNumber:          types.Int64Value(int64(setNumber)),
 				ID:                 types.Int64Value(p.ID),
@@ -452,12 +393,12 @@ func flattenPools(pools map[string]map[string]client.PoolSetInfo) []serverInfoPo
 	return out
 }
 
-func flattenServers(servers []client.ServerEntry) []serverInfoServerModel {
-	out := make([]serverInfoServerModel, 0, len(servers))
+func flattenServers(servers []client.ServerEntry) []models.ServerInfoServerModel {
+	out := make([]models.ServerInfoServerModel, 0, len(servers))
 	for _, s := range servers {
-		drives := make([]serverInfoDriveModel, 0, len(s.Drives))
+		drives := make([]models.ServerInfoDriveModel, 0, len(s.Drives))
 		for _, dr := range s.Drives {
-			drives = append(drives, serverInfoDriveModel{
+			drives = append(drives, models.ServerInfoDriveModel{
 				Endpoint:     types.StringValue(dr.Endpoint),
 				Path:         types.StringValue(dr.Path),
 				State:        types.StringValue(dr.State),
@@ -471,7 +412,7 @@ func flattenServers(servers []client.ServerEntry) []serverInfoServerModel {
 				Utilization:  types.Float64Value(dr.Utilization),
 			})
 		}
-		out = append(out, serverInfoServerModel{
+		out = append(out, models.ServerInfoServerModel{
 			Endpoint: types.StringValue(s.Endpoint),
 			State:    types.StringValue(s.State),
 			Version:  types.StringValue(s.Version),

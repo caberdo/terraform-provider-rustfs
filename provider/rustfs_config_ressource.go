@@ -12,18 +12,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
 	_ resource.Resource                = &ConfigRessource{}
 	_ resource.ResourceWithImportState = &ConfigRessource{}
 )
-
-type ConfigRessourceModel struct {
-	SubSystem types.String `tfsdk:"sub_system"`
-	Settings  types.Map    `tfsdk:"settings"`
-	ID        types.String `tfsdk:"id"`
-}
 
 func NewConfigRessource() resource.Resource {
 	return &ConfigRessource{}
@@ -103,7 +98,7 @@ func settingsFromConfigKVs(ctx context.Context, kvs []client.ConfigKV) types.Map
 }
 
 func (r *ConfigRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ConfigRessourceModel
+	var plan models.ConfigRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -127,7 +122,7 @@ func (r *ConfigRessource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *ConfigRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state ConfigRessourceModel
+	var state models.ConfigRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -152,7 +147,7 @@ func (r *ConfigRessource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *ConfigRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ConfigRessourceModel
+	var plan models.ConfigRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -176,7 +171,7 @@ func (r *ConfigRessource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *ConfigRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ConfigRessourceModel
+	var data models.ConfigRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

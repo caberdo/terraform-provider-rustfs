@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &StorageInfoDataSource{}
@@ -44,31 +45,6 @@ var storageDiskAttrTypes = map[string]attr.Type{
 
 type StorageInfoDataSource struct {
 	client *AllClient
-}
-
-type StorageInfoDataSourceModel struct {
-	Backend types.Object `tfsdk:"backend"`
-	Disks   types.List   `tfsdk:"disks"`
-	RawJSON types.String `tfsdk:"raw_json"`
-}
-
-type storageDiskModel struct {
-	DiskIndex    types.Int64  `tfsdk:"disk_index"`
-	Endpoint     types.String `tfsdk:"endpoint"`
-	AvailSpace   types.Int64  `tfsdk:"avail_space"`
-	FreeInodes   types.Int64  `tfsdk:"free_inodes"`
-	UsedInodes   types.Int64  `tfsdk:"used_inodes"`
-	Healing      types.Bool   `tfsdk:"healing"`
-	Local        types.Bool   `tfsdk:"local"`
-	Path         types.String `tfsdk:"path"`
-	PoolIndex    types.Int64  `tfsdk:"pool_index"`
-	RuntimeState types.String `tfsdk:"runtime_state"`
-	Scanning     types.Bool   `tfsdk:"scanning"`
-	SetIndex     types.Int64  `tfsdk:"set_index"`
-	State        types.String `tfsdk:"state"`
-	TotalSpace   types.Int64  `tfsdk:"total_space"`
-	UsedSpace    types.Int64  `tfsdk:"used_space"`
-	UUID         types.String `tfsdk:"uuid"`
 }
 
 func NewStorageInfoDataSource() datasource.DataSource {
@@ -197,7 +173,7 @@ func (d *StorageInfoDataSource) Read(ctx context.Context, _ datasource.ReadReque
 		return
 	}
 
-	state := StorageInfoDataSourceModel{
+	state := models.StorageInfoDataSourceModel{
 		RawJSON: types.StringValue(string(raw)),
 	}
 
@@ -234,9 +210,9 @@ func (d *StorageInfoDataSource) Read(ctx context.Context, _ datasource.ReadReque
 		state.Backend = backendObj
 	}
 
-	disks := make([]storageDiskModel, 0, len(info.Info.Disks))
+	disks := make([]models.StorageDiskModel, 0, len(info.Info.Disks))
 	for _, disk := range info.Info.Disks {
-		disks = append(disks, storageDiskModel{
+		disks = append(disks, models.StorageDiskModel{
 			DiskIndex:    types.Int64Value(int64(disk.DiskIndex)),
 			Endpoint:     types.StringValue(disk.Endpoint),
 			AvailSpace:   types.Int64Value(disk.AvailSpace),

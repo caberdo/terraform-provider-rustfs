@@ -8,16 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &IamBackupDataSource{}
 
 type IamBackupDataSource struct {
 	client *AllClient
-}
-
-type IamBackupDataSourceModel struct {
-	ContentBase64 types.String `tfsdk:"content_base64"`
 }
 
 func NewIamBackupDataSource() datasource.DataSource {
@@ -58,7 +55,7 @@ func (d *IamBackupDataSource) Configure(_ context.Context, req datasource.Config
 }
 
 func (d *IamBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config IamBackupDataSourceModel
+	var config models.IamBackupDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

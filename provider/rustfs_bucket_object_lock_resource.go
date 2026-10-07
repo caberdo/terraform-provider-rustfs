@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -21,13 +22,6 @@ var (
 
 type BucketObjectLockResource struct {
 	client *AllClient
-}
-
-type BucketObjectLockResourceModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Mode   types.String `tfsdk:"mode"`
-	Days   types.Int64  `tfsdk:"days"`
-	Years  types.Int64  `tfsdk:"years"`
 }
 
 func NewBucketObjectLockResource() resource.Resource {
@@ -87,7 +81,7 @@ func (r *BucketObjectLockResource) Configure(_ context.Context, req resource.Con
 	r.client = client
 }
 
-func (r *BucketObjectLockResource) setConfig(ctx context.Context, plan BucketObjectLockResourceModel) error {
+func (r *BucketObjectLockResource) setConfig(ctx context.Context, plan models.BucketObjectLockResourceModel) error {
 	mode := minio.RetentionMode(plan.Mode.ValueString())
 	daysVal := plan.Days.ValueInt64()
 	yearsVal := plan.Years.ValueInt64()
@@ -116,7 +110,7 @@ func (r *BucketObjectLockResource) setConfig(ctx context.Context, plan BucketObj
 }
 
 func (r *BucketObjectLockResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan BucketObjectLockResourceModel
+	var plan models.BucketObjectLockResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -134,7 +128,7 @@ func (r *BucketObjectLockResource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *BucketObjectLockResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state BucketObjectLockResourceModel
+	var state models.BucketObjectLockResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -165,7 +159,7 @@ func (r *BucketObjectLockResource) Read(ctx context.Context, req resource.ReadRe
 }
 
 func (r *BucketObjectLockResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BucketObjectLockResourceModel
+	var plan models.BucketObjectLockResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return

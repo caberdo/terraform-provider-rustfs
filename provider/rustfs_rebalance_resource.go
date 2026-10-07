@@ -7,16 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ resource.Resource = &RebalanceResource{}
 
 type RebalanceResource struct {
 	client *AllClient
-}
-
-type RebalanceResourceModel struct {
-	ID types.String `tfsdk:"id"`
 }
 
 func NewRebalanceResource() resource.Resource {
@@ -53,7 +50,7 @@ func (r *RebalanceResource) Configure(_ context.Context, req resource.ConfigureR
 }
 
 func (r *RebalanceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan RebalanceResourceModel
+	var plan models.RebalanceResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -69,7 +66,7 @@ func (r *RebalanceResource) Create(ctx context.Context, req resource.CreateReque
 }
 
 func (r *RebalanceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state RebalanceResourceModel
+	var state models.RebalanceResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

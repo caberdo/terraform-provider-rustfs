@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -26,15 +27,6 @@ func NewSiteReplicationRessource() resource.Resource {
 
 type SiteReplicationRessource struct {
 	client *AllClient
-}
-
-type SiteReplicationRessourceModel struct {
-	Name          types.String `tfsdk:"name"`
-	Endpoint      types.String `tfsdk:"endpoint"`
-	AccessKey     types.String `tfsdk:"access_key"`
-	SecretKey     types.String `tfsdk:"secret_key"`
-	SkipTLSVerify types.Bool   `tfsdk:"skip_tls_verify"`
-	CACertPEM     types.String `tfsdk:"ca_cert_pem"`
 }
 
 func (r *SiteReplicationRessource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -97,7 +89,7 @@ func (r *SiteReplicationRessource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *SiteReplicationRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan SiteReplicationRessourceModel
+	var plan models.SiteReplicationRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -111,7 +103,7 @@ func (r *SiteReplicationRessource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *SiteReplicationRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state SiteReplicationRessourceModel
+	var state models.SiteReplicationRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -138,7 +130,7 @@ func (r *SiteReplicationRessource) Read(ctx context.Context, req resource.ReadRe
 }
 
 func (r *SiteReplicationRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan SiteReplicationRessourceModel
+	var plan models.SiteReplicationRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -152,7 +144,7 @@ func (r *SiteReplicationRessource) Update(ctx context.Context, req resource.Upda
 }
 
 func (r *SiteReplicationRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data SiteReplicationRessourceModel
+	var data models.SiteReplicationRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -166,7 +158,7 @@ func (r *SiteReplicationRessource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
 }
 
-func modelToSite(plan SiteReplicationRessourceModel) client.SiteReplicationSite {
+func modelToSite(plan models.SiteReplicationRessourceModel) client.SiteReplicationSite {
 	return client.SiteReplicationSite{
 		Name:          plan.Name.ValueString(),
 		Endpoint:      strings.TrimSuffix(plan.Endpoint.ValueString(), "/"),

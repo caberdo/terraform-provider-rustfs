@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -25,19 +26,6 @@ var (
 // or notification ARNs in rustfs.
 type RemoteTargetRessource struct {
 	client *AllClient
-}
-
-type RemoteTargetRessourceModel struct {
-	Arn          types.String `tfsdk:"arn"`
-	Type         types.String `tfsdk:"type"`
-	Endpoint     types.String `tfsdk:"endpoint"`
-	AccessKey    types.String `tfsdk:"access_key"`
-	SecretKey    types.String `tfsdk:"secret_key"`
-	Secure       types.Bool   `tfsdk:"secure"`
-	Region       types.String `tfsdk:"region"`
-	Path         types.String `tfsdk:"path"`
-	Bucket       types.String `tfsdk:"bucket"`
-	TargetBucket types.String `tfsdk:"target_bucket"`
 }
 
 // NewRemoteTargetRessource returns a new RemoteTargetRessource.
@@ -132,7 +120,7 @@ func (r *RemoteTargetRessource) Configure(_ context.Context, req resource.Config
 }
 
 func (r *RemoteTargetRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan RemoteTargetRessourceModel
+	var plan models.RemoteTargetRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -148,7 +136,7 @@ func (r *RemoteTargetRessource) Create(ctx context.Context, req resource.CreateR
 }
 
 func (r *RemoteTargetRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state RemoteTargetRessourceModel
+	var state models.RemoteTargetRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -191,7 +179,7 @@ func (r *RemoteTargetRessource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *RemoteTargetRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan, state RemoteTargetRessourceModel
+	var plan, state models.RemoteTargetRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -209,7 +197,7 @@ func (r *RemoteTargetRessource) Update(ctx context.Context, req resource.UpdateR
 }
 
 func (r *RemoteTargetRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data RemoteTargetRessourceModel
+	var data models.RemoteTargetRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -234,7 +222,7 @@ func (r *RemoteTargetRessource) ImportState(ctx context.Context, req resource.Im
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("arn"), parts[1])...)
 }
 
-func (r *RemoteTargetRessource) targetFromModel(plan RemoteTargetRessourceModel) client.RemoteTarget {
+func (r *RemoteTargetRessource) targetFromModel(plan models.RemoteTargetRessourceModel) client.RemoteTarget {
 	return client.RemoteTarget{
 		Type:         plan.Type.ValueString(),
 		Endpoint:     plan.Endpoint.ValueString(),

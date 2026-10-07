@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -24,13 +25,6 @@ var (
 
 type LDAPPolicyAttachmentRessource struct {
 	client *AllClient
-}
-
-type LDAPPolicyAttachmentRessourceModel struct {
-	UserOrGroup types.String `tfsdk:"user_or_group"`
-	Policy      types.String `tfsdk:"policy"`
-	IsGroup     types.Bool   `tfsdk:"is_group"`
-	ID          types.String `tfsdk:"id"`
 }
 
 func NewLDAPPolicyAttachmentRessource() resource.Resource {
@@ -93,7 +87,7 @@ func (r *LDAPPolicyAttachmentRessource) Configure(_ context.Context, req resourc
 }
 
 func (r *LDAPPolicyAttachmentRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan LDAPPolicyAttachmentRessourceModel
+	var plan models.LDAPPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -118,7 +112,7 @@ func (r *LDAPPolicyAttachmentRessource) Create(ctx context.Context, req resource
 }
 
 func (r *LDAPPolicyAttachmentRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state LDAPPolicyAttachmentRessourceModel
+	var state models.LDAPPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -135,7 +129,7 @@ func (r *LDAPPolicyAttachmentRessource) Read(ctx context.Context, req resource.R
 }
 
 func (r *LDAPPolicyAttachmentRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan LDAPPolicyAttachmentRessourceModel
+	var plan models.LDAPPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -159,7 +153,7 @@ func (r *LDAPPolicyAttachmentRessource) Update(ctx context.Context, req resource
 }
 
 func (r *LDAPPolicyAttachmentRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data LDAPPolicyAttachmentRessourceModel
+	var data models.LDAPPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -24,12 +25,6 @@ func NewBucketPolicyRessource() resource.Resource {
 
 type bucketPolicyRessource struct {
 	client *AllClient
-}
-
-type bucketPolicyModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Id     types.String `tfsdk:"id"`
-	Policy types.String `tfsdk:"policy"`
 }
 
 func (r *bucketPolicyRessource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -79,7 +74,7 @@ func (r *bucketPolicyRessource) Configure(_ context.Context, req resource.Config
 }
 
 func (r *bucketPolicyRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketPolicyModel
+	var plan models.BucketPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -101,7 +96,7 @@ func (r *bucketPolicyRessource) Create(ctx context.Context, req resource.CreateR
 }
 
 func (r *bucketPolicyRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketPolicyModel
+	var state models.BucketPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -126,7 +121,7 @@ func (r *bucketPolicyRessource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *bucketPolicyRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketPolicyModel
+	var plan models.BucketPolicyModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -146,7 +141,7 @@ func (r *bucketPolicyRessource) Update(ctx context.Context, req resource.UpdateR
 }
 
 func (r *bucketPolicyRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketPolicyModel
+	var data models.BucketPolicyModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

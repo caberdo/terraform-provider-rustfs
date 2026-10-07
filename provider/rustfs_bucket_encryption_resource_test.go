@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 func TestBucketEncryptionResourceSchema(t *testing.T) {
@@ -39,7 +40,7 @@ func TestBucketEncryptionResourceMetadata(t *testing.T) {
 }
 
 func TestBuildEncryptionConfig_AES256(t *testing.T) {
-	plan := BucketEncryptionResourceModel{
+	plan := models.BucketEncryptionResourceModel{
 		Bucket:    types.StringValue("test-bucket"),
 		Algorithm: types.StringValue("AES256"),
 	}
@@ -57,7 +58,7 @@ func TestBuildEncryptionConfig_AES256(t *testing.T) {
 }
 
 func TestBuildEncryptionConfig_AWSKMS(t *testing.T) {
-	plan := BucketEncryptionResourceModel{
+	plan := models.BucketEncryptionResourceModel{
 		Bucket:         types.StringValue("test-bucket"),
 		Algorithm:      types.StringValue("aws:kms"),
 		KmsMasterKeyID: types.StringValue("arn:aws:kms:us-east-1:123456789012:key/abcd"),

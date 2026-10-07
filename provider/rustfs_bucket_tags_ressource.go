@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -28,12 +29,6 @@ func NewBucketTagsRessource() resource.Resource {
 // bucketTagsRessource is the resource implementation.
 type bucketTagsRessource struct {
 	client *AllClient
-}
-
-type bucketTagsModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Id     types.String `tfsdk:"id"`
-	Tags   types.Map    `tfsdk:"tags"`
 }
 
 // Metadata returns the resource type name.
@@ -87,7 +82,7 @@ func (r *bucketTagsRessource) Configure(_ context.Context, req resource.Configur
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *bucketTagsRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketTagsModel
+	var plan models.BucketTagsModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -116,7 +111,7 @@ func (r *bucketTagsRessource) Create(ctx context.Context, req resource.CreateReq
 
 // Read refreshes the Terraform state with the latest data.
 func (r *bucketTagsRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketTagsModel
+	var state models.BucketTagsModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -150,7 +145,7 @@ func (r *bucketTagsRessource) Read(ctx context.Context, req resource.ReadRequest
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *bucketTagsRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketTagsModel
+	var plan models.BucketTagsModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -177,7 +172,7 @@ func (r *bucketTagsRessource) Update(ctx context.Context, req resource.UpdateReq
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *bucketTagsRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketTagsModel
+	var data models.BucketTagsModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

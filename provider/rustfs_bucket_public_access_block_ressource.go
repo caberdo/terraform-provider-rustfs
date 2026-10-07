@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -29,15 +30,6 @@ func NewBucketPublicAccessBlockRessource() resource.Resource {
 // bucketPublicAccessBlockRessource is the resource implementation.
 type bucketPublicAccessBlockRessource struct {
 	client *AllClient
-}
-
-type bucketPublicAccessBlockModel struct {
-	Bucket                types.String `tfsdk:"bucket"`
-	Id                    types.String `tfsdk:"id"`
-	BlockPublicAcls       types.Bool   `tfsdk:"block_public_acls"`
-	IgnorePublicAcls      types.Bool   `tfsdk:"ignore_public_acls"`
-	BlockPublicPolicy     types.Bool   `tfsdk:"block_public_policy"`
-	RestrictPublicBuckets types.Bool   `tfsdk:"restrict_public_buckets"`
 }
 
 // Metadata returns the resource type name.
@@ -106,7 +98,7 @@ func (r *bucketPublicAccessBlockRessource) Configure(_ context.Context, req reso
 
 // Create creates the resource and sets the initial Terraform state.
 func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketPublicAccessBlockModel
+	var plan models.BucketPublicAccessBlockModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -136,7 +128,7 @@ func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resou
 
 // Read refreshes the Terraform state with the latest data.
 func (r *bucketPublicAccessBlockRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketPublicAccessBlockModel
+	var state models.BucketPublicAccessBlockModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -167,7 +159,7 @@ func (r *bucketPublicAccessBlockRessource) Read(ctx context.Context, req resourc
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *bucketPublicAccessBlockRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketPublicAccessBlockModel
+	var plan models.BucketPublicAccessBlockModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -195,7 +187,7 @@ func (r *bucketPublicAccessBlockRessource) Update(ctx context.Context, req resou
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *bucketPublicAccessBlockRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketPublicAccessBlockModel
+	var data models.BucketPublicAccessBlockModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

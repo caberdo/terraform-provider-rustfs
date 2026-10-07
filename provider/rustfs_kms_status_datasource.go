@@ -9,40 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &KmsStatusDataSource{}
 
 type KmsStatusDataSource struct {
 	client *AllClient
-}
-
-type kmsCacheStatsModel struct {
-	HitCount      types.Int64 `tfsdk:"hit_count"`
-	MissCount     types.Int64 `tfsdk:"miss_count"`
-	EntryCount    types.Int64 `tfsdk:"entry_count"`
-	EvictionCount types.Int64 `tfsdk:"eviction_count"`
-}
-
-type kmsClusterNodeModel struct {
-	Host              types.String `tfsdk:"host"`
-	ConfigFingerprint types.String `tfsdk:"config_fingerprint"`
-	Error             types.String `tfsdk:"error"`
-}
-
-type kmsClusterConfigModel struct {
-	Consistent types.Bool            `tfsdk:"consistent"`
-	Nodes      []kmsClusterNodeModel `tfsdk:"nodes"`
-}
-
-type KmsStatusDataSourceModel struct {
-	BackendType   types.String           `tfsdk:"backend_type"`
-	BackendStatus types.String           `tfsdk:"backend_status"`
-	CacheEnabled  types.Bool             `tfsdk:"cache_enabled"`
-	CacheStats    *kmsCacheStatsModel    `tfsdk:"cache_stats"`
-	DefaultKeyID  types.String           `tfsdk:"default_key_id"`
-	Capabilities  types.Map              `tfsdk:"capabilities"`
-	ClusterConfig *kmsClusterConfigModel `tfsdk:"cluster_config"`
 }
 
 func NewKmsStatusDataSource() datasource.DataSource {
@@ -151,7 +124,7 @@ func (d *KmsStatusDataSource) Configure(_ context.Context, req datasource.Config
 }
 
 func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config KmsStatusDataSourceModel
+	var config models.KmsStatusDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -175,8 +148,8 @@ func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func kmsStatusModelFromStatus(ctx context.Context, status *client.KmsStatus) (KmsStatusDataSourceModel, diag.Diagnostics) {
-	var config KmsStatusDataSourceModel
+func kmsStatusModelFromStatus(ctx context.Context, status *client.KmsStatus) (models.KmsStatusDataSourceModel, diag.Diagnostics) {
+	var config models.KmsStatusDataSourceModel
 	var diags diag.Diagnostics
 
 	config.BackendType = types.StringValue(status.BackendType)
@@ -185,7 +158,7 @@ func kmsStatusModelFromStatus(ctx context.Context, status *client.KmsStatus) (Km
 	config.DefaultKeyID = stringFromPtr(status.DefaultKeyID)
 
 	if status.CacheStats != nil {
-		config.CacheStats = &kmsCacheStatsModel{
+		config.CacheStats = &models.KmsCacheStatsModel{
 			HitCount:      types.Int64Value(int64(status.CacheStats.HitCount)),      // #nosec G115
 			MissCount:     types.Int64Value(int64(status.CacheStats.MissCount)),     // #nosec G115
 			EntryCount:    types.Int64Value(int64(status.CacheStats.EntryCount)),    // #nosec G115
@@ -205,15 +178,15 @@ func kmsStatusModelFromStatus(ctx context.Context, status *client.KmsStatus) (Km
 	}
 
 	if status.ClusterConfig != nil {
-		nodes := make([]kmsClusterNodeModel, 0, len(status.ClusterConfig.Nodes))
+		nodes := make([]models.KmsClusterNodeModel, 0, len(status.ClusterConfig.Nodes))
 		for _, node := range status.ClusterConfig.Nodes {
-			nodes = append(nodes, kmsClusterNodeModel{
+			nodes = append(nodes, models.KmsClusterNodeModel{
 				Host:              types.StringValue(node.Host),
 				ConfigFingerprint: stringFromPtr(node.ConfigFingerprint),
 				Error:             stringFromPtr(node.Error),
 			})
 		}
-		config.ClusterConfig = &kmsClusterConfigModel{
+		config.ClusterConfig = &models.KmsClusterConfigModel{
 			Consistent: types.BoolValue(status.ClusterConfig.Consistent),
 			Nodes:      nodes,
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -20,12 +21,6 @@ var (
 
 type ModuleSwitchRessource struct {
 	client *AllClient
-}
-
-type ModuleSwitchRessourceModel struct {
-	ID            types.String `tfsdk:"id"`
-	NotifyEnabled types.Bool   `tfsdk:"notify_enabled"`
-	AuditEnabled  types.Bool   `tfsdk:"audit_enabled"`
 }
 
 func NewModuleSwitchRessource() resource.Resource {
@@ -74,7 +69,7 @@ func (r *ModuleSwitchRessource) Configure(_ context.Context, req resource.Config
 }
 
 func (r *ModuleSwitchRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ModuleSwitchRessourceModel
+	var plan models.ModuleSwitchRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -93,7 +88,7 @@ func (r *ModuleSwitchRessource) Create(ctx context.Context, req resource.CreateR
 }
 
 func (r *ModuleSwitchRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state ModuleSwitchRessourceModel
+	var state models.ModuleSwitchRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -110,7 +105,7 @@ func (r *ModuleSwitchRessource) Read(ctx context.Context, req resource.ReadReque
 }
 
 func (r *ModuleSwitchRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan ModuleSwitchRessourceModel
+	var plan models.ModuleSwitchRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -138,14 +133,14 @@ func (r *ModuleSwitchRessource) ImportState(ctx context.Context, req resource.Im
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }
 
-func moduleSwitchUpdateFromModel(model ModuleSwitchRessourceModel) client.ModuleSwitchUpdate {
+func moduleSwitchUpdateFromModel(model models.ModuleSwitchRessourceModel) client.ModuleSwitchUpdate {
 	return client.ModuleSwitchUpdate{
 		NotifyEnabled: model.NotifyEnabled.ValueBool(),
 		AuditEnabled:  model.AuditEnabled.ValueBool(),
 	}
 }
 
-func applyModuleSwitchState(model *ModuleSwitchRessourceModel, state *client.ModuleSwitchState) {
+func applyModuleSwitchState(model *models.ModuleSwitchRessourceModel, state *client.ModuleSwitchState) {
 	model.NotifyEnabled = types.BoolValue(state.NotifyEnabled)
 	model.AuditEnabled = types.BoolValue(state.AuditEnabled)
 }

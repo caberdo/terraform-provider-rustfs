@@ -10,25 +10,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &ReplicationMetricsDataSource{}
 
 type ReplicationMetricsDataSource struct {
 	client *AllClient
-}
-
-type ReplicationMetricsDataSourceModel struct {
-	Bucket                   types.String `tfsdk:"bucket"`
-	ID                       types.String `tfsdk:"id"`
-	ReplicationCount         types.Int64  `tfsdk:"replication_count"`
-	CompletedReplicationSize types.Int64  `tfsdk:"completed_replication_size"`
-	ReplicaCount             types.Int64  `tfsdk:"replica_count"`
-	ReplicaSize              types.Int64  `tfsdk:"replica_size"`
-	Failed                   types.Object `tfsdk:"failed"`
-	Queued                   types.Object `tfsdk:"queued"`
-	Targets                  types.List   `tfsdk:"targets"`
-	JSON                     types.String `tfsdk:"json"`
 }
 
 var replicationRStatAttrTypes = map[string]attr.Type{
@@ -252,7 +240,7 @@ func (d *ReplicationMetricsDataSource) Configure(_ context.Context, req datasour
 }
 
 func (d *ReplicationMetricsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config ReplicationMetricsDataSourceModel
+	var config models.ReplicationMetricsDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -22,12 +23,6 @@ var (
 
 type GroupResource struct {
 	client *AllClient
-}
-
-type GroupResourceModel struct {
-	Name    types.String `tfsdk:"name"`
-	Status  types.String `tfsdk:"status"`
-	Members types.Set    `tfsdk:"members"`
 }
 
 func NewGroupResource() resource.Resource {
@@ -82,7 +77,7 @@ func (r *GroupResource) Configure(_ context.Context, req resource.ConfigureReque
 }
 
 func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan GroupResourceModel
+	var plan models.GroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -139,7 +134,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 }
 
 func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state GroupResourceModel
+	var state models.GroupResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -163,7 +158,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 }
 
 func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan GroupResourceModel
+	var plan models.GroupResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -216,7 +211,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 }
 
 func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data GroupResourceModel
+	var data models.GroupResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

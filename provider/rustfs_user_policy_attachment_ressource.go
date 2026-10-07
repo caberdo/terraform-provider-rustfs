@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -24,12 +25,6 @@ var (
 // top of the user's primary policy, so a user can hold more than one policy.
 type UserPolicyAttachmentRessource struct {
 	client *AllClient
-}
-
-type UserPolicyAttachmentRessourceModel struct {
-	User   types.String `tfsdk:"user"`
-	Policy types.String `tfsdk:"policy"`
-	ID     types.String `tfsdk:"id"`
 }
 
 // NewUserPolicyAttachmentRessource is a helper function to simplify the provider implementation.
@@ -90,7 +85,7 @@ func (r *UserPolicyAttachmentRessource) Configure(_ context.Context, req resourc
 
 // Create attaches the policy to the user and sets the initial Terraform state.
 func (r *UserPolicyAttachmentRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan UserPolicyAttachmentRessourceModel
+	var plan models.UserPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -115,7 +110,7 @@ func (r *UserPolicyAttachmentRessource) Create(ctx context.Context, req resource
 // operation is idempotent and the user/policy pair is immutable, so the
 // last known state is kept (same pattern as rustfs_bucket).
 func (r *UserPolicyAttachmentRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state UserPolicyAttachmentRessourceModel
+	var state models.UserPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -128,7 +123,7 @@ func (r *UserPolicyAttachmentRessource) Read(ctx context.Context, req resource.R
 // Terraform normally plans a replacement; re-attaching keeps this method
 // correct if it is invoked.
 func (r *UserPolicyAttachmentRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan UserPolicyAttachmentRessourceModel
+	var plan models.UserPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -149,7 +144,7 @@ func (r *UserPolicyAttachmentRessource) Update(ctx context.Context, req resource
 
 // Delete detaches the policy from the user and removes the Terraform state on success.
 func (r *UserPolicyAttachmentRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data UserPolicyAttachmentRessourceModel
+	var data models.UserPolicyAttachmentRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

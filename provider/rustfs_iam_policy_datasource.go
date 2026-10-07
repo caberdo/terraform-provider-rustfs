@@ -7,24 +7,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &IAMPolicyDataSource{}
 
 type IAMPolicyDataSource struct {
 	client *AllClient
-}
-
-type iamPolicyStatementDataSourceModel struct {
-	Effect   types.String `tfsdk:"effect"`
-	Action   types.Set    `tfsdk:"action"`
-	Resource types.Set    `tfsdk:"resource"`
-}
-
-type IAMPolicyDataSourceModel struct {
-	Name      types.String                        `tfsdk:"name"`
-	Version   types.String                        `tfsdk:"version"`
-	Statement []iamPolicyStatementDataSourceModel `tfsdk:"statement"`
 }
 
 func NewIAMPolicyDataSource() datasource.DataSource {
@@ -86,7 +75,7 @@ func (d *IAMPolicyDataSource) Configure(_ context.Context, req datasource.Config
 }
 
 func (d *IAMPolicyDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config IAMPolicyDataSourceModel
+	var config models.IAMPolicyDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -103,7 +92,7 @@ func (d *IAMPolicyDataSource) Read(ctx context.Context, req datasource.ReadReque
 
 	config.Name = types.StringValue(policy.Name)
 	config.Version = types.StringValue(policy.Version)
-	config.Statement = []iamPolicyStatementDataSourceModel{}
+	config.Statement = []models.IamPolicyStatementDataSourceModel{}
 	for _, s := range policy.Statement {
 		actions, diags := types.SetValueFrom(ctx, types.StringType, s.Action)
 		resp.Diagnostics.Append(diags...)
@@ -112,7 +101,7 @@ func (d *IAMPolicyDataSource) Read(ctx context.Context, req datasource.ReadReque
 		if resp.Diagnostics.HasError() {
 			return
 		}
-		config.Statement = append(config.Statement, iamPolicyStatementDataSourceModel{
+		config.Statement = append(config.Statement, models.IamPolicyStatementDataSourceModel{
 			Effect:   types.StringValue(s.Effect),
 			Action:   actions,
 			Resource: resources,

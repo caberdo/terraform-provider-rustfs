@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -27,21 +28,6 @@ func NewBucketCorsRessource() resource.Resource {
 
 type bucketCorsRessource struct {
 	client *AllClient
-}
-
-type bucketCorsModel struct {
-	Bucket types.String    `tfsdk:"bucket"`
-	Id     types.String    `tfsdk:"id"`
-	Rule   []corsRuleModel `tfsdk:"rule"`
-}
-
-type corsRuleModel struct {
-	AllowedHeaders types.Set    `tfsdk:"allowed_headers"`
-	AllowedMethods types.Set    `tfsdk:"allowed_methods"`
-	AllowedOrigins types.Set    `tfsdk:"allowed_origins"`
-	ExposeHeaders  types.Set    `tfsdk:"expose_headers"`
-	MaxAgeSeconds  types.Int64  `tfsdk:"max_age_seconds"`
-	Id             types.String `tfsdk:"id"`
 }
 
 func (r *bucketCorsRessource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -140,7 +126,7 @@ func stringSliceFromSet(ctx context.Context, s types.Set) []string {
 	return out
 }
 
-func buildCorsConfig(ctx context.Context, plan bucketCorsModel) *client.CORSConfiguration {
+func buildCorsConfig(ctx context.Context, plan models.BucketCorsModel) *client.CORSConfiguration {
 	rules := make([]client.CORSRule, 0, len(plan.Rule))
 	for _, rp := range plan.Rule {
 		rule := client.CORSRule{
@@ -156,10 +142,10 @@ func buildCorsConfig(ctx context.Context, plan bucketCorsModel) *client.CORSConf
 	return &client.CORSConfiguration{Rules: rules}
 }
 
-func flattenCorsRules(cfg *client.CORSConfiguration) []corsRuleModel {
-	rules := make([]corsRuleModel, 0, len(cfg.Rules))
+func flattenCorsRules(cfg *client.CORSConfiguration) []models.CorsRuleModel {
+	rules := make([]models.CorsRuleModel, 0, len(cfg.Rules))
 	for _, rc := range cfg.Rules {
-		rules = append(rules, corsRuleModel{
+		rules = append(rules, models.CorsRuleModel{
 			Id:             types.StringValue(rc.ID),
 			MaxAgeSeconds:  types.Int64Value(int64(rc.MaxAgeSeconds)),
 			AllowedHeaders: stringSetFromSlice(rc.AllowedHeaders),
@@ -172,7 +158,7 @@ func flattenCorsRules(cfg *client.CORSConfiguration) []corsRuleModel {
 }
 
 func (r *bucketCorsRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan bucketCorsModel
+	var plan models.BucketCorsModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -194,7 +180,7 @@ func (r *bucketCorsRessource) Create(ctx context.Context, req resource.CreateReq
 }
 
 func (r *bucketCorsRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state bucketCorsModel
+	var state models.BucketCorsModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -221,7 +207,7 @@ func (r *bucketCorsRessource) Read(ctx context.Context, req resource.ReadRequest
 }
 
 func (r *bucketCorsRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan bucketCorsModel
+	var plan models.BucketCorsModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -241,7 +227,7 @@ func (r *bucketCorsRessource) Update(ctx context.Context, req resource.UpdateReq
 }
 
 func (r *bucketCorsRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data bucketCorsModel
+	var data models.BucketCorsModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

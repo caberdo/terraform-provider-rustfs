@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7/pkg/sse"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -20,12 +21,6 @@ var (
 
 type BucketEncryptionResource struct {
 	client *AllClient
-}
-
-type BucketEncryptionResourceModel struct {
-	Bucket         types.String `tfsdk:"bucket"`
-	Algorithm      types.String `tfsdk:"algorithm"`
-	KmsMasterKeyID types.String `tfsdk:"kms_master_key_id"`
 }
 
 func NewBucketEncryptionResource() resource.Resource {
@@ -76,7 +71,7 @@ func (r *BucketEncryptionResource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *BucketEncryptionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan BucketEncryptionResourceModel
+	var plan models.BucketEncryptionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -95,7 +90,7 @@ func (r *BucketEncryptionResource) Create(ctx context.Context, req resource.Crea
 }
 
 func (r *BucketEncryptionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state BucketEncryptionResourceModel
+	var state models.BucketEncryptionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -119,7 +114,7 @@ func (r *BucketEncryptionResource) Read(ctx context.Context, req resource.ReadRe
 }
 
 func (r *BucketEncryptionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BucketEncryptionResourceModel
+	var plan models.BucketEncryptionResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -138,7 +133,7 @@ func (r *BucketEncryptionResource) Update(ctx context.Context, req resource.Upda
 }
 
 func (r *BucketEncryptionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data BucketEncryptionResourceModel
+	var data models.BucketEncryptionResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -158,7 +153,7 @@ func (r *BucketEncryptionResource) ImportState(ctx context.Context, req resource
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func buildEncryptionConfig(plan BucketEncryptionResourceModel) *sse.Configuration {
+func buildEncryptionConfig(plan models.BucketEncryptionResourceModel) *sse.Configuration {
 	return &sse.Configuration{
 		Rules: []sse.Rule{
 			{

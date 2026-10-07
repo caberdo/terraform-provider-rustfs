@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -26,11 +27,6 @@ func NewBucketDurabilityRessource() resource.Resource {
 
 type BucketDurabilityRessource struct {
 	client *AllClient
-}
-
-type BucketDurabilityRessourceModel struct {
-	Bucket types.String `tfsdk:"bucket"`
-	Mode   types.String `tfsdk:"mode"`
 }
 
 func (r *BucketDurabilityRessource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -76,7 +72,7 @@ func (r *BucketDurabilityRessource) Configure(_ context.Context, req resource.Co
 }
 
 func (r *BucketDurabilityRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan BucketDurabilityRessourceModel
+	var plan models.BucketDurabilityRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -95,7 +91,7 @@ func (r *BucketDurabilityRessource) Create(ctx context.Context, req resource.Cre
 }
 
 func (r *BucketDurabilityRessource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state BucketDurabilityRessourceModel
+	var state models.BucketDurabilityRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -113,7 +109,7 @@ func (r *BucketDurabilityRessource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *BucketDurabilityRessource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan BucketDurabilityRessourceModel
+	var plan models.BucketDurabilityRessourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -132,7 +128,7 @@ func (r *BucketDurabilityRessource) Update(ctx context.Context, req resource.Upd
 }
 
 func (r *BucketDurabilityRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data BucketDurabilityRessourceModel
+	var data models.BucketDurabilityRessourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return

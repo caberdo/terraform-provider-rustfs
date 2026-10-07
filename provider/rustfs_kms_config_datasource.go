@@ -9,20 +9,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &KmsConfigDataSource{}
 
 type KmsConfigDataSource struct {
 	client *AllClient
-}
-
-type KmsConfigDataSourceModel struct {
-	Backend         types.String `tfsdk:"backend"`
-	CacheEnabled    types.Bool   `tfsdk:"cache_enabled"`
-	CacheMaxKeys    types.Int64  `tfsdk:"cache_max_keys"`
-	CacheTTLSeconds types.Int64  `tfsdk:"cache_ttl_seconds"`
-	DefaultKeyID    types.String `tfsdk:"default_key_id"`
 }
 
 func NewKmsConfigDataSource() datasource.DataSource {
@@ -78,7 +71,7 @@ func (d *KmsConfigDataSource) Configure(_ context.Context, req datasource.Config
 }
 
 func (d *KmsConfigDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config KmsConfigDataSourceModel
+	var config models.KmsConfigDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -102,8 +95,8 @@ func (d *KmsConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &config)...)
 }
 
-func kmsConfigModelFromConfig(kmsConfig *client.KmsConfig) (KmsConfigDataSourceModel, diag.Diagnostics) {
-	var config KmsConfigDataSourceModel
+func kmsConfigModelFromConfig(kmsConfig *client.KmsConfig) (models.KmsConfigDataSourceModel, diag.Diagnostics) {
+	var config models.KmsConfigDataSourceModel
 	config.Backend = types.StringValue(kmsConfig.Backend)
 	config.CacheEnabled = types.BoolValue(kmsConfig.CacheEnabled)
 	config.CacheMaxKeys = types.Int64Value(int64(kmsConfig.CacheMaxKeys))

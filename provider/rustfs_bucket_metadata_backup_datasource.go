@@ -8,16 +8,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var _ datasource.DataSource = &BucketMetadataBackupDataSource{}
 
 type BucketMetadataBackupDataSource struct {
 	client *AllClient
-}
-
-type BucketMetadataBackupDataSourceModel struct {
-	ContentBase64 types.String `tfsdk:"content_base64"`
 }
 
 func NewBucketMetadataBackupDataSource() datasource.DataSource {
@@ -54,7 +51,7 @@ func (d *BucketMetadataBackupDataSource) Configure(_ context.Context, req dataso
 }
 
 func (d *BucketMetadataBackupDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var config BucketMetadataBackupDataSourceModel
+	var config models.BucketMetadataBackupDataSourceModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 	if resp.Diagnostics.HasError() {
 		return

@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/weinmann-emt/terraform-provider-rustfs/internal/models"
 )
 
 var (
@@ -21,12 +22,6 @@ var (
 
 type GroupPolicyAttachmentResource struct {
 	client *AllClient
-}
-
-type GroupPolicyAttachmentResourceModel struct {
-	Group  types.String `tfsdk:"group"`
-	Policy types.String `tfsdk:"policy"`
-	ID     types.String `tfsdk:"id"`
 }
 
 func NewGroupPolicyAttachmentResource() resource.Resource {
@@ -80,7 +75,7 @@ func (r *GroupPolicyAttachmentResource) Configure(_ context.Context, req resourc
 }
 
 func (r *GroupPolicyAttachmentResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan GroupPolicyAttachmentResourceModel
+	var plan models.GroupPolicyAttachmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -101,7 +96,7 @@ func (r *GroupPolicyAttachmentResource) Create(ctx context.Context, req resource
 }
 
 func (r *GroupPolicyAttachmentResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var state GroupPolicyAttachmentResourceModel
+	var state models.GroupPolicyAttachmentResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -113,7 +108,7 @@ func (r *GroupPolicyAttachmentResource) Read(ctx context.Context, req resource.R
 }
 
 func (r *GroupPolicyAttachmentResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan GroupPolicyAttachmentResourceModel
+	var plan models.GroupPolicyAttachmentResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -133,7 +128,7 @@ func (r *GroupPolicyAttachmentResource) Update(ctx context.Context, req resource
 }
 
 func (r *GroupPolicyAttachmentResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data GroupPolicyAttachmentResourceModel
+	var data models.GroupPolicyAttachmentResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
