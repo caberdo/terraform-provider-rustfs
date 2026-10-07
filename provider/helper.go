@@ -3,8 +3,8 @@ package provider
 import (
 	"os"
 
-	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 func envOrDefault(envKey, defaultValue string) string {

@@ -56,7 +56,7 @@ func (c *RustfsAdmin) AddRemoteTarget(bucket string, target RemoteTarget) (strin
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -78,7 +78,7 @@ func (c *RustfsAdmin) ListRemoteTargets(bucket string) ([]RemoteTarget, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var targets []RemoteTarget
 	err = json.NewDecoder(resp.Body).Decode(&targets)
 	return targets, err
@@ -98,6 +98,6 @@ func (c *RustfsAdmin) DeleteRemoteTarget(bucket, arn string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

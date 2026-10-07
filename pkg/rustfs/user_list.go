@@ -28,7 +28,7 @@ func (c *RustfsAdmin) ListUsers(bucket string) ([]UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var users []UserInfo
 	err = json.NewDecoder(resp.Body).Decode(&users)
 	return users, err

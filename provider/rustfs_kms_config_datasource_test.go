@@ -1,17 +1,18 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 func TestKmsConfigDataSourceSchema(t *testing.T) {
 	d := NewKmsConfigDataSource()
 	resp := &datasource.SchemaResponse{}
-	d.Schema(nil, datasource.SchemaRequest{}, resp)
+	d.Schema(context.TODO(), datasource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -38,7 +39,7 @@ func TestKmsConfigDataSourceSchema(t *testing.T) {
 func TestKmsConfigDataSourceMetadata(t *testing.T) {
 	d := NewKmsConfigDataSource()
 	resp := &datasource.MetadataResponse{}
-	d.Metadata(nil, datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	d.Metadata(context.TODO(), datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_kms_config" {
 		t.Errorf("expected rustfs_kms_config, got %s", resp.TypeName)

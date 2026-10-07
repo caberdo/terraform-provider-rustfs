@@ -38,7 +38,7 @@ func (c *RustfsAdmin) ListGroups() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (c *RustfsAdmin) GetGroup(name string) (GroupInfo, error) {
 	if err != nil {
 		return GroupInfo{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var info GroupInfo
 	err = json.NewDecoder(resp.Body).Decode(&info)
 	return info, err
@@ -100,7 +100,7 @@ func (c *RustfsAdmin) UpdateGroupMembers(req GroupAddRemove) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -115,7 +115,7 @@ func (c *RustfsAdmin) DeleteGroup(name string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -134,6 +134,6 @@ func (c *RustfsAdmin) SetGroupStatus(name, status string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

@@ -53,6 +53,6 @@ func (c *RustfsAdmin) ldapPolicyOperation(operation string, req LDAPPolicyAttach
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

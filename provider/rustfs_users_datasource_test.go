@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -9,7 +10,7 @@ import (
 func TestUsersDataSourceSchema(t *testing.T) {
 	d := NewUsersDataSource()
 	resp := &datasource.SchemaResponse{}
-	d.Schema(nil, datasource.SchemaRequest{}, resp)
+	d.Schema(context.TODO(), datasource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -27,7 +28,7 @@ func TestUsersDataSourceSchema(t *testing.T) {
 func TestUsersDataSourceMetadata(t *testing.T) {
 	d := NewUsersDataSource()
 	resp := &datasource.MetadataResponse{}
-	d.Metadata(nil, datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	d.Metadata(context.TODO(), datasource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_users" {
 		t.Errorf("expected rustfs_users, got %s", resp.TypeName)

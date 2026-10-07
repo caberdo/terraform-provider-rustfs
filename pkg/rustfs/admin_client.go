@@ -65,6 +65,7 @@ func (c *RustfsAdmin) IsAdmin() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer drainClose(resp)
 
 	type adminRequest struct {
 		Admin bool `json:"is_admin"`
@@ -86,10 +87,21 @@ func (c *RustfsAdmin) doRequest(ctx context.Context, reqData RequestData) (res *
 	}
 	if res.StatusCode > 299 {
 		body, _ := io.ReadAll(res.Body)
+		drainClose(res)
 		return res, errors.New(string(body))
 	}
 
 	return
+}
+
+// drainClose discards any unread response body and closes it. Draining keeps the
+// underlying connection reusable and both errors are intentionally ignored.
+func drainClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
 }
 
 func (c *RustfsAdmin) createEndpointUrl(endpoint string, secure bool) string {
@@ -171,6 +183,7 @@ func (c *RustfsAdmin) DoDirectRequest(ctx context.Context, request RequestData) 
 	}
 	if res.StatusCode != 200 && res.StatusCode != 204 {
 		body, _ := io.ReadAll(res.Body)
+		drainClose(res)
 		return res, errors.New(string(body))
 	}
 

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
 
 func TestAccQuotaResource_basic(t *testing.T) {

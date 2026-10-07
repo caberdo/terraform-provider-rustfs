@@ -102,7 +102,7 @@ func (c *RustfsAdmin) ReplicationMetrics(bucket string) (ReplicationMetrics, err
 		}
 		return ReplicationMetrics{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ReplicationMetrics{}, err

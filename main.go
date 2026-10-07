@@ -10,8 +10,8 @@ import (
 	"flag"
 	"log"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/caberdo/terraform-provider-rustfs/provider"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 var (

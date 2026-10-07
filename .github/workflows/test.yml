@@ -34,7 +34,9 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # Pinned so CI and local runs agree on the linter set and gofmt
+          # behaviour (tracked in .github/golangci.yml).
+          version: v2.14.0
           args: --config .github/golangci.yml
 
       - name: Run Gosec Security Scanner

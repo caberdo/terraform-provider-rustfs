@@ -47,6 +47,10 @@ func (c *RustfsAdmin) userPolicyAssociation(user, policy, relPath string) error 
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, reqData)
-	return err
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }

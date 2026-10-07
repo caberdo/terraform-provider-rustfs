@@ -87,7 +87,7 @@ func (c *RustfsAdmin) SiteReplicationInfo() (SiteReplicationInfo, error) {
 	if err != nil {
 		return SiteReplicationInfo{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var info SiteReplicationInfo
 	err = json.NewDecoder(resp.Body).Decode(&info)
 	return info, err
@@ -115,7 +115,7 @@ func (c *RustfsAdmin) SiteReplicationResyncOp(operation string, peer SiteReplica
 	if err != nil {
 		return SiteReplicationResync{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var resync SiteReplicationResync
 	err = json.NewDecoder(resp.Body).Decode(&resync)
 	return resync, err
@@ -133,6 +133,6 @@ func (c *RustfsAdmin) siteReplicationWrite(relPath string, body []byte) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

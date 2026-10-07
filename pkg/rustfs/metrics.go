@@ -17,6 +17,7 @@ func (c *RustfsAdmin) GetMetrics() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer drainClose(resp)
 	raw, err := io.ReadAll(resp.Body)
 	return string(raw), err
 }

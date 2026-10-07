@@ -22,6 +22,7 @@ func (c *RustfsAdmin) ReadQuota(bucket string) (quota Quota, err error) {
 	if err != nil {
 		return quota, err
 	}
+	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&quota)
 	return quota, err
 }
@@ -43,7 +44,7 @@ func (c *RustfsAdmin) SetQuota(new Quota) (quota Quota, err error) {
 	if err != nil {
 		return Quota{}, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&quota)
 	return quota, err
 }
@@ -63,6 +64,6 @@ func (c *RustfsAdmin) DeletQuota(bucket string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

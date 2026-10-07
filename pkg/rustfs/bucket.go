@@ -17,10 +17,11 @@ func (c *RustfsAdmin) CreateBucket(bucket string) (err error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.DoDirectRequest(ctx, req_data)
+	resp, err := c.DoDirectRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
+	drainClose(resp)
 	return nil
 }
 
@@ -32,9 +33,10 @@ func (c *RustfsAdmin) DeleteBucket(bucket string) (err error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.DoDirectRequest(ctx, req_data)
+	resp, err := c.DoDirectRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
+	drainClose(resp)
 	return nil
 }

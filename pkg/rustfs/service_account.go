@@ -55,6 +55,7 @@ func (c *RustfsAdmin) CreateServiceAccount(account ServiceAccount) error {
 	if err != nil {
 		return err
 	}
+	defer drainClose(resp)
 	var is ServiceAccountReply
 	err = json.NewDecoder(resp.Body).Decode(&is)
 	return err
@@ -75,6 +76,7 @@ func (c *RustfsAdmin) ReadServiceAccount(name string) (ServiceAccount, error) {
 	if err != nil {
 		return instance, err
 	}
+	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&instance)
 	return instance, err
 }
@@ -96,11 +98,12 @@ func (c *RustfsAdmin) UpdateServiceAccount(account ServiceAccount) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
-	return err
+	drainClose(resp)
+	return nil
 }
 
 func (c *RustfsAdmin) DeleteServiceAccount(account ServiceAccount) error {
@@ -114,11 +117,12 @@ func (c *RustfsAdmin) DeleteServiceAccount(account ServiceAccount) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
+	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
-	return err
+	drainClose(resp)
+	return nil
 }
 
 func normalizeServiceAccount(account *ServiceAccount) {

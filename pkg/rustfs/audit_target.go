@@ -47,7 +47,7 @@ func (c *RustfsAdmin) ListAuditTargets() ([]AuditTarget, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	var out auditTargetListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -79,7 +79,7 @@ func (c *RustfsAdmin) SetAuditTarget(targetType, targetName string, keyValues []
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }
 
@@ -96,6 +96,6 @@ func (c *RustfsAdmin) ResetAuditTarget(targetType, targetName string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

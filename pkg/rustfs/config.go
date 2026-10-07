@@ -48,7 +48,7 @@ func (c *RustfsAdmin) GetConfig(subSystem string) ([]ConfigKV, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -68,8 +68,12 @@ func (c *RustfsAdmin) SetConfig(subSystem string, kvs []ConfigKV) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, reqData)
-	return err
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
 
 // DeleteConfig removes a config scope via DELETE del-config-kv. The whole
@@ -83,8 +87,12 @@ func (c *RustfsAdmin) DeleteConfig(subSystem string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, reqData)
-	return err
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
 
 // HelpConfig returns the documented keys of a sub-system via GET help-config-kv.
@@ -103,7 +111,7 @@ func (c *RustfsAdmin) HelpConfig(subSystem string) ([]ConfigKV, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var out configHelpResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return nil, err

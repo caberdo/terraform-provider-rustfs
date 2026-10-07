@@ -29,6 +29,7 @@ func (c *RustfsAdmin) ReadUserMFA(accessKey string) (UserMFAStatus, error) {
 	if err != nil {
 		return status, err
 	}
+	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&status)
 	return status, err
 }
@@ -44,6 +45,10 @@ func (c *RustfsAdmin) ClearUserMFA(accessKey string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }

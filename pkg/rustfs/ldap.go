@@ -26,6 +26,10 @@ func (c *RustfsAdmin) CreateLDAPServiceAccount(account ServiceAccount) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err = c.doRequest(ctx, req_data)
-	return err
+	resp, err := c.doRequest(ctx, req_data)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }

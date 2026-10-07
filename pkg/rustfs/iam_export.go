@@ -16,7 +16,7 @@ func (c *RustfsAdmin) ExportIam() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return io.ReadAll(resp.Body)
 }
 
@@ -32,6 +32,6 @@ func (c *RustfsAdmin) ImportIam(data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	return nil
 }

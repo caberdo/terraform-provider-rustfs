@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -11,7 +12,7 @@ import (
 func TestBucketEncryptionResourceSchema(t *testing.T) {
 	r := NewBucketEncryptionResource()
 	resp := &resource.SchemaResponse{}
-	r.Schema(nil, resource.SchemaRequest{}, resp)
+	r.Schema(context.TODO(), resource.SchemaRequest{}, resp)
 
 	if diags := resp.Diagnostics; diags.HasError() {
 		t.Fatalf("schema diagnostics: %v", diags)
@@ -32,7 +33,7 @@ func TestBucketEncryptionResourceSchema(t *testing.T) {
 func TestBucketEncryptionResourceMetadata(t *testing.T) {
 	r := NewBucketEncryptionResource()
 	resp := &resource.MetadataResponse{}
-	r.Metadata(nil, resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
+	r.Metadata(context.TODO(), resource.MetadataRequest{ProviderTypeName: "rustfs"}, resp)
 
 	if resp.TypeName != "rustfs_bucket_encryption" {
 		t.Errorf("expected rustfs_bucket_encryption, got %s", resp.TypeName)

@@ -58,7 +58,7 @@ func (c *RustfsAdmin) GetBucketPublicAccessBlock(bucket string) (*PublicAccessBl
 		}
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -79,7 +79,7 @@ func (c *RustfsAdmin) getHealthInfo(relPath string) (*HealthInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer drainClose(resp)
 	var info HealthInfo
 	err = json.NewDecoder(resp.Body).Decode(&info)
 	if err != nil {

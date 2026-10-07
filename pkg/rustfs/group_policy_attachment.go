@@ -18,8 +18,12 @@ func (c *RustfsAdmin) AttachGroupPolicy(group, policy string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, reqData)
-	return err
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
 
 // DetachGroupPolicy detaches a canned policy from an IAM group. The admin API
@@ -37,6 +41,10 @@ func (c *RustfsAdmin) DetachGroupPolicy(group, policy string) error {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := c.doRequest(ctx, reqData)
-	return err
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return err
+	}
+	drainClose(resp)
+	return nil
 }
