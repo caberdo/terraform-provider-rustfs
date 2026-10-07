@@ -1,0 +1,134 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          args: --config .github/golangci.yml
+
+      - name: Run Gosec Security Scanner
+        id: gosec
+        uses: securego/gosec@v2.29.0
+        continue-on-error: true
+        env:
+          GOTOOLCHAIN: auto
+        with:
+          args: -fmt sarif -out gosec.sarif -exclude-dir=vendor -tests=false ./
+
+      - name: Upload security scan results
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('gosec.sarif') != ''
+        with:
+          sarif_file: gosec.sarif
+
+      - name: Fail on Gosec findings
+        if: always() && steps.gosec.outcome == 'failure'
+        run: |
+          echo "## Gosec Security Scanner Found Issues" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f gosec.sarif ]; then
+            echo "| Rule | File | Line | Description |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|------|------|-------------|" >> $GITHUB_STEP_SUMMARY
+            jq -r '.runs[0].results[] | "| \(.ruleId) | \(.locations[0].physicalLocation.artifactLocation.uri) | \(.locations[0].physicalLocation.region.startLine) | \(.message.text) |"' gosec.sarif >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See the **Security** tab for full details." >> $GITHUB_STEP_SUMMARY
+          exit 1
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build and vet
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: Validate examples
+        run: ./scripts/validate-examples.sh
+
+      # Narrow to ./internal/... once the code layout lands (#8-#11).
+      - name: Run tests
+        run: go test -v -cover -race ./...
+
+  rustfs_versions:
+    name: Supported RustFS Versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only the acceptance job consumes this, and that job only runs on main.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      list: ${{ steps.read.outputs.list }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read the supported versions into a JSON array
+        id: read
+        run: |
+          list=$(jq -R -s -c 'split("\n") | map(select(length > 0))' .github/rustfs-versions.txt)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  acceptance:
+    name: Acceptance Tests (RustFS ${{ matrix.rustfs }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs:
+      - test
+      - rustfs_versions
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        # Single source of truth: .github/rustfs-versions.txt.
+        rustfs: ${{ fromJSON(needs.rustfs_versions.outputs.list) }}
+    env:
+      RUSTFS_VERSION: ${{ matrix.rustfs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run acceptance tests
+        run: docker compose run --rm test
