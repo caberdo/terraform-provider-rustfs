@@ -4,7 +4,7 @@
 
 A Terraform provider for [RustFS](https://github.com/rustfs/rustfs), an S3-compatible object
 storage system, built with the Plugin Framework (v1.19.0) and Go 1.26.4. The provider serves
-both the S3 API (through `minio-go`) and the RustFS admin API (`/rustfs/admin/v3`).
+both the S3 API (through the AWS SDK for Go v2) and the RustFS admin API (`/rustfs/admin/v3`).
 
 Registry address: `registry.terraform.io/caberdo/rustfs`.
 
@@ -74,7 +74,7 @@ migration below only moves Go files and identifiers.
 main.go                       # providerserver entry point, version set via goreleaser ldflags
 provider/                     # flat package `provider`
 ├── provider.go               # provider schema, Configure, Resources(), DataSources()
-├── all_client.go             # AllClient{Minio *minio.Client, RustClient rustfs.RustfsAdmin}
+├── all_client.go             # AllClient{S3 *s3.Client, RustClient rustfs.RustfsAdmin}
 ├── helper.go                 # envOrDefault, secret_key/access_secret resolution
 ├── rustfs_<name>_resource.go # resource (legacy spelling: _ressource.go)
 ├── rustfs_<name>_datasource.go # data source (legacy spelling: _data_source.go)
@@ -108,9 +108,11 @@ Until the child issues land, the current paths above are authoritative; afterwar
 `Configure` builds an `*AllClient` and hands it to both `resp.ResourceData` and
 `resp.DataSourceData`:
 
-- `client.Minio` (`*minio.Client`) — S3 API calls (buckets, policies, tags, CORS, versioning, …).
+- `client.S3` (`*s3.Client`) — S3 API calls (buckets, policies, tags, CORS, versioning, …), built from
+  an `aws.Config` with a static credentials provider, `BaseEndpoint` and `UsePathStyle`.
 - `client.RustClient` (`rustfs.RustfsAdmin`) — RustFS admin API (`/rustfs/admin/v3`), SigV4-signed
-  with the provider credentials; `DoDirectRequest` targets paths outside the admin base
+  with the AWS SDK v2 signer (`aws/signer/v4`, service `s3`, region `us-east-01`);
+  `DoDirectRequest` targets paths outside the admin base
   (for example `/rustfs/admin/v3` is stripped, used for metrics/health endpoints).
 
 Provider attributes: `endpoint`, `access_key`, `secret_key` (sensitive), `access_secret`
@@ -199,7 +201,7 @@ or drop a schema change silently — an attribute that cannot be updated in plac
 
 ### Checklist for New Resources
 
-- [ ] API methods in `pkg/rustfs/<name>.go` (admin) and/or via `client.Minio` (S3)
+- [ ] API methods in `pkg/rustfs/<name>.go` (admin) and/or via `client.S3` (S3)
 - [ ] `provider/rustfs_<name>_resource.go` implementing `resource.Resource` and
       `resource.ResourceWithImportState`
 - [ ] Registered in `provider/provider.go` `Resources()`
@@ -251,5 +253,6 @@ them live before claiming a CRUD change works.
 - `terraform-plugin-docs` v0.25.0 (docs generation, via `//go:generate` in `main.go`)
 - `terraform-plugin-framework` v1.19.0, `terraform-plugin-framework-validators` v0.19.0
 - `terraform-plugin-testing` v1.16.0
-- `github.com/minio/minio-go/v7` v7.3.0 (S3 client + SigV4 signer)
+- `github.com/aws/aws-sdk-go-v2` with `.../config`, `.../credentials`, `.../service/s3` and
+  `.../aws/signer/v4` (S3 client + SigV4 signer)
 - `github.com/ProtonMail/go-crypto` (KMS/encryption helpers)

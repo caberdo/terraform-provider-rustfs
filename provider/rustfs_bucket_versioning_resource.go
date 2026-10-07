@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -11,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/minio/minio-go/v7"
 )
 
 var (
@@ -78,8 +80,11 @@ func (r *BucketVersioningResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	err := r.client.Minio.SetBucketVersioning(ctx, plan.Bucket.ValueString(), minio.BucketVersioningConfiguration{
-		Status: plan.Status.ValueString(),
+	_, err := r.client.S3.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{
+		Bucket: aws.String(plan.Bucket.ValueString()),
+		VersioningConfiguration: &s3types.VersioningConfiguration{
+			Status: s3types.BucketVersioningStatus(plan.Status.ValueString()),
+		},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -100,7 +105,9 @@ func (r *BucketVersioningResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	config, err := r.client.Minio.GetBucketVersioning(ctx, state.Bucket.ValueString())
+	config, err := r.client.S3.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket versioning",
@@ -109,7 +116,7 @@ func (r *BucketVersioningResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	state.Status = types.StringValue(config.Status)
+	state.Status = types.StringValue(string(config.Status))
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -120,8 +127,11 @@ func (r *BucketVersioningResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 
-	err := r.client.Minio.SetBucketVersioning(ctx, plan.Bucket.ValueString(), minio.BucketVersioningConfiguration{
-		Status: plan.Status.ValueString(),
+	_, err := r.client.S3.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{
+		Bucket: aws.String(plan.Bucket.ValueString()),
+		VersioningConfiguration: &s3types.VersioningConfiguration{
+			Status: s3types.BucketVersioningStatus(plan.Status.ValueString()),
+		},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -141,7 +151,12 @@ func (r *BucketVersioningResource) Delete(ctx context.Context, req resource.Dele
 		return
 	}
 
-	err := r.client.Minio.SuspendVersioning(ctx, data.Bucket.ValueString())
+	_, err := r.client.S3.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{
+		Bucket: aws.String(data.Bucket.ValueString()),
+		VersioningConfiguration: &s3types.VersioningConfiguration{
+			Status: s3types.BucketVersioningStatusSuspended,
+		},
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error suspending bucket versioning",

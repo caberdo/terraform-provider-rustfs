@@ -7,11 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 func TestAccBucketResource_basic(t *testing.T) {
@@ -61,12 +63,12 @@ func testAccCheckBucketExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no bucket name set")
 		}
 
-		client, err := testAccMinioClient()
+		client, err := testAccS3Client()
 		if err != nil {
 			return err
 		}
 
-		exists, err := client.BucketExists(context.Background(), bucketName)
+		exists, err := bucketExists(context.Background(), client, bucketName)
 		if err != nil {
 			return fmt.Errorf("error checking bucket: %s", err)
 		}
@@ -78,7 +80,7 @@ func testAccCheckBucketExists(n string) resource.TestCheckFunc {
 }
 
 func testAccCheckBucketDestroy(s *terraform.State) error {
-	client, err := testAccMinioClient()
+	client, err := testAccS3Client()
 	if err != nil {
 		return err
 	}
@@ -93,12 +95,8 @@ func testAccCheckBucketDestroy(s *terraform.State) error {
 			continue
 		}
 
-		exists, err := client.BucketExists(context.Background(), bucketName)
+		exists, err := bucketExists(context.Background(), client, bucketName)
 		if err != nil {
-			minioErr, ok := err.(minio.ErrorResponse)
-			if ok && (strings.Contains(minioErr.Code, "NotFound") || minioErr.StatusCode == 404) {
-				continue
-			}
 			return fmt.Errorf("error checking bucket destruction: %s", err)
 		}
 		if exists {
@@ -108,12 +106,26 @@ func testAccCheckBucketDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccMinioClient() (*minio.Client, error) {
-	endpoint := os.Getenv("RUSTFS_ENDPOINT")
-	accessKey := os.Getenv("RUSTFS_USER")
-	secretKey := os.Getenv("RUSTFS_SECRET")
-	return minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false,
-	})
+func testAccS3Client() (*s3.Client, error) {
+	return newTestS3Client(os.Getenv("RUSTFS_ENDPOINT"), os.Getenv("RUSTFS_USER"), os.Getenv("RUSTFS_SECRET"))
+}
+
+func newTestS3Client(endpoint, accessKey, secretKey string) (*s3.Client, error) {
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion("us-east-1"),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointURL := endpoint
+	if !strings.Contains(endpointURL, "://") {
+		endpointURL = "http://" + endpointURL
+	}
+
+	return s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(endpointURL)
+		o.UsePathStyle = true
+	}), nil
 }

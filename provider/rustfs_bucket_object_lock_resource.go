@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -11,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/minio/minio-go/v7"
 )
 
 var (
@@ -88,7 +90,6 @@ func (r *BucketObjectLockResource) Configure(_ context.Context, req resource.Con
 }
 
 func (r *BucketObjectLockResource) setConfig(ctx context.Context, plan BucketObjectLockResourceModel) error {
-	mode := minio.RetentionMode(plan.Mode.ValueString())
 	daysVal := plan.Days.ValueInt64()
 	yearsVal := plan.Years.ValueInt64()
 	if daysVal < 0 {
@@ -97,22 +98,32 @@ func (r *BucketObjectLockResource) setConfig(ctx context.Context, plan BucketObj
 	if yearsVal < 0 {
 		yearsVal = 0
 	}
-	days := uint(daysVal)
-	years := uint(yearsVal)
-	var validity *uint
-	var unit *minio.ValidityUnit
 
-	if days > 0 {
-		validity = &days
-		d := minio.Days
-		unit = &d
-	} else if years > 0 {
-		validity = &years
-		y := minio.Years
-		unit = &y
+	config := &s3types.ObjectLockConfiguration{
+		ObjectLockEnabled: s3types.ObjectLockEnabledEnabled,
 	}
 
-	return r.client.Minio.SetObjectLockConfig(ctx, plan.Bucket.ValueString(), &mode, validity, unit)
+	if daysVal > 0 {
+		config.Rule = &s3types.ObjectLockRule{
+			DefaultRetention: &s3types.DefaultRetention{
+				Mode: s3types.ObjectLockRetentionMode(plan.Mode.ValueString()),
+				Days: aws.Int32(int32(daysVal)), // #nosec G115
+			},
+		}
+	} else if yearsVal > 0 {
+		config.Rule = &s3types.ObjectLockRule{
+			DefaultRetention: &s3types.DefaultRetention{
+				Mode:  s3types.ObjectLockRetentionMode(plan.Mode.ValueString()),
+				Years: aws.Int32(int32(yearsVal)), // #nosec G115
+			},
+		}
+	}
+
+	_, err := r.client.S3.PutObjectLockConfiguration(ctx, &s3.PutObjectLockConfigurationInput{
+		Bucket:                  aws.String(plan.Bucket.ValueString()),
+		ObjectLockConfiguration: config,
+	})
+	return err
 }
 
 func (r *BucketObjectLockResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -140,7 +151,9 @@ func (r *BucketObjectLockResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	mode, validity, unit, err := r.client.Minio.GetBucketObjectLockConfig(ctx, state.Bucket.ValueString())
+	out, err := r.client.S3.GetObjectLockConfiguration(ctx, &s3.GetObjectLockConfigurationInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading object lock",
@@ -149,15 +162,16 @@ func (r *BucketObjectLockResource) Read(ctx context.Context, req resource.ReadRe
 		return
 	}
 
-	if mode != nil {
-		state.Mode = types.StringValue(string(*mode))
-	}
-	if validity != nil && unit != nil {
-		switch *unit {
-		case minio.Days:
-			state.Days = types.Int64Value(int64(*validity)) // #nosec G115
-		case minio.Years:
-			state.Years = types.Int64Value(int64(*validity)) // #nosec G115
+	if out.ObjectLockConfiguration != nil && out.ObjectLockConfiguration.Rule != nil {
+		retention := out.ObjectLockConfiguration.Rule.DefaultRetention
+		if retention != nil {
+			state.Mode = types.StringValue(string(retention.Mode))
+			if retention.Days != nil {
+				state.Days = types.Int64Value(int64(*retention.Days))
+			}
+			if retention.Years != nil {
+				state.Years = types.Int64Value(int64(*retention.Years))
+			}
 		}
 	}
 

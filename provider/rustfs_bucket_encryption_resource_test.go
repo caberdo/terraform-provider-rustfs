@@ -3,6 +3,7 @@ package provider
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -48,10 +49,10 @@ func TestBuildEncryptionConfig_AES256(t *testing.T) {
 	if len(config.Rules) != 1 {
 		t.Fatalf("expected 1 rule, got %d", len(config.Rules))
 	}
-	if config.Rules[0].Apply.SSEAlgorithm != "AES256" {
-		t.Errorf("expected AES256, got %s", config.Rules[0].Apply.SSEAlgorithm)
+	if config.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm != "AES256" {
+		t.Errorf("expected AES256, got %s", config.Rules[0].ApplyServerSideEncryptionByDefault.SSEAlgorithm)
 	}
-	if config.Rules[0].Apply.KmsMasterKeyID != "" {
+	if aws.ToString(config.Rules[0].ApplyServerSideEncryptionByDefault.KMSMasterKeyID) != "" {
 		t.Error("KMS key should be empty for AES256")
 	}
 }
@@ -64,7 +65,7 @@ func TestBuildEncryptionConfig_AWSKMS(t *testing.T) {
 	}
 	config := buildEncryptionConfig(plan)
 
-	if config.Rules[0].Apply.KmsMasterKeyID != "arn:aws:kms:us-east-1:123456789012:key/abcd" {
-		t.Errorf("unexpected KMS key ID: %s", config.Rules[0].Apply.KmsMasterKeyID)
+	if aws.ToString(config.Rules[0].ApplyServerSideEncryptionByDefault.KMSMasterKeyID) != "arn:aws:kms:us-east-1:123456789012:key/abcd" {
+		t.Errorf("unexpected KMS key ID: %s", aws.ToString(config.Rules[0].ApplyServerSideEncryptionByDefault.KMSMasterKeyID))
 	}
 }

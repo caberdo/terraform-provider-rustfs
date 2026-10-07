@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/minio/minio-go/v7/pkg/notification"
 )
 
 var (
@@ -105,8 +107,11 @@ func (r *BucketNotificationResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	config := buildNotificationConfig(plan)
-	if err := r.client.Minio.SetBucketNotification(ctx, plan.Bucket.ValueString(), config); err != nil {
+	config := buildNotificationConfig(ctx, plan)
+	if _, err := r.client.S3.PutBucketNotificationConfiguration(ctx, &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(plan.Bucket.ValueString()),
+		NotificationConfiguration: config,
+	}); err != nil {
 		resp.Diagnostics.AddError(
 			"Error setting bucket notification",
 			"Could not set bucket notification: "+err.Error(),
@@ -124,7 +129,9 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	config, err := r.client.Minio.GetBucketNotification(ctx, state.Bucket.ValueString())
+	config, err := r.client.S3.GetBucketNotificationConfiguration(ctx, &s3.GetBucketNotificationConfigurationInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket notification",
@@ -134,7 +141,7 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 	}
 
 	var queues []bucketNotificationQueueModel
-	for _, q := range config.QueueConfigs {
+	for _, q := range config.QueueConfigurations {
 		var events []string
 		for _, e := range q.Events {
 			events = append(events, string(e))
@@ -143,19 +150,19 @@ func (r *BucketNotificationResource) Read(ctx context.Context, req resource.Read
 		resp.Diagnostics.Append(diags...)
 
 		var prefix, suffix string
-		if q.Filter != nil {
-			for _, rule := range q.Filter.S3Key.FilterRules {
+		if q.Filter != nil && q.Filter.Key != nil {
+			for _, rule := range q.Filter.Key.FilterRules {
 				switch rule.Name {
-				case "prefix":
-					prefix = rule.Value
-				case "suffix":
-					suffix = rule.Value
+				case s3types.FilterRuleNamePrefix:
+					prefix = aws.ToString(rule.Value)
+				case s3types.FilterRuleNameSuffix:
+					suffix = aws.ToString(rule.Value)
 				}
 			}
 		}
 
 		queues = append(queues, bucketNotificationQueueModel{
-			Arn:          types.StringValue(q.Queue),
+			Arn:          types.StringValue(aws.ToString(q.QueueArn)),
 			Events:       eventsSet,
 			FilterPrefix: types.StringValue(prefix),
 			FilterSuffix: types.StringValue(suffix),
@@ -173,8 +180,11 @@ func (r *BucketNotificationResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	config := buildNotificationConfig(plan)
-	if err := r.client.Minio.SetBucketNotification(ctx, plan.Bucket.ValueString(), config); err != nil {
+	config := buildNotificationConfig(ctx, plan)
+	if _, err := r.client.S3.PutBucketNotificationConfiguration(ctx, &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(plan.Bucket.ValueString()),
+		NotificationConfiguration: config,
+	}); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating bucket notification",
 			"Could not update bucket notification: "+err.Error(),
@@ -192,7 +202,10 @@ func (r *BucketNotificationResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	if err := r.client.Minio.RemoveAllBucketNotification(ctx, data.Bucket.ValueString()); err != nil {
+	if _, err := r.client.S3.PutBucketNotificationConfiguration(ctx, &s3.PutBucketNotificationConfigurationInput{
+		Bucket:                    aws.String(data.Bucket.ValueString()),
+		NotificationConfiguration: &s3types.NotificationConfiguration{},
+	}); err != nil {
 		resp.Diagnostics.AddError(
 			"Error removing bucket notification",
 			"Could not remove bucket notification: "+err.Error(),
@@ -205,32 +218,39 @@ func (r *BucketNotificationResource) ImportState(ctx context.Context, req resour
 	resource.ImportStatePassthroughID(ctx, path.Root("bucket"), req, resp)
 }
 
-func buildNotificationConfig(plan bucketNotificationResourceModel) notification.Configuration {
-	var config notification.Configuration
+func buildNotificationConfig(ctx context.Context, plan bucketNotificationResourceModel) *s3types.NotificationConfiguration {
+	config := &s3types.NotificationConfiguration{}
 	for _, q := range plan.Queue {
-		var events []notification.EventType
-		q.Events.ElementsAs(nil, &events, false)
+		var events []string
+		q.Events.ElementsAs(ctx, &events, false)
 
-		filter := &notification.Filter{}
+		var filters []s3types.FilterRule
 		if prefix := q.FilterPrefix.ValueString(); prefix != "" {
-			filter.S3Key.FilterRules = append(filter.S3Key.FilterRules,
-				notification.FilterRule{Name: "prefix", Value: prefix})
+			filters = append(filters, s3types.FilterRule{
+				Name:  s3types.FilterRuleNamePrefix,
+				Value: aws.String(prefix),
+			})
 		}
 		if suffix := q.FilterSuffix.ValueString(); suffix != "" {
-			filter.S3Key.FilterRules = append(filter.S3Key.FilterRules,
-				notification.FilterRule{Name: "suffix", Value: suffix})
-		}
-		if len(filter.S3Key.FilterRules) == 0 {
-			filter = nil
+			filters = append(filters, s3types.FilterRule{
+				Name:  s3types.FilterRuleNameSuffix,
+				Value: aws.String(suffix),
+			})
 		}
 
-		config.QueueConfigs = append(config.QueueConfigs, notification.QueueConfig{
-			Config: notification.Config{
-				Events: events,
-				Filter: filter,
-			},
-			Queue: q.Arn.ValueString(),
-		})
+		queueConfig := s3types.QueueConfiguration{
+			QueueArn: aws.String(q.Arn.ValueString()),
+		}
+		for _, e := range events {
+			queueConfig.Events = append(queueConfig.Events, s3types.Event(e))
+		}
+		if len(filters) > 0 {
+			queueConfig.Filter = &s3types.NotificationConfigurationFilter{
+				Key: &s3types.S3KeyFilter{FilterRules: filters},
+			}
+		}
+
+		config.QueueConfigurations = append(config.QueueConfigurations, queueConfig)
 	}
 	return config
 }
