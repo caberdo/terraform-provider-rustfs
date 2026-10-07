@@ -1,0 +1,13 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https?://(registry\\.terraform\\.io|opentofu\\.org|rustfs\\.com|rustfs\\.org|github\\.com|localhost)"
+    },
+    {
+      "pattern": "^https?://[^/]*example\\.com"
+    },
+    {
+      "pattern": "^https?://(s3\\.amazonaws\\.com|img\\.shields\\.io|golang\\.org|hooks\\.slack\\.com)"
+    }
+  ]
+}
