@@ -29,6 +29,10 @@ func TestIsAdmin(t *testing.T) {
 	key := os.Getenv("RUSTFS_USER")
 	secret := os.Getenv("RUSTFS_SECRET")
 
+	if endpoint == "" || key == "" || secret == "" {
+		t.Skip("skipping live RustFS admin test: set RUSTFS_ENDPOINT, RUSTFS_USER and RUSTFS_SECRET to run")
+	}
+
 	config := rustfs.RustfsAdminConfig{
 		AccessKey:    key,
 		AccessSecret: secret,

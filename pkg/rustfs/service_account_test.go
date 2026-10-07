@@ -9,10 +9,15 @@ import (
 	"github.com/weinmann-emt/terraform-provider-rustfs/pkg/rustfs"
 )
 
-func getClient() rustfs.RustfsAdmin {
+func getClient(t *testing.T) rustfs.RustfsAdmin {
+	t.Helper()
 	endpoint := os.Getenv("RUSTFS_ENDPOINT")
 	key := os.Getenv("RUSTFS_USER")
 	secret := os.Getenv("RUSTFS_SECRET")
+
+	if endpoint == "" || key == "" || secret == "" {
+		t.Skip("skipping live RustFS admin test: set RUSTFS_ENDPOINT, RUSTFS_USER and RUSTFS_SECRET to run")
+	}
 
 	config := rustfs.RustfsAdminConfig{
 		AccessKey:    key,
@@ -46,7 +51,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		SecretKey: "someSuperS3cret",
 		Name:      randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateServiceAccount(account)
 	if err != nil {
 		t.Error(err)
@@ -60,7 +65,7 @@ func TestCreateAndDeleteServiceAccount(t *testing.T) {
 		SecretKey: "someSuperS3cret",
 		Name:      randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateServiceAccount(account)
 	if err != nil {
 		t.Error(err)
@@ -77,7 +82,7 @@ func TestCreateUpdateAndDeleteServiceAccount(t *testing.T) {
 		SecretKey: "someSuperS3cret",
 		Name:      randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateServiceAccount(account)
 	if err != nil {
 		t.Error(err)
@@ -99,7 +104,7 @@ func TestCreateReadAndDeleteServiceAccount(t *testing.T) {
 		SecretKey: "someSuperS3cret",
 		Name:      randomString(8),
 	}
-	dut := getClient()
+	dut := getClient(t)
 	err := dut.CreateServiceAccount(account)
 	if err != nil {
 		t.Error(err)

@@ -10,7 +10,7 @@ import (
 
 func TestReadQuota(t *testing.T) {
 	name := randomString(8)
-	dut := getClient()
+	dut := getClient(t)
 	name = strings.ToLower(name)
 	if err := dut.CreateBucket(name); err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestCRDQuota(t *testing.T) {
 		Bucket: name,
 		Quota:  100054541,
 	}
-	dut := getClient()
+	dut := getClient(t)
 	if err := dut.CreateBucket(name); err != nil {
 		t.Fatal(err)
 	}

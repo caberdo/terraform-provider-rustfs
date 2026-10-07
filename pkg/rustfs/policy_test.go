@@ -7,7 +7,7 @@ import (
 )
 
 func TestCreateAndDeletePolicy(t *testing.T) {
-	dut := getClient()
+	dut := getClient(t)
 	actions := [1]string{
 		"s3:GetObject",
 	}
