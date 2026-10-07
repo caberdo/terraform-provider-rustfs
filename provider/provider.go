@@ -174,6 +174,7 @@ func (p *RustfsProvider) DataSources(ctx context.Context) []func() datasource.Da
 		NewStorageInfoDataSource,
 		NewServerInfoDataSource,
 		NewReplicationMetricsDataSource,
+		NewIlmTierStatsDataSource,
 	}
 }
 
