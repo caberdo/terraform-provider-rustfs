@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_quota Resource - rustfs"
+page_title: "rustfs_quota Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage bucket quota in rustfs

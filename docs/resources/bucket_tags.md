@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_bucket_tags Resource - rustfs"
+page_title: "rustfs_bucket_tags Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage the tags on an S3 bucket in rustfs

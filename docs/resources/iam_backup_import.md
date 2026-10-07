@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_iam_backup_import Resource - rustfs"
+page_title: "rustfs_iam_backup_import Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Import RustFS IAM entities (users, groups, policies, service accounts) from a base64-encoded ZIP archive

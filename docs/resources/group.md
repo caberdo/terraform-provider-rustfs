@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_group Resource - rustfs"
+page_title: "rustfs_group Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS IAM groups and their members

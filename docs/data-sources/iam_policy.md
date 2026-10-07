@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_iam_policy Data Source - rustfs"
+page_title: "rustfs_iam_policy Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Fetch the details of a single canned IAM policy by name

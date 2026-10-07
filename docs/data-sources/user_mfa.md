@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_user_mfa Data Source - rustfs"
+page_title: "rustfs_user_mfa Data Source - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Fetch the second-factor (MFA) status of a RustFS user by access key

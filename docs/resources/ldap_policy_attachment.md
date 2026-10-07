@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_ldap_policy_attachment Resource - rustfs"
+page_title: "rustfs_ldap_policy_attachment Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Attach a canned policy to an LDAP user or group and detach it on destroy

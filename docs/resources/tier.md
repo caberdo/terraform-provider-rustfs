@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_tier Resource - rustfs"
+page_title: "rustfs_tier Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS storage tiers for data transition to external backends

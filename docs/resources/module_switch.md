@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_module_switch Resource - rustfs"
+page_title: "rustfs_module_switch Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS feature module switches (notify and audit modules).

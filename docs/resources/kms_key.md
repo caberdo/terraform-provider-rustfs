@@ -1,5 +1,5 @@
 ---
-page_title: "rustfs_kms_key Resource - rustfs"
+page_title: "rustfs_kms_key Resource - terraform-provider-rustfs"
 subcategory: ""
 description: |-
   Manage RustFS KMS master keys. Deleting a KMS master key is critical and irreversible: it schedules the destruction of the key material and makes every object encrypted under the key permanently unreadable. Guard the key with skip_destroy = true.
