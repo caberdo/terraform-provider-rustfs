@@ -13,7 +13,25 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
+	dsbucketmetadatabackup "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/bucket_metadata_backup"
+	dsgroups "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/groups"
+	dshealthinfo "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/health_info"
+	dsiambackup "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/iam_backup"
+	dsiampolicies "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/iam_policies"
+	dsiampolicy "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/iam_policy"
+	dsilmtierstats "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/ilm_tier_stats"
+	dskmsconfig "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/kms_config"
+	dskmsstatus "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/kms_status"
+	dsmetrics "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/metrics"
+	dspools "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/pools"
+	dsquota "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/quota"
+	dsreplicationmetrics "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/replication_metrics"
+	dsserverinfo "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/server_info"
+	dsstorageinfo "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/storage_info"
+	dsusermfa "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/user_mfa"
+	dsusers "github.com/weinmann-emt/terraform-provider-rustfs/internal/datasources/users"
 )
 
 // Ensure RustfsProvider satisfies various provider interfaces.
@@ -164,23 +182,23 @@ func (p *RustfsProvider) Resources(ctx context.Context) []func() resource.Resour
 
 func (p *RustfsProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewPoolsDataSource,
-		NewIamBackupDataSource,
-		NewBucketMetadataBackupDataSource,
-		NewUsersDataSource,
-		NewUserMfaDataSource,
-		NewIAMPoliciesDataSource,
-		NewIAMPolicyDataSource,
-		NewKmsStatusDataSource,
-		NewKmsConfigDataSource,
-		NewQuotaDataSource,
-		NewGroupsDataSource,
-		NewMetricsDataSource,
-		NewHealthInfoDataSource,
-		NewStorageInfoDataSource,
-		NewServerInfoDataSource,
-		NewReplicationMetricsDataSource,
-		NewIlmTierStatsDataSource,
+		dspools.NewPoolsDataSource,
+		dsiambackup.NewIamBackupDataSource,
+		dsbucketmetadatabackup.NewBucketMetadataBackupDataSource,
+		dsusers.NewUsersDataSource,
+		dsusermfa.NewUserMfaDataSource,
+		dsiampolicies.NewIAMPoliciesDataSource,
+		dsiampolicy.NewIAMPolicyDataSource,
+		dskmsstatus.NewKmsStatusDataSource,
+		dskmsconfig.NewKmsConfigDataSource,
+		dsquota.NewQuotaDataSource,
+		dsgroups.NewGroupsDataSource,
+		dsmetrics.NewMetricsDataSource,
+		dshealthinfo.NewHealthInfoDataSource,
+		dsstorageinfo.NewStorageInfoDataSource,
+		dsserverinfo.NewServerInfoDataSource,
+		dsreplicationmetrics.NewReplicationMetricsDataSource,
+		dsilmtierstats.NewIlmTierStatsDataSource,
 	}
 }
 

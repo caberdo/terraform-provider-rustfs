@@ -1,11 +1,8 @@
 package provider
 
-import (
-	"github.com/minio/minio-go/v7"
-	"github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
-)
+import "github.com/weinmann-emt/terraform-provider-rustfs/internal/client"
 
-type AllClient struct {
-	Minio      *minio.Client
-	RustClient client.RustfsAdmin
-}
+// AllClient is kept as an alias of client.AllClient so the flat provider
+// package keeps compiling while resources and data sources move into their own
+// packages under internal/.
+type AllClient = client.AllClient
