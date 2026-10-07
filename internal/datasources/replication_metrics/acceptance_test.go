@@ -14,7 +14,7 @@ func TestAccReplicationMetrics(t *testing.T) {
 	name := fmt.Sprintf("tf-test-repl-metrics-%d", acctest.RandInt())
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { acceptance.PreCheck(t) },
+		PreCheck:                 acceptance.LivePreCheck(t),
 		ProtoV6ProviderFactories: acceptance.ProtoV6ProviderFactories(),
 		Steps: []resource.TestStep{
 			{

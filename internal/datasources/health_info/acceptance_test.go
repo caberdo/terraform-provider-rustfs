@@ -10,7 +10,7 @@ import (
 
 func TestAccHealthInfoDataSource(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { acceptance.PreCheck(t) },
+		PreCheck:                 acceptance.LivePreCheck(t),
 		ProtoV6ProviderFactories: acceptance.ProtoV6ProviderFactories(),
 		Steps: []resource.TestStep{
 			{

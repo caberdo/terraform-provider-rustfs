@@ -150,21 +150,23 @@ go test ./provider/... -v -run "^[^T]"  # Skip acceptance tests
 
 ### Acceptance tests
 
-Requires a running RustFS instance:
+The live suite is driven by the shared harness in `internal/acceptance` and a
+throwaway RustFS server defined in the root `docker-compose.yml`:
 
 ```bash
-# Start RustFS
-podman-compose -f acc_test/docker-compose.yml up -d
+# Start RustFS and run the live suite in one shot
+make testacc-live
 
-# Run acceptance tests
+# ...or against a server you started yourself
+make testacc-up
 RUSTFS_ENDPOINT="127.0.0.1:9001" \
 RUSTFS_USER="rustfsadmin" \
 RUSTFS_SECRET="rustfsadmin" \
-TF_ACC=1 go test -v ./provider -run "TestAcc"
-
-# Cleanup
-podman-compose -f acc_test/docker-compose.yml down
+TF_ACC=1 go test -v ./internal/... ./provider -run "TestAcc"
+make testacc-down
 ```
+
+Without `TF_ACC` (or without `RUSTFS_ENDPOINT`) the live tests skip cleanly.
 
 ## Documentation
 
