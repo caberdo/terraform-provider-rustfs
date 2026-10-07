@@ -13,7 +13,7 @@ func TestExportBucketMetadata(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/zip")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("fake-metadata-zip"))
+		_, _ = w.Write([]byte("fake-metadata-zip"))
 	}))
 	defer server.Close()
 

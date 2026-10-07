@@ -22,7 +22,7 @@ func TestGetGroup(t *testing.T) {
 			Members: []string{"alice", "bob"},
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(info)
+		_ = json.NewEncoder(w).Encode(info)
 	}))
 	defer server.Close()
 

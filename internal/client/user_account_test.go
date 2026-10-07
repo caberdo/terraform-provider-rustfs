@@ -9,8 +9,8 @@ import (
 func TestCreateUserAccount(t *testing.T) {
 
 	account := client.UserAccount{
-		AccessKey: randomString(8),
-		SecretKey: randomString(8),
+		AccessKey: randomString(),
+		SecretKey: randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateUserAccount(account)
@@ -34,8 +34,8 @@ func TestCreateUserAccount(t *testing.T) {
 func TestCreateUserAccountWithGrp(t *testing.T) {
 
 	account := client.UserAccount{
-		AccessKey: randomString(8),
-		SecretKey: randomString(8),
+		AccessKey: randomString(),
+		SecretKey: randomString(),
 		Policy:    "readwrite",
 	}
 	dut := getClient()
@@ -51,8 +51,8 @@ func TestCreateUserAccountWithGrp(t *testing.T) {
 
 func TestAddUserWithAccesKey(t *testing.T) {
 	account := client.UserAccount{
-		AccessKey: randomString(8),
-		SecretKey: randomString(8),
+		AccessKey: randomString(),
+		SecretKey: randomString(),
 	}
 	dut := getClient()
 	err := dut.CreateUserAccount(account)
@@ -61,9 +61,9 @@ func TestAddUserWithAccesKey(t *testing.T) {
 	}
 
 	service := client.ServiceAccount{
-		AccessKey:  randomString(8),
+		AccessKey:  randomString(),
 		SecretKey:  "someSuperS3cret",
-		Name:       randomString(8),
+		Name:       randomString(),
 		TargetUser: account.AccessKey,
 	}
 	err = dut.CreateServiceAccount(service)

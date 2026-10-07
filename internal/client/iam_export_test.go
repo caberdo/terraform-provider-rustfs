@@ -13,7 +13,7 @@ func TestExportIam(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/zip")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("fake-zip-data"))
+		_, _ = w.Write([]byte("fake-zip-data"))
 	}))
 	defer server.Close()
 

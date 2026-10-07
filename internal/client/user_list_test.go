@@ -17,7 +17,7 @@ func TestListUsers(t *testing.T) {
 			{AccessKey: "bob", Status: "disabled", Policy: "readonly"},
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(users)
+		_ = json.NewEncoder(w).Encode(users)
 	}))
 	defer server.Close()
 
@@ -49,7 +49,7 @@ func TestListUsersWithBucket(t *testing.T) {
 			t.Errorf("expected bucket=my-bucket, got %s", bucket)
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]UserInfo{})
+		_ = json.NewEncoder(w).Encode([]UserInfo{})
 	}))
 	defer server.Close()
 

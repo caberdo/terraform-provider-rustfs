@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 )
 
 func (c *RustfsAdmin) AddTier(config json.RawMessage) error {
@@ -63,9 +64,12 @@ type TierStat struct {
 // TierStats returns per-tier usage statistics keyed by tier name. When no
 // tiers are configured the server returns an empty map.
 func (c *RustfsAdmin) TierStats() (map[string]TierStat, error) {
+	// RustFS contract v2 returns an envelope; the flat tier-name => counters map
+	// this client decodes is served by the documented legacy format.
 	reqData := RequestData{
-		Method:  "GET",
-		RelPath: "tier-stats",
+		Method:      "GET",
+		RelPath:     "tier-stats",
+		QueryValues: url.Values{"format": []string{"legacy"}},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

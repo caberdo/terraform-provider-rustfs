@@ -57,10 +57,7 @@ func TestKmsConfigModelFromConfig(t *testing.T) {
 		DefaultKeyID:    stringPtr("key-01"),
 	}
 
-	model, diags := kmsConfigModelFromConfig(kmsConfig)
-	if diags.HasError() {
-		t.Fatalf("unexpected diagnostics: %v", diags)
-	}
+	model := kmsConfigModelFromConfig(kmsConfig)
 	if model.Backend.ValueString() != "vault-kv2" {
 		t.Errorf("expected vault-kv2, got %s", model.Backend.ValueString())
 	}
@@ -81,10 +78,7 @@ func TestKmsConfigModelFromConfig(t *testing.T) {
 func TestKmsConfigModelFromConfigNullDefaultKey(t *testing.T) {
 	kmsConfig := &client.KmsConfig{Backend: "local"}
 
-	model, diags := kmsConfigModelFromConfig(kmsConfig)
-	if diags.HasError() {
-		t.Fatalf("unexpected diagnostics: %v", diags)
-	}
+	model := kmsConfigModelFromConfig(kmsConfig)
 	if !model.DefaultKeyID.IsNull() {
 		t.Errorf("expected null default_key_id, got %s", model.DefaultKeyID)
 	}

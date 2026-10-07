@@ -17,7 +17,7 @@ func TestListPools(t *testing.T) {
 			{Name: "pool-1"},
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(pools)
+		_ = json.NewEncoder(w).Encode(pools)
 	}))
 	defer server.Close()
 

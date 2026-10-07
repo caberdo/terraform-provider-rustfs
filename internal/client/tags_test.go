@@ -86,7 +86,7 @@ func TestBucketTagsGet(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/xml")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<Tagging><TagSet><Tag><Key>environment</Key><Value>production</Value></Tag><Tag><Key>team</Key><Value>platform</Value></Tag></TagSet></Tagging>`))
+		_, _ = w.Write([]byte(`<Tagging><TagSet><Tag><Key>environment</Key><Value>production</Value></Tag><Tag><Key>team</Key><Value>platform</Value></Tag></TagSet></Tagging>`))
 	}))
 	defer server.Close()
 
@@ -114,7 +114,7 @@ func TestBucketTagsGet(t *testing.T) {
 func TestBucketTagsGetError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`<Error><Code>NoSuchTagSet</Code><Message>The TagSet does not exist</Message></Error>`))
+		_, _ = w.Write([]byte(`<Error><Code>NoSuchTagSet</Code><Message>The TagSet does not exist</Message></Error>`))
 	}))
 	defer server.Close()
 

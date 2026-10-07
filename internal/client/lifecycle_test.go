@@ -9,12 +9,11 @@ import (
 )
 
 func TestCreateUpdateDelete(t *testing.T) {
-	name := randomString(8)
+	name := randomString()
 	name = strings.ToLower(name)
 	days := 20
 	dut := getClient()
-	dut.CreateBucket(name)
-
+	_ = dut.CreateBucket(name)
 	lifecycleConfig := client.LifecycleConfiguration{
 		Rules: []client.LifecycleRule{
 			{
@@ -58,5 +57,5 @@ func TestCreateUpdateDelete(t *testing.T) {
 		t.Error("Eror during delete", err)
 	}
 
-	dut.DeleteBucket(name)
+	_ = dut.DeleteBucket(name)
 }
