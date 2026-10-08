@@ -1,4 +1,4 @@
-## 0.2.0 (Unreleased)
+## 0.2.0 (2026-10-08)
 
 BREAKING CHANGES:
 - `rustfs_bucket_encryption`: the flat `algorithm`/`kms_master_key_id` attributes are replaced by a
