@@ -3,8 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
+	"sort"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -85,6 +88,24 @@ func (r *bucketTagsRessource) Configure(_ context.Context, req resource.Configur
 	r.client = client
 }
 
+// buildBucketTagging converts a tag map into a deterministic SDK TagSet.
+func buildBucketTagging(tags map[string]string) *s3types.Tagging {
+	keys := make([]string, 0, len(tags))
+	for k := range tags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	tagSet := make([]s3types.Tag, 0, len(keys))
+	for _, k := range keys {
+		tagSet = append(tagSet, s3types.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(tags[k]),
+		})
+	}
+	return &s3types.Tagging{TagSet: tagSet}
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *bucketTagsRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan bucketTagsModel
@@ -99,7 +120,10 @@ func (r *bucketTagsRessource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	err := r.client.RustClient.SetBucketTagging(plan.Bucket.ValueString(), tagMap)
+	_, err := r.client.S3.PutBucketTagging(ctx, &s3.PutBucketTaggingInput{
+		Bucket:  aws.String(plan.Bucket.ValueString()),
+		Tagging: buildBucketTagging(tagMap),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating bucket tags",
@@ -122,11 +146,11 @@ func (r *bucketTagsRessource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	tagMap, err := r.client.RustClient.GetBucketTagging(state.Bucket.ValueString())
+	out, err := r.client.S3.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
-		if strings.Contains(err.Error(), "NoSuchTagSet") ||
-			strings.Contains(err.Error(), "NoSuchBucket") ||
-			strings.Contains(err.Error(), "404") {
+		if isBucketSubresourceAbsent(err, "NoSuchTagSet") {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -135,6 +159,11 @@ func (r *bucketTagsRessource) Read(ctx context.Context, req resource.ReadRequest
 			"Could not read bucket tagging: "+err.Error(),
 		)
 		return
+	}
+
+	tagMap := make(map[string]string, len(out.TagSet))
+	for _, t := range out.TagSet {
+		tagMap[aws.ToString(t.Key)] = aws.ToString(t.Value)
 	}
 
 	tags, diags := types.MapValueFrom(ctx, types.StringType, tagMap)
@@ -162,7 +191,10 @@ func (r *bucketTagsRessource) Update(ctx context.Context, req resource.UpdateReq
 		return
 	}
 
-	err := r.client.RustClient.SetBucketTagging(plan.Bucket.ValueString(), tagMap)
+	_, err := r.client.S3.PutBucketTagging(ctx, &s3.PutBucketTaggingInput{
+		Bucket:  aws.String(plan.Bucket.ValueString()),
+		Tagging: buildBucketTagging(tagMap),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating bucket tags",
@@ -183,11 +215,11 @@ func (r *bucketTagsRessource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	err := r.client.RustClient.RemoveBucketTagging(data.Bucket.ValueString())
+	_, err := r.client.S3.DeleteBucketTagging(ctx, &s3.DeleteBucketTaggingInput{
+		Bucket: aws.String(data.Bucket.ValueString()),
+	})
 	if err != nil {
-		if strings.Contains(err.Error(), "NoSuchTagSet") ||
-			strings.Contains(err.Error(), "NoSuchBucket") ||
-			strings.Contains(err.Error(), "404") {
+		if isBucketSubresourceAbsent(err, "NoSuchTagSet") {
 			// Already deleted
 			return
 		}

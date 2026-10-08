@@ -6,9 +6,34 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+func TestBuildPublicAccessBlock(t *testing.T) {
+	plan := bucketPublicAccessBlockModel{
+		BlockPublicAcls:       types.BoolValue(true),
+		IgnorePublicAcls:      types.BoolNull(),
+		BlockPublicPolicy:     types.BoolUnknown(),
+		RestrictPublicBuckets: types.BoolValue(false),
+	}
+
+	config := buildPublicAccessBlock(plan)
+
+	if config.BlockPublicAcls == nil || *config.BlockPublicAcls != true {
+		t.Errorf("expected BlockPublicAcls true, got %v", config.BlockPublicAcls)
+	}
+	if config.IgnorePublicAcls != nil {
+		t.Errorf("expected IgnorePublicAcls nil for null, got %v", *config.IgnorePublicAcls)
+	}
+	if config.BlockPublicPolicy != nil {
+		t.Errorf("expected BlockPublicPolicy nil for unknown, got %v", *config.BlockPublicPolicy)
+	}
+	if config.RestrictPublicBuckets == nil || *config.RestrictPublicBuckets != false {
+		t.Errorf("expected RestrictPublicBuckets false, got %v", config.RestrictPublicBuckets)
+	}
+}
 
 func TestBucketPublicAccessBlockRessourceSchema(t *testing.T) {
 	r := NewBucketPublicAccessBlockRessource()

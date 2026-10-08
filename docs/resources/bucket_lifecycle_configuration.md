@@ -12,6 +12,9 @@ Manage S3 bucket lifecycle configurations in rustfs
 ## Example Usage
 
 ```terraform
+# Multiple lifecycle rules on one bucket: expiry with a prefix filter, a
+# transition to a warm/cold ILM tier for noncurrent versions, and size-based
+# filtering combined with tags.
 resource "rustfs_bucket" "example" {
   name = "my-lifecycle-bucket"
 }
@@ -19,45 +22,108 @@ resource "rustfs_bucket" "example" {
 resource "rustfs_bucket_lifecycle_configuration" "example" {
   bucket = rustfs_bucket.example.name
 
-  rule {
-    id     = "expire-logs"
-    status = "Enabled"
+  rule = [
+    {
+      id     = "expire-logs"
+      status = "Enabled"
 
-    filter {
-      prefix = "logs/"
+      filter = {
+        prefix = "logs/"
+      }
+
+      expiration = {
+        days = 30
+      }
+
+      abort_incomplete_multipart_upload = {
+        days_after_initiation = 7
+      }
+    },
+    {
+      id     = "archive-old"
+      status = "Enabled"
+
+      filter = {
+        prefix = "archive/"
+      }
+
+      transition = [
+        {
+          days          = 60
+          storage_class = "WARM"
+        }
+      ]
+
+      noncurrent_version_transition = [
+        {
+          noncurrent_days           = 30
+          newer_noncurrent_versions = 3
+          storage_class             = "COLD"
+        }
+      ]
+
+      noncurrent_version_expiration = {
+        noncurrent_days = 365
+      }
+    },
+    {
+      id     = "expire-tagged-large-objects"
+      status = "Enabled"
+
+      filter = {
+        and = {
+          prefix = "reports/"
+
+          tags = [
+            {
+              key   = "tier"
+              value = "cold"
+            }
+          ]
+
+          object_size_greater_than = 1048576
+        }
+      }
+
+      expiration = {
+        date = "2027-01-01T00:00:00Z"
+      }
     }
+  ]
+}
 
-    expiration {
-      days = 30
+# A rule with a single tag filter, noncurrent-version expiry limited to the
+# newest offenders, and the minimum object size that triggers transitions.
+resource "rustfs_bucket" "tagged" {
+  name = "my-tagged-lifecycle-bucket"
+}
+
+resource "rustfs_bucket_lifecycle_configuration" "tagged" {
+  bucket                                 = rustfs_bucket.tagged.name
+  transition_default_minimum_object_size = "all_storage_classes_128K"
+
+  rule = [
+    {
+      id     = "expire-tagged"
+      status = "Enabled"
+
+      filter = {
+        tag = {
+          key   = "retention"
+          value = "short"
+        }
+      }
+
+      expiration = {
+        days = 14
+      }
+
+      noncurrent_version_expiration = {
+        noncurrent_days           = 3
+        newer_noncurrent_versions = 2
+      }
     }
-  }
-
-  rule {
-    id     = "archive-old"
-    status = "Enabled"
-
-    filter {
-      prefix = "archive/"
-    }
-
-    transition {
-      days          = 60
-      storage_class = "WARM"
-    }
-
-    noncurrent_version_transition {
-      noncurrent_days = 30
-      storage_class   = "WARM"
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = 365
-    }
-
-    abort_incomplete_multipart_upload {
-      days_after_initiation = 7
-    }
-  }
+  ]
 }
 ```
 
@@ -67,33 +133,34 @@ resource "rustfs_bucket_lifecycle_configuration" "example" {
 ### Required
 
 - `bucket` (String) Name of the bucket
+- `rule` (Attributes List) List of lifecycle rules (see [below for nested schema](#nestedatt--rule))
 
 ### Optional
 
-- `rule` (Block List) List of lifecycle rules (see [below for nested schema](#nestedblock--rule))
+- `transition_default_minimum_object_size` (String) Which default minimum object size behaviour applies to transitions in this configuration: all_storage_classes_128K or varies_by_storage_class.
 
 ### Read-Only
 
 - `id` (String) The bucket name
 
-<a id="nestedblock--rule"></a>
+<a id="nestedatt--rule"></a>
 ### Nested Schema for `rule`
 
 Required:
 
 - `id` (String) Unique identifier for the rule
-- `status` (String) Status of the rule, either Enabled or Disabled
+- `status` (String) Whether the rule is currently applied: Enabled or Disabled
 
 Optional:
 
-- `abort_incomplete_multipart_upload` (Block, Optional) Configuration block for aborting incomplete multipart uploads (see [below for nested schema](#nestedblock--rule--abort_incomplete_multipart_upload))
-- `expiration` (Block, Optional) Configuration block for object expiration (see [below for nested schema](#nestedblock--rule--expiration))
-- `filter` (Block, Optional) Filter identifying one or more objects to which the rule applies (see [below for nested schema](#nestedblock--rule--filter))
-- `noncurrent_version_expiration` (Block, Optional) Configuration block for expiring noncurrent object versions (see [below for nested schema](#nestedblock--rule--noncurrent_version_expiration))
-- `noncurrent_version_transition` (Block, Optional) Configuration block for transitioning noncurrent object versions to an ILM tier (see [below for nested schema](#nestedblock--rule--noncurrent_version_transition))
-- `transition` (Block, Optional) Configuration block for transitioning objects to an ILM tier (see [below for nested schema](#nestedblock--rule--transition))
+- `abort_incomplete_multipart_upload` (Attributes) Configuration block for aborting incomplete multipart uploads (see [below for nested schema](#nestedatt--rule--abort_incomplete_multipart_upload))
+- `expiration` (Attributes) Configuration block for object expiration (see [below for nested schema](#nestedatt--rule--expiration))
+- `filter` (Attributes) Filter identifying the objects to which the rule applies (see [below for nested schema](#nestedatt--rule--filter))
+- `noncurrent_version_expiration` (Attributes) Configuration block for expiring noncurrent object versions (see [below for nested schema](#nestedatt--rule--noncurrent_version_expiration))
+- `noncurrent_version_transition` (Attributes List) Configuration blocks for transitioning noncurrent object versions to an ILM tier (see [below for nested schema](#nestedatt--rule--noncurrent_version_transition))
+- `transition` (Attributes List) Configuration blocks for transitioning current object versions to an ILM tier (see [below for nested schema](#nestedatt--rule--transition))
 
-<a id="nestedblock--rule--abort_incomplete_multipart_upload"></a>
+<a id="nestedatt--rule--abort_incomplete_multipart_upload"></a>
 ### Nested Schema for `rule.abort_incomplete_multipart_upload`
 
 Optional:
@@ -101,46 +168,87 @@ Optional:
 - `days_after_initiation` (Number) Number of days after multipart upload initiation before the upload is aborted
 
 
-<a id="nestedblock--rule--expiration"></a>
+<a id="nestedatt--rule--expiration"></a>
 ### Nested Schema for `rule.expiration`
 
 Optional:
 
-- `date` (String) Date at which the objects expire (ISO8601, e.g. 2026-12-31T00:00:00Z)
+- `date` (String) Date at which the objects expire (RFC3339, e.g. 2026-12-31T00:00:00Z)
 - `days` (Number) Lifetime of the objects in days
 - `expired_object_delete_marker` (Boolean) Whether to remove the delete marker of expired objects with no versions
 
 
-<a id="nestedblock--rule--filter"></a>
+<a id="nestedatt--rule--filter"></a>
 ### Nested Schema for `rule.filter`
 
 Optional:
 
-- `prefix` (String) Object key prefix identifying one or more objects to which the rule applies
+- `and` (Attributes) Logical AND of two or more predicates that objects must all match (see [below for nested schema](#nestedatt--rule--filter--and))
+- `object_size_greater_than` (Number) Minimum object size in bytes to which the rule applies
+- `object_size_less_than` (Number) Maximum object size in bytes to which the rule applies
+- `prefix` (String) Object key prefix identifying one or more objects
+- `tag` (Attributes) Tag that must exist on an object for the rule to apply (see [below for nested schema](#nestedatt--rule--filter--tag))
+
+<a id="nestedatt--rule--filter--and"></a>
+### Nested Schema for `rule.filter.and`
+
+Optional:
+
+- `object_size_greater_than` (Number) Minimum object size in bytes to which the rule applies
+- `object_size_less_than` (Number) Maximum object size in bytes to which the rule applies
+- `prefix` (String) Object key prefix identifying one or more objects
+- `tags` (Attributes List) Tags that must all exist on an object for the rule to apply (see [below for nested schema](#nestedatt--rule--filter--and--tags))
+
+<a id="nestedatt--rule--filter--and--tags"></a>
+### Nested Schema for `rule.filter.and.tags`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
 
 
-<a id="nestedblock--rule--noncurrent_version_expiration"></a>
+
+<a id="nestedatt--rule--filter--tag"></a>
+### Nested Schema for `rule.filter.tag`
+
+Required:
+
+- `key` (String) Tag key
+- `value` (String) Tag value
+
+
+
+<a id="nestedatt--rule--noncurrent_version_expiration"></a>
 ### Nested Schema for `rule.noncurrent_version_expiration`
 
 Optional:
 
+- `newer_noncurrent_versions` (Number) Number of noncurrent versions to retain
 - `noncurrent_days` (Number) Number of days an object is noncurrent before it expires
 
 
-<a id="nestedblock--rule--noncurrent_version_transition"></a>
+<a id="nestedatt--rule--noncurrent_version_transition"></a>
 ### Nested Schema for `rule.noncurrent_version_transition`
 
-Optional:
+Required:
 
-- `noncurrent_days` (Number) Number of days an object is noncurrent before it is transitioned
 - `storage_class` (String) Name of the RustFS ILM tier to transition noncurrent versions to
 
+Optional:
 
-<a id="nestedblock--rule--transition"></a>
+- `newer_noncurrent_versions` (Number) Number of noncurrent versions to retain in the current storage class before transitioning
+- `noncurrent_days` (Number) Number of days an object is noncurrent before it is transitioned
+
+
+<a id="nestedatt--rule--transition"></a>
 ### Nested Schema for `rule.transition`
+
+Required:
+
+- `storage_class` (String) Name of the RustFS ILM tier to transition objects to
 
 Optional:
 
-- `date` (String) Date at which the objects are transitioned (ISO8601, e.g. 2026-12-31T00:00:00Z)
+- `date` (String) Date at which the objects are transitioned (RFC3339, e.g. 2026-12-31T00:00:00Z)
 - `days` (Number) Lifetime of the objects in days before transition
-- `storage_class` (String) Name of the RustFS ILM tier to transition objects to

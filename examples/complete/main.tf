@@ -13,7 +13,8 @@
 # BUCKET - storage container with its feature set
 # ---------------------------------------------------------------------------
 resource "rustfs_bucket" "data" {
-  name = "app-data"
+  name                           = "app-data"
+  object_lock_enabled_for_bucket = true
 }
 
 resource "rustfs_bucket_versioning" "data" {
@@ -22,14 +23,27 @@ resource "rustfs_bucket_versioning" "data" {
 }
 
 resource "rustfs_bucket_encryption" "data" {
-  bucket    = rustfs_bucket.data.name
-  algorithm = "AES256"
+  bucket = rustfs_bucket.data.name
+
+  rule = [
+    {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm = "AES256"
+      }
+    },
+  ]
 }
 
 resource "rustfs_bucket_object_lock" "data" {
-  bucket = rustfs_bucket.data.name
-  mode   = "COMPLIANCE"
-  days   = 365
+  bucket              = rustfs_bucket.data.name
+  object_lock_enabled = "Enabled"
+
+  rule = {
+    default_retention = {
+      mode = "COMPLIANCE"
+      days = 365
+    }
+  }
 }
 
 resource "rustfs_bucket_public_access_block" "data" {
@@ -52,36 +66,39 @@ resource "rustfs_bucket_tags" "data" {
 resource "rustfs_bucket_lifecycle_configuration" "data" {
   bucket = rustfs_bucket.data.name
 
-  rule {
-    id     = "expire-logs"
-    status = "Enabled"
+  rule = [
+    {
+      id     = "expire-logs"
+      status = "Enabled"
 
-    filter {
-      prefix = "logs/"
-    }
+      filter = {
+        prefix = "logs/"
+      }
 
-    expiration {
-      days = 30
-    }
-  }
+      expiration = {
+        days = 30
+      }
+    },
+    {
+      id     = "archive-documents"
+      status = "Enabled"
 
-  rule {
-    id     = "archive-documents"
-    status = "Enabled"
+      filter = {
+        prefix = "documents/"
+      }
 
-    filter {
-      prefix = "documents/"
-    }
+      transition = [
+        {
+          days          = 60
+          storage_class = "WARM"
+        },
+      ]
 
-    transition {
-      days          = 60
-      storage_class = "WARM"
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = 365
-    }
-  }
+      noncurrent_version_expiration = {
+        noncurrent_days = 365
+      }
+    },
+  ]
 }
 
 resource "rustfs_bucket_cors" "data" {

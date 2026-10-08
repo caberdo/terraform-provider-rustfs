@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -85,7 +87,10 @@ func (r *bucketPolicyRessource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	err := r.client.RustClient.SetBucketPolicy(plan.Bucket.ValueString(), plan.Policy.ValueString())
+	_, err := r.client.S3.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(plan.Bucket.ValueString()),
+		Policy: aws.String(plan.Policy.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating bucket policy",
@@ -107,14 +112,22 @@ func (r *bucketPolicyRessource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	policy, err := r.client.RustClient.GetBucketPolicy(state.Bucket.ValueString())
+	out, err := r.client.S3.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
 	if err != nil {
+		if isBucketSubresourceAbsent(err, "NoSuchBucketPolicy") {
+			resp.State.RemoveResource(ctx)
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error reading bucket policy",
 			"Could not read bucket policy: "+err.Error(),
 		)
 		return
 	}
+
+	policy := aws.ToString(out.Policy)
 	if policy == "" {
 		resp.State.RemoveResource(ctx)
 		return
@@ -132,7 +145,10 @@ func (r *bucketPolicyRessource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	err := r.client.RustClient.SetBucketPolicy(plan.Bucket.ValueString(), plan.Policy.ValueString())
+	_, err := r.client.S3.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{
+		Bucket: aws.String(plan.Bucket.ValueString()),
+		Policy: aws.String(plan.Policy.ValueString()),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating bucket policy",
@@ -142,7 +158,7 @@ func (r *bucketPolicyRessource) Update(ctx context.Context, req resource.UpdateR
 	}
 
 	plan.Id = types.StringValue(plan.Bucket.ValueString())
-	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *bucketPolicyRessource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -152,8 +168,13 @@ func (r *bucketPolicyRessource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.client.RustClient.RemoveBucketPolicy(data.Bucket.ValueString())
+	_, err := r.client.S3.DeleteBucketPolicy(ctx, &s3.DeleteBucketPolicyInput{
+		Bucket: aws.String(data.Bucket.ValueString()),
+	})
 	if err != nil {
+		if isBucketSubresourceAbsent(err, "NoSuchBucketPolicy") {
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error deleting bucket policy",
 			"Could not remove bucket policy: "+err.Error(),

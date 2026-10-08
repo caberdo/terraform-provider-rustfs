@@ -3,9 +3,10 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -104,6 +105,49 @@ func (r *bucketPublicAccessBlockRessource) Configure(_ context.Context, req reso
 	r.client = client
 }
 
+func buildPublicAccessBlock(plan bucketPublicAccessBlockModel) *s3types.PublicAccessBlockConfiguration {
+	config := &s3types.PublicAccessBlockConfiguration{}
+	if !plan.BlockPublicAcls.IsNull() && !plan.BlockPublicAcls.IsUnknown() {
+		config.BlockPublicAcls = aws.Bool(plan.BlockPublicAcls.ValueBool())
+	}
+	if !plan.IgnorePublicAcls.IsNull() && !plan.IgnorePublicAcls.IsUnknown() {
+		config.IgnorePublicAcls = aws.Bool(plan.IgnorePublicAcls.ValueBool())
+	}
+	if !plan.BlockPublicPolicy.IsNull() && !plan.BlockPublicPolicy.IsUnknown() {
+		config.BlockPublicPolicy = aws.Bool(plan.BlockPublicPolicy.ValueBool())
+	}
+	if !plan.RestrictPublicBuckets.IsNull() && !plan.RestrictPublicBuckets.IsUnknown() {
+		config.RestrictPublicBuckets = aws.Bool(plan.RestrictPublicBuckets.ValueBool())
+	}
+	return config
+}
+
+// readPublicAccessBlock refreshes state from the server. A nil payload means the
+// bucket has no explicit configuration, in which case every flag takes its
+// effective server default of false.
+func (r *bucketPublicAccessBlockRessource) readPublicAccessBlock(ctx context.Context, state *bucketPublicAccessBlockModel) error {
+	out, err := r.client.S3.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{
+		Bucket: aws.String(state.Bucket.ValueString()),
+	})
+	if err != nil {
+		return err
+	}
+
+	config := out.PublicAccessBlockConfiguration
+	if config == nil {
+		state.BlockPublicAcls = types.BoolValue(false)
+		state.IgnorePublicAcls = types.BoolValue(false)
+		state.BlockPublicPolicy = types.BoolValue(false)
+		state.RestrictPublicBuckets = types.BoolValue(false)
+	} else {
+		state.BlockPublicAcls = types.BoolValue(aws.ToBool(config.BlockPublicAcls))
+		state.IgnorePublicAcls = types.BoolValue(aws.ToBool(config.IgnorePublicAcls))
+		state.BlockPublicPolicy = types.BoolValue(aws.ToBool(config.BlockPublicPolicy))
+		state.RestrictPublicBuckets = types.BoolValue(aws.ToBool(config.RestrictPublicBuckets))
+	}
+	return nil
+}
+
 // Create creates the resource and sets the initial Terraform state.
 func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan bucketPublicAccessBlockModel
@@ -112,14 +156,10 @@ func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resou
 		return
 	}
 
-	config := &rustfs.PublicAccessBlockConfiguration{
-		BlockPublicAcls:       plan.BlockPublicAcls.ValueBool(),
-		IgnorePublicAcls:      plan.IgnorePublicAcls.ValueBool(),
-		BlockPublicPolicy:     plan.BlockPublicPolicy.ValueBool(),
-		RestrictPublicBuckets: plan.RestrictPublicBuckets.ValueBool(),
-	}
-
-	err := r.client.RustClient.SetBucketPublicAccessBlock(plan.Bucket.ValueString(), config)
+	_, err := r.client.S3.PutPublicAccessBlock(ctx, &s3.PutPublicAccessBlockInput{
+		Bucket:                         aws.String(plan.Bucket.ValueString()),
+		PublicAccessBlockConfiguration: buildPublicAccessBlock(plan),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating bucket public access block",
@@ -131,6 +171,13 @@ func (r *bucketPublicAccessBlockRessource) Create(ctx context.Context, req resou
 	tflog.Trace(ctx, "created a bucket public access block resource")
 
 	plan.Id = types.StringValue(plan.Bucket.ValueString())
+	if err := r.readPublicAccessBlock(ctx, &plan); err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading bucket public access block after create",
+			"Could not read public access block: "+err.Error(),
+		)
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -142,11 +189,8 @@ func (r *bucketPublicAccessBlockRessource) Read(ctx context.Context, req resourc
 		return
 	}
 
-	config, err := r.client.RustClient.GetBucketPublicAccessBlock(state.Bucket.ValueString())
-	if err != nil {
-		if strings.Contains(err.Error(), "NoSuchPublicAccessBlockConfiguration") ||
-			strings.Contains(err.Error(), "NoSuchBucket") ||
-			strings.Contains(err.Error(), "404") {
+	if err := r.readPublicAccessBlock(ctx, &state); err != nil {
+		if isBucketSubresourceAbsent(err, "NoSuchPublicAccessBlockConfiguration") {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -157,10 +201,6 @@ func (r *bucketPublicAccessBlockRessource) Read(ctx context.Context, req resourc
 		return
 	}
 
-	state.BlockPublicAcls = types.BoolValue(config.BlockPublicAcls)
-	state.IgnorePublicAcls = types.BoolValue(config.IgnorePublicAcls)
-	state.BlockPublicPolicy = types.BoolValue(config.BlockPublicPolicy)
-	state.RestrictPublicBuckets = types.BoolValue(config.RestrictPublicBuckets)
 	state.Id = types.StringValue(state.Bucket.ValueString())
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -173,14 +213,10 @@ func (r *bucketPublicAccessBlockRessource) Update(ctx context.Context, req resou
 		return
 	}
 
-	config := &rustfs.PublicAccessBlockConfiguration{
-		BlockPublicAcls:       plan.BlockPublicAcls.ValueBool(),
-		IgnorePublicAcls:      plan.IgnorePublicAcls.ValueBool(),
-		BlockPublicPolicy:     plan.BlockPublicPolicy.ValueBool(),
-		RestrictPublicBuckets: plan.RestrictPublicBuckets.ValueBool(),
-	}
-
-	err := r.client.RustClient.SetBucketPublicAccessBlock(plan.Bucket.ValueString(), config)
+	_, err := r.client.S3.PutPublicAccessBlock(ctx, &s3.PutPublicAccessBlockInput{
+		Bucket:                         aws.String(plan.Bucket.ValueString()),
+		PublicAccessBlockConfiguration: buildPublicAccessBlock(plan),
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating bucket public access block",
@@ -190,6 +226,13 @@ func (r *bucketPublicAccessBlockRessource) Update(ctx context.Context, req resou
 	}
 
 	plan.Id = types.StringValue(plan.Bucket.ValueString())
+	if err := r.readPublicAccessBlock(ctx, &plan); err != nil {
+		resp.Diagnostics.AddError(
+			"Error reading bucket public access block after update",
+			"Could not read public access block: "+err.Error(),
+		)
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -201,11 +244,11 @@ func (r *bucketPublicAccessBlockRessource) Delete(ctx context.Context, req resou
 		return
 	}
 
-	err := r.client.RustClient.DeleteBucketPublicAccessBlock(data.Bucket.ValueString())
+	_, err := r.client.S3.DeletePublicAccessBlock(ctx, &s3.DeletePublicAccessBlockInput{
+		Bucket: aws.String(data.Bucket.ValueString()),
+	})
 	if err != nil {
-		if strings.Contains(err.Error(), "NoSuchPublicAccessBlockConfiguration") ||
-			strings.Contains(err.Error(), "NoSuchBucket") ||
-			strings.Contains(err.Error(), "404") {
+		if isBucketSubresourceAbsent(err, "NoSuchPublicAccessBlockConfiguration") {
 			// Already deleted
 			return
 		}

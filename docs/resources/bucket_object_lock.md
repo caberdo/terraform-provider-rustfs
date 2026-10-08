@@ -12,10 +12,41 @@ Manage RustFS bucket object lock configuration
 ## Example Usage
 
 ```terraform
+# An object lock configuration with a day-based compliance retention.
+resource "rustfs_bucket" "example" {
+  name                           = "my-locked-bucket"
+  object_lock_enabled_for_bucket = true
+}
+
 resource "rustfs_bucket_object_lock" "example" {
-  bucket = rustfs_bucket.example.name
-  mode   = "COMPLIANCE"
-  days   = 365
+  bucket              = rustfs_bucket.example.name
+  object_lock_enabled = "Enabled"
+
+  rule = {
+    default_retention = {
+      mode = "COMPLIANCE"
+      days = 365
+    }
+  }
+}
+
+# A governance retention using years instead of days. days and years are
+# mutually exclusive: exactly one of them must be set.
+resource "rustfs_bucket" "governance" {
+  name                           = "my-governance-bucket"
+  object_lock_enabled_for_bucket = true
+}
+
+resource "rustfs_bucket_object_lock" "governance" {
+  bucket              = rustfs_bucket.governance.name
+  object_lock_enabled = "Enabled"
+
+  rule = {
+    default_retention = {
+      mode  = "GOVERNANCE"
+      years = 5
+    }
+  }
 }
 ```
 
@@ -25,9 +56,30 @@ resource "rustfs_bucket_object_lock" "example" {
 ### Required
 
 - `bucket` (String) Name of the bucket. Bucket must have been created with object lock enabled.
-- `mode` (String) Object lock retention mode: COMPLIANCE or GOVERNANCE.
 
 ### Optional
 
-- `days` (Number) Retention period in days.
-- `years` (Number) Retention period in years.
+- `checksum_algorithm` (String) Checksum algorithm used by the SDK when sending the request.
+- `content_md5` (String) MD5 hash for the request body.
+- `expected_bucket_owner` (String) Account ID of the expected bucket owner. The request fails if it does not match the actual owner.
+- `object_lock_enabled` (String) Whether this bucket has an Object Lock configuration enabled. RustFS only accepts Enabled.
+- `rule` (Attributes) Object Lock rule for the bucket. (see [below for nested schema](#nestedatt--rule))
+
+<a id="nestedatt--rule"></a>
+### Nested Schema for `rule`
+
+Required:
+
+- `default_retention` (Attributes) Default Object Lock retention settings for new objects. (see [below for nested schema](#nestedatt--rule--default_retention))
+
+<a id="nestedatt--rule--default_retention"></a>
+### Nested Schema for `rule.default_retention`
+
+Required:
+
+- `mode` (String) Default Object Lock retention mode: GOVERNANCE or COMPLIANCE.
+
+Optional:
+
+- `days` (Number) Default retention period in days. Mutually exclusive with years.
+- `years` (Number) Default retention period in years. Mutually exclusive with days.

@@ -12,13 +12,38 @@ Manage RustFS bucket versioning configuration
 ## Example Usage
 
 ```terraform
+# Enable bucket versioning.
 resource "rustfs_bucket" "example" {
   name = "my-versioned-bucket"
 }
 
 resource "rustfs_bucket_versioning" "example" {
-  bucket = rustfs_bucket.example.name
-  status = "Enabled"
+  bucket     = rustfs_bucket.example.name
+  status     = "Enabled"
+  mfa_delete = "Disabled"
+}
+
+# Suspend bucket versioning again.
+resource "rustfs_bucket" "suspended" {
+  name = "my-suspended-bucket"
+}
+
+resource "rustfs_bucket_versioning" "suspended" {
+  bucket = rustfs_bucket.suspended.name
+  status = "Suspended"
+}
+
+# Enable versioning together with MFA delete. mfa is a one-time value combining
+# the MFA device serial number and the current code (format "<device> <code>").
+resource "rustfs_bucket" "mfa" {
+  name = "my-mfa-bucket"
+}
+
+resource "rustfs_bucket_versioning" "mfa" {
+  bucket     = rustfs_bucket.mfa.name
+  status     = "Enabled"
+  mfa_delete = "Enabled"
+  mfa        = "arn:aws:iam::123456789012:mfa/root-account-mfa-device 123456"
 }
 ```
 
@@ -29,3 +54,11 @@ resource "rustfs_bucket_versioning" "example" {
 
 - `bucket` (String) Name of the bucket.
 - `status` (String) Versioning status: Enabled or Suspended.
+
+### Optional
+
+- `checksum_algorithm` (String) Checksum algorithm used by the SDK when sending the request.
+- `content_md5` (String) Base64 encoded 128-bit MD5 digest of the request body, used as a message integrity check.
+- `expected_bucket_owner` (String) Account ID of the expected bucket owner. The request fails if it does not match the actual owner.
+- `mfa` (String, Sensitive) Concatenation of the authentication device serial number, a space, and the value displayed on the MFA device. Required to change MFA delete state.
+- `mfa_delete` (String) Specifies whether MFA delete is enabled in the bucket versioning configuration. Enabled or Disabled.

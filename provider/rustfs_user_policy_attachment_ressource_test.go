@@ -45,7 +45,7 @@ resource "rustfs_policy" "test" {
   statement = [{
     effect    = "Allow"
     action    = ["s3:GetObject"]
-    ressource = ["arn:aws:s3:::accbucket/*"]
+    resource  = ["arn:aws:s3:::accbucket/*"]
   }]
 }
 resource "rustfs_user" "test" {

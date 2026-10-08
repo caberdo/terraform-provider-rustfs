@@ -12,8 +12,38 @@ Manage S3 buckets in rustfs
 ## Example Usage
 
 ```terraform
+# A basic bucket with tags and a region set at creation time.
 resource "rustfs_bucket" "example" {
-  name = "my-bucket"
+  name             = "my-bucket"
+  object_ownership = "BucketOwnerEnforced"
+
+  create_bucket_configuration = {
+    location_constraint = "eu-west-1"
+
+    tags = {
+      env = "test"
+    }
+  }
+}
+
+# A bucket created with a canned ACL and legacy grant recipients. Grants and the
+# ACL are only applied at creation time, so changing any of them recreates the
+# bucket.
+resource "rustfs_bucket" "public" {
+  name             = "my-public-bucket"
+  acl              = "public-read"
+  object_ownership = "BucketOwnerPreferred"
+
+  grant_read         = "uri=http://acs.amazonaws.com/groups/global/AllUsers"
+  grant_read_acp     = "uri=http://acs.amazonaws.com/groups/global/AllUsers"
+  grant_full_control = "emailaddress=ops@example.com"
+}
+
+# A bucket with S3 Object Lock enabled. Object Lock can only be switched on at
+# bucket creation time and can never be disabled afterwards.
+resource "rustfs_bucket" "locked" {
+  name                           = "my-locked-bucket"
+  object_lock_enabled_for_bucket = true
 }
 ```
 
@@ -23,3 +53,24 @@ resource "rustfs_bucket" "example" {
 ### Required
 
 - `name` (String) Name of the bucket
+
+### Optional
+
+- `acl` (String) Canned ACL applied to the bucket at creation time (for example private, public-read, public-read-write or authenticated-read).
+- `bucket_namespace` (String) Namespace the bucket is created in: account-regional or global.
+- `create_bucket_configuration` (Attributes) Additional bucket creation options (region and tags). (see [below for nested schema](#nestedatt--create_bucket_configuration))
+- `grant_full_control` (String) Grantee to whom full control over the bucket is granted at creation time.
+- `grant_read` (String) Grantee to whom the read permission on the bucket is granted at creation time.
+- `grant_read_acp` (String) Grantee to whom the read ACL permission on the bucket is granted at creation time.
+- `grant_write` (String) Grantee to whom the write permission on the bucket is granted at creation time.
+- `grant_write_acp` (String) Grantee to whom the write ACL permission on the bucket is granted at creation time.
+- `object_lock_enabled_for_bucket` (Boolean) Whether S3 Object Lock is enabled for the new bucket. This can only be set at creation time.
+- `object_ownership` (String) Object ownership setting for the bucket: BucketOwnerPreferred, ObjectWriter or BucketOwnerEnforced.
+
+<a id="nestedatt--create_bucket_configuration"></a>
+### Nested Schema for `create_bucket_configuration`
+
+Optional:
+
+- `location_constraint` (String) Region in which the bucket is created (for example eu-west-1).
+- `tags` (Map of String) Map of key/value tag pairs applied to the bucket at creation time.

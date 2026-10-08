@@ -12,6 +12,8 @@ Manage RustFS bucket event notification configuration
 ## Example Usage
 
 ```terraform
+# Notify an SQS-style queue and an SNS-style topic with key-name filtering, and
+# forward events to Amazon EventBridge.
 resource "rustfs_bucket" "events" {
   name = "my-event-bucket"
 }
@@ -21,10 +23,49 @@ resource "rustfs_bucket_notification" "example" {
 
   queue = [
     {
-      arn           = "arn:minio:sqs::PRIMARY:amqp"
-      events        = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
-      filter_prefix = "uploads/"
-      filter_suffix = ".jpg"
+      id     = "primary-queue"
+      arn    = "arn:minio:sqs::PRIMARY:amqp"
+      events = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
+
+      filter = {
+        prefix = "uploads/"
+        suffix = ".jpg"
+      }
+    },
+  ]
+
+  topic = [
+    {
+      id     = "primary-topic"
+      arn    = "arn:minio:sns::PRIMARY:topic"
+      events = ["s3:ObjectCreated:Put"]
+    },
+  ]
+
+  event_bridge = {
+    event_bridge_enabled = true
+  }
+}
+
+# Invoke a Lambda-style function on object creation, skipping server-side
+# validation of the destination ARN.
+resource "rustfs_bucket" "lambda_events" {
+  name = "my-lambda-event-bucket"
+}
+
+resource "rustfs_bucket_notification" "lambda" {
+  bucket                      = rustfs_bucket.lambda_events.name
+  skip_destination_validation = true
+
+  lambda = [
+    {
+      id     = "process-upload"
+      arn    = "arn:minio:lambda::PRIMARY:process-upload"
+      events = ["s3:ObjectCreated:Put"]
+
+      filter = {
+        prefix = "incoming/"
+      }
     },
   ]
 }
@@ -39,7 +80,43 @@ resource "rustfs_bucket_notification" "example" {
 
 ### Optional
 
-- `queue` (Attributes List) Queue notification configurations. (see [below for nested schema](#nestedatt--queue))
+- `event_bridge` (Attributes) Amazon EventBridge notification settings. (see [below for nested schema](#nestedatt--event_bridge))
+- `expected_bucket_owner` (String) Account ID of the expected bucket owner.
+- `lambda` (Attributes List) AWS Lambda function notification configurations. (see [below for nested schema](#nestedatt--lambda))
+- `queue` (Attributes List) Amazon SQS queue notification configurations. (see [below for nested schema](#nestedatt--queue))
+- `skip_destination_validation` (Boolean) Skips validation of the SQS, SNS and Lambda destinations.
+- `topic` (Attributes List) Amazon SNS topic notification configurations. (see [below for nested schema](#nestedatt--topic))
+
+<a id="nestedatt--event_bridge"></a>
+### Nested Schema for `event_bridge`
+
+Required:
+
+- `event_bridge_enabled` (Boolean) Whether event delivery to Amazon EventBridge is enabled.
+
+
+<a id="nestedatt--lambda"></a>
+### Nested Schema for `lambda`
+
+Required:
+
+- `arn` (String) ARN of the Lambda function target.
+- `events` (Set of String) S3 event types (e.g., s3:ObjectCreated:*, s3:ObjectRemoved:*).
+
+Optional:
+
+- `filter` (Attributes) Object key name prefix/suffix filtering rules. (see [below for nested schema](#nestedatt--lambda--filter))
+- `id` (String) Optional unique identifier for the configuration.
+
+<a id="nestedatt--lambda--filter"></a>
+### Nested Schema for `lambda.filter`
+
+Optional:
+
+- `prefix` (String) Filter events by object key prefix.
+- `suffix` (String) Filter events by object key suffix.
+
+
 
 <a id="nestedatt--queue"></a>
 ### Nested Schema for `queue`
@@ -51,5 +128,36 @@ Required:
 
 Optional:
 
-- `filter_prefix` (String) Filter events by object key prefix.
-- `filter_suffix` (String) Filter events by object key suffix.
+- `filter` (Attributes) Object key name prefix/suffix filtering rules. (see [below for nested schema](#nestedatt--queue--filter))
+- `id` (String) Optional unique identifier for the configuration.
+
+<a id="nestedatt--queue--filter"></a>
+### Nested Schema for `queue.filter`
+
+Optional:
+
+- `prefix` (String) Filter events by object key prefix.
+- `suffix` (String) Filter events by object key suffix.
+
+
+
+<a id="nestedatt--topic"></a>
+### Nested Schema for `topic`
+
+Required:
+
+- `arn` (String) ARN of the topic target (e.g., arn:minio:sns::PRIMARY:topic).
+- `events` (Set of String) S3 event types (e.g., s3:ObjectCreated:*, s3:ObjectRemoved:*).
+
+Optional:
+
+- `filter` (Attributes) Object key name prefix/suffix filtering rules. (see [below for nested schema](#nestedatt--topic--filter))
+- `id` (String) Optional unique identifier for the configuration.
+
+<a id="nestedatt--topic--filter"></a>
+### Nested Schema for `topic.filter`
+
+Optional:
+
+- `prefix` (String) Filter events by object key prefix.
+- `suffix` (String) Filter events by object key suffix.

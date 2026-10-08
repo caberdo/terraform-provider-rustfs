@@ -12,13 +12,43 @@ Manage RustFS bucket server-side encryption configuration
 ## Example Usage
 
 ```terraform
+# Server-side encryption with the default AES256 algorithm.
 resource "rustfs_bucket" "encrypted" {
   name = "my-encrypted-bucket"
 }
 
 resource "rustfs_bucket_encryption" "example" {
-  bucket    = rustfs_bucket.encrypted.name
-  algorithm = "AES256"
+  bucket = rustfs_bucket.encrypted.name
+
+  rule = [
+    {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm = "AES256"
+      }
+      bucket_key_enabled = false
+    },
+  ]
+
+  checksum_algorithm = "SHA256"
+}
+
+# SSE-KMS with an explicit customer managed key and a bucket key.
+resource "rustfs_bucket" "encrypted_kms" {
+  name = "my-encrypted-kms-bucket"
+}
+
+resource "rustfs_bucket_encryption" "kms" {
+  bucket = rustfs_bucket.encrypted_kms.name
+
+  rule = [
+    {
+      apply_server_side_encryption_by_default = {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = "arn:aws:kms:us-east-1:123456789012:key/abcd"
+      }
+      bucket_key_enabled = true
+    },
+  ]
 }
 ```
 
@@ -27,9 +57,30 @@ resource "rustfs_bucket_encryption" "example" {
 
 ### Required
 
-- `algorithm` (String) Encryption algorithm: AES256 or aws:kms.
 - `bucket` (String) Name of the bucket.
+- `rule` (Attributes List) Ordered list of server-side encryption rules. At least one rule is required. (see [below for nested schema](#nestedatt--rule))
 
 ### Optional
 
-- `kms_master_key_id` (String) KMS Master Key ID. Required when algorithm is aws:kms.
+- `checksum_algorithm` (String) Checksum algorithm used by the SDK when sending the request.
+- `content_md5` (String) Base64 encoded 128-bit MD5 digest of the server-side encryption configuration.
+- `expected_bucket_owner` (String) Account ID of the expected bucket owner. The request fails if it does not match the actual owner.
+
+<a id="nestedatt--rule"></a>
+### Nested Schema for `rule`
+
+Optional:
+
+- `apply_server_side_encryption_by_default` (Attributes) Default server-side encryption applied to new objects in the bucket. (see [below for nested schema](#nestedatt--rule--apply_server_side_encryption_by_default))
+- `bucket_key_enabled` (Boolean) Whether Amazon S3 should use an S3 Bucket Key for SSE-KMS encryption of new objects.
+
+<a id="nestedatt--rule--apply_server_side_encryption_by_default"></a>
+### Nested Schema for `rule.apply_server_side_encryption_by_default`
+
+Required:
+
+- `sse_algorithm` (String) Server-side encryption algorithm (for example AES256 or aws:kms).
+
+Optional:
+
+- `kms_master_key_id` (String) KMS customer managed key ID, key alias or ARN. Only valid when sse_algorithm is aws:kms.

@@ -12,16 +12,109 @@ Manage RustFS bucket replication configuration
 ## Example Usage
 
 ```terraform
+# Replicate objects under "logs/" with delete-marker handling, overwriting the
+# destination storage class and replicating with SSE-KMS.
 resource "rustfs_bucket" "source" {
   name = "source-bucket"
 }
 
 resource "rustfs_bucket_replication" "example" {
-  bucket             = rustfs_bucket.source.name
-  role               = "arn:minio:replication::id:source-bucket"
-  destination_bucket = "arn:aws:s3:::dest-bucket"
-  priority           = 1
-  status             = "Enabled"
+  bucket = rustfs_bucket.source.name
+  role   = "arn:minio:replication::id:source-bucket"
+
+  rule = [
+    {
+      id       = "replicate-logs"
+      priority = 1
+      status   = "Enabled"
+
+      filter = {
+        prefix = "logs/"
+      }
+
+      delete_marker_replication = {
+        status = "Enabled"
+      }
+
+      existing_object_replication = {
+        status = "Enabled"
+      }
+
+      destination = {
+        bucket        = "arn:aws:s3:::dest-bucket"
+        storage_class = "STANDARD"
+
+        encryption_configuration = {
+          replica_kms_key_id = "arn:aws:kms:us-east-1:123456789012:key/abcd"
+        }
+      }
+    }
+  ]
+}
+
+# A cross-account rule with tag-based filtering, source selection criteria and
+# replication time control (RTC) with metrics.
+resource "rustfs_bucket" "source_advanced" {
+  name = "source-advanced-bucket"
+}
+
+resource "rustfs_bucket_replication" "advanced" {
+  bucket             = rustfs_bucket.source_advanced.name
+  role               = "arn:minio:replication::id:source-advanced-bucket"
+  checksum_algorithm = "SHA256"
+
+  rule = [
+    {
+      id       = "replicate-tagged"
+      priority = 10
+      status   = "Enabled"
+
+      filter = {
+        tag = {
+          key   = "team"
+          value = "core"
+        }
+      }
+
+      delete_marker_replication = {
+        status = "Disabled"
+      }
+
+      source_selection_criteria = {
+        replica_modifications = {
+          status = "Enabled"
+        }
+        sse_kms_encrypted_objects = {
+          status = "Enabled"
+        }
+      }
+
+      destination = {
+        bucket        = "arn:aws:s3:::dest-advanced-bucket"
+        account       = "111122223333"
+        storage_class = "STANDARD_IA"
+        access_control_translation = {
+          owner = "Destination"
+        }
+
+        metrics = {
+          status = "Enabled"
+
+          event_threshold = {
+            minutes = 15
+          }
+        }
+
+        replication_time = {
+          status = "Enabled"
+
+          time = {
+            minutes = 15
+          }
+        }
+      }
+    }
+  ]
 }
 ```
 
@@ -31,12 +124,175 @@ resource "rustfs_bucket_replication" "example" {
 ### Required
 
 - `bucket` (String) Name of the source bucket.
-- `destination_bucket` (String) Destination bucket ARN.
-- `role` (String) Replication role ARN.
+- `role` (String) Amazon Resource Name (ARN) of the IAM role RustFS assumes when replicating objects.
+- `rule` (Attributes List) Replication rules. Each rule maps one-to-one to an S3 replication rule. (see [below for nested schema](#nestedatt--rule))
 
 ### Optional
 
-- `delete_marker_replication` (String) Delete marker replication: Enabled or Disabled.
-- `delete_replication` (String) Delete replication: Enabled or Disabled.
-- `priority` (Number) Rule priority.
-- `status` (String) Rule status: Enabled or Disabled.
+- `checksum_algorithm` (String) Checksum algorithm used to create the request checksum.
+- `content_md5` (String) Base64 encoded 128-bit MD5 digest of the request body.
+- `expected_bucket_owner` (String) Account ID of the expected bucket owner.
+- `token` (String) Token that allows Object Lock to be enabled for an existing bucket.
+
+<a id="nestedatt--rule"></a>
+### Nested Schema for `rule`
+
+Required:
+
+- `destination` (Attributes) Destination bucket and its replication settings. (see [below for nested schema](#nestedatt--rule--destination))
+- `status` (String) Whether the rule is enabled.
+
+Optional:
+
+- `delete_marker_replication` (Attributes) Specifies whether delete markers are replicated. (see [below for nested schema](#nestedatt--rule--delete_marker_replication))
+- `existing_object_replication` (Attributes) Specifies whether existing source bucket objects are replicated. (see [below for nested schema](#nestedatt--rule--existing_object_replication))
+- `filter` (Attributes) Filter that identifies the subset of objects to which the rule applies. (see [below for nested schema](#nestedatt--rule--filter))
+- `id` (String) Unique identifier for the rule.
+- `priority` (Number) Priority of the rule; the higher the number, the higher the precedence.
+- `source_selection_criteria` (Attributes) Additional filters for identifying the source objects to replicate. (see [below for nested schema](#nestedatt--rule--source_selection_criteria))
+
+<a id="nestedatt--rule--destination"></a>
+### Nested Schema for `rule.destination`
+
+Required:
+
+- `bucket` (String) ARN of the destination bucket.
+
+Optional:
+
+- `access_control_translation` (Attributes) Replica ownership translation settings. (see [below for nested schema](#nestedatt--rule--destination--access_control_translation))
+- `account` (String) Account ID of the destination bucket owner in a cross-account scenario.
+- `encryption_configuration` (Attributes) Encryption settings for replicas written to the destination bucket. (see [below for nested schema](#nestedatt--rule--destination--encryption_configuration))
+- `metrics` (Attributes) Replication metrics settings. (see [below for nested schema](#nestedatt--rule--destination--metrics))
+- `replication_time` (Attributes) S3 Replication Time Control (RTC) settings. (see [below for nested schema](#nestedatt--rule--destination--replication_time))
+- `storage_class` (String) Storage class to use when replicating objects.
+
+<a id="nestedatt--rule--destination--access_control_translation"></a>
+### Nested Schema for `rule.destination.access_control_translation`
+
+Required:
+
+- `owner` (String) Specifies the replica ownership.
+
+
+<a id="nestedatt--rule--destination--encryption_configuration"></a>
+### Nested Schema for `rule.destination.encryption_configuration`
+
+Optional:
+
+- `replica_kms_key_id` (String) ARN of the KMS key used to encrypt replica objects.
+
+
+<a id="nestedatt--rule--destination--metrics"></a>
+### Nested Schema for `rule.destination.metrics`
+
+Required:
+
+- `status` (String) Whether replication metrics are enabled.
+
+Optional:
+
+- `event_threshold` (Attributes) Time threshold for emitting the replication missed-threshold event. (see [below for nested schema](#nestedatt--rule--destination--metrics--event_threshold))
+
+<a id="nestedatt--rule--destination--metrics--event_threshold"></a>
+### Nested Schema for `rule.destination.metrics.event_threshold`
+
+Required:
+
+- `minutes` (Number) Time in minutes; valid value is 15.
+
+
+
+<a id="nestedatt--rule--destination--replication_time"></a>
+### Nested Schema for `rule.destination.replication_time`
+
+Required:
+
+- `status` (String) Whether S3 Replication Time Control is enabled.
+- `time` (Attributes) Time by which all objects must be replicated. (see [below for nested schema](#nestedatt--rule--destination--replication_time--time))
+
+<a id="nestedatt--rule--destination--replication_time--time"></a>
+### Nested Schema for `rule.destination.replication_time.time`
+
+Required:
+
+- `minutes` (Number) Time in minutes; valid value is 15.
+
+
+
+
+<a id="nestedatt--rule--delete_marker_replication"></a>
+### Nested Schema for `rule.delete_marker_replication`
+
+Required:
+
+- `status` (String) Whether delete marker replication is enabled.
+
+
+<a id="nestedatt--rule--existing_object_replication"></a>
+### Nested Schema for `rule.existing_object_replication`
+
+Required:
+
+- `status` (String) Whether existing object replication is enabled.
+
+
+<a id="nestedatt--rule--filter"></a>
+### Nested Schema for `rule.filter`
+
+Optional:
+
+- `and` (Attributes) Combined filter requiring a prefix and/or multiple tags to match. (see [below for nested schema](#nestedatt--rule--filter--and))
+- `prefix` (String) Object key prefix that identifies the subset of objects to which the rule applies.
+- `tag` (Attributes) Tag that objects must carry for the rule to apply. (see [below for nested schema](#nestedatt--rule--filter--tag))
+
+<a id="nestedatt--rule--filter--and"></a>
+### Nested Schema for `rule.filter.and`
+
+Optional:
+
+- `prefix` (String) Object key prefix used in the combined filter.
+- `tags` (Attributes List) Tags all of which must match. (see [below for nested schema](#nestedatt--rule--filter--and--tags))
+
+<a id="nestedatt--rule--filter--and--tags"></a>
+### Nested Schema for `rule.filter.and.tags`
+
+Required:
+
+- `key` (String) Tag key.
+- `value` (String) Tag value.
+
+
+
+<a id="nestedatt--rule--filter--tag"></a>
+### Nested Schema for `rule.filter.tag`
+
+Required:
+
+- `key` (String) Tag key.
+- `value` (String) Tag value.
+
+
+
+<a id="nestedatt--rule--source_selection_criteria"></a>
+### Nested Schema for `rule.source_selection_criteria`
+
+Optional:
+
+- `replica_modifications` (Attributes) Specifies whether replica modifications are replicated. (see [below for nested schema](#nestedatt--rule--source_selection_criteria--replica_modifications))
+- `sse_kms_encrypted_objects` (Attributes) Specifies whether SSE-KMS encrypted objects are replicated. (see [below for nested schema](#nestedatt--rule--source_selection_criteria--sse_kms_encrypted_objects))
+
+<a id="nestedatt--rule--source_selection_criteria--replica_modifications"></a>
+### Nested Schema for `rule.source_selection_criteria.replica_modifications`
+
+Required:
+
+- `status` (String) Whether replica modification replication is enabled.
+
+
+<a id="nestedatt--rule--source_selection_criteria--sse_kms_encrypted_objects"></a>
+### Nested Schema for `rule.source_selection_criteria.sse_kms_encrypted_objects`
+
+Required:
+
+- `status` (String) Whether replication of SSE-KMS encrypted objects is enabled.
