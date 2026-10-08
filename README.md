@@ -21,30 +21,62 @@ notification targets — work once the matching RustFS sub-system is enabled and
 
 | Resource | Description |
 |----------|-------------|
-| `rustfs_bucket` | S3-compatible bucket management |
-| `rustfs_bucket_encryption` | Server-side encryption (SSE-S3, SSE-KMS) |
-| `rustfs_bucket_lifecycle_configuration` | Object lifecycle rules |
-| `rustfs_bucket_notification` | Event notification queues |
-| `rustfs_bucket_object_lock` | Object lock and retention |
-| `rustfs_bucket_replication` | Cross-bucket replication |
-| `rustfs_bucket_versioning` | Versioning configuration |
-| `rustfs_group` | IAM group management with members |
-| `rustfs_iam_backup_import` | Import IAM entities from backup |
-| `rustfs_policy` | S3 policy management |
-| `rustfs_quota` | Bucket quota limits |
-| `rustfs_rebalance` | Trigger pool rebalancing |
+| `rustfs_user` | IAM users |
+| `rustfs_policy` | S3/IAM policies |
 | `rustfs_serviceaccount` | Service accounts / API keys |
-| `rustfs_tier` | Storage tier management (S3, Azure, GCS, etc.) |
-| `rustfs_user` | IAM user management |
+| `rustfs_ldap_service_account` | Service accounts scoped to an LDAP user |
+| `rustfs_bucket` | S3 buckets |
+| `rustfs_quota` | Per-bucket quota limits |
+| `rustfs_user_policy_attachment` | Canned policy on an IAM user |
+| `rustfs_group_policy_attachment` | Canned policy on an IAM group |
+| `rustfs_ldap_policy_attachment` | Canned policy on an LDAP user/group |
+| `rustfs_bucket_policy` | Raw S3 bucket policy document |
+| `rustfs_bucket_public_access_block` | Block-public-access configuration |
+| `rustfs_bucket_tags` | Bucket tags |
+| `rustfs_bucket_cors` | Bucket CORS rules |
+| `rustfs_bucket_versioning` | Bucket versioning |
+| `rustfs_bucket_object_lock` | Object lock / retention |
+| `rustfs_bucket_encryption` | SSE-S3 / SSE-KMS encryption |
+| `rustfs_bucket_lifecycle_configuration` | Lifecycle rules |
+| `rustfs_bucket_notification` | Event notification targets |
+| `rustfs_bucket_replication` | Cross-bucket replication |
+| `rustfs_bucket_durability` | Per-bucket durability override |
+| `rustfs_site_replication` | Site-replication peers |
+| `rustfs_remote_target` | Remote replication/notification targets |
+| `rustfs_rebalance` | Trigger pool rebalancing |
+| `rustfs_group` | IAM groups with members |
+| `rustfs_tier` | Storage tiers (S3, Azure, GCS, etc.) |
+| `rustfs_kms_key` | KMS master keys |
+| `rustfs_config` | Server sub-system configuration (config-kv) |
+| `rustfs_module_switch` | Feature module switches |
+| `rustfs_audit_target` | Audit-log webhook/HTTP targets |
+| `rustfs_iam_backup_import` | Import IAM entities from a backup |
+| `rustfs_bucket_metadata_backup_import` | Import bucket metadata from a backup |
+
+> **Note:** `rustfs_iam_backup_import`, `rustfs_bucket_metadata_backup_import` and `rustfs_rebalance`
+> are action-style resources and deliberately do not support import.
 
 ## Data Sources
 
 | Data Source | Description |
 |-------------|-------------|
-| `rustfs_bucket_metadata_backup` | Export bucket metadata as ZIP |
-| `rustfs_iam_backup` | Export IAM entities as ZIP |
-| `rustfs_pools` | List storage pools |
-| `rustfs_users` | List IAM users |
+| `rustfs_pools` | Storage pools |
+| `rustfs_users` | IAM users |
+| `rustfs_groups` | IAM groups |
+| `rustfs_user_mfa` | MFA status of a user |
+| `rustfs_iam_backup` | IAM export (ZIP) |
+| `rustfs_iam_policies` | Canned IAM policies |
+| `rustfs_iam_policy` | A single canned IAM policy |
+| `rustfs_quota` | Bucket quota |
+| `rustfs_bucket_metadata_backup` | Bucket metadata export (ZIP) |
+| `rustfs_metrics` | Metrics stream |
+| `rustfs_health_info` | Cluster health / OBD diagnostics |
+| `rustfs_storage_info` | Cluster storage info |
+| `rustfs_server_info` | Cluster, server, pool and drive info |
+| `rustfs_replication_metrics` | Replication transfer metrics |
+| `rustfs_ilm_tier_stats` | Per-tier ILM statistics |
+| `rustfs_kms_config` | KMS backend configuration |
+| `rustfs_kms_status` | KMS service status |
 
 ## Example Usage
 
