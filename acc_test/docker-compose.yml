@@ -1,6 +1,6 @@
 services:
   test:
-    image: golang:1.26
+    image: golang:1.27
     volumes:
       - ..:/workspaces/terraform-provider-rustfs
       - go-modules:/go/pkg/mod
