@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -171,6 +172,10 @@ func isBucketSubresourceAbsent(err error, codes ...string) bool {
 				return true
 			}
 		}
+	}
+
+	if rustfs.IsAPIErrorCode(err, "NoSuchBucket") || rustfs.IsAPIErrorCode(err, codes...) {
+		return true
 	}
 
 	if strings.Contains(err.Error(), "NoSuchBucket") {

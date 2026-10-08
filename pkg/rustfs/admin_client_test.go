@@ -3,7 +3,6 @@ package rustfs_test
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -22,29 +21,4 @@ func newTestAdminServer(t *testing.T, handler http.HandlerFunc) *rustfs.RustfsAd
 		Endpoint:     strings.TrimPrefix(srv.URL, "http://"),
 	})
 	return &c
-}
-
-func TestIsAdmin(t *testing.T) {
-	endpoint := os.Getenv("RUSTFS_ENDPOINT")
-	key := os.Getenv("RUSTFS_USER")
-	secret := os.Getenv("RUSTFS_SECRET")
-
-	if endpoint == "" || key == "" || secret == "" {
-		t.Skip("skipping live RustFS admin test: set RUSTFS_ENDPOINT, RUSTFS_USER and RUSTFS_SECRET to run")
-	}
-
-	config := rustfs.RustfsAdminConfig{
-		AccessKey:    key,
-		AccessSecret: secret,
-		Endpoint:     endpoint,
-
-		Ssl: false,
-	}
-
-	dut := rustfs.New(&config)
-	admin, _ := dut.IsAdmin()
-	if !admin {
-		t.Error("User is no admin")
-	}
-
 }

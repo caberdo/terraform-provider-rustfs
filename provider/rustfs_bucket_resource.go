@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -457,6 +458,9 @@ func isBucketNotFound(err error) bool {
 		case "NotFound", "NoSuchBucket", "404":
 			return true
 		}
+	}
+	if rustfs.IsAPIErrorCode(err, "NotFound", "NoSuchBucket", "404") {
+		return true
 	}
 	return false
 }
