@@ -8,7 +8,7 @@ Terraform provider for managing [RustFS](https://github.com/rustfs/rustfs) — a
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.25 (to build from source)
+- [Go](https://golang.org/doc/install) >= 1.27 (to build from source)
 
 ## Support and compatibility
 
@@ -53,7 +53,7 @@ terraform {
   required_providers {
     rustfs = {
       source  = "caberdo/rustfs"
-      version = "~> 0.0.7"
+      version = "~> 0.2.0"
     }
   }
 }
@@ -70,7 +70,8 @@ provider "rustfs" {
 
 # Bucket
 resource "rustfs_bucket" "example" {
-  name = "my-bucket"
+  name                           = "my-bucket"
+  object_lock_enabled_for_bucket = true
 }
 
 # User with access key
@@ -113,9 +114,15 @@ resource "rustfs_bucket_versioning" "example" {
 
 # Object lock
 resource "rustfs_bucket_object_lock" "example" {
-  bucket = rustfs_bucket.example.name
-  mode   = "COMPLIANCE"
-  days   = 365
+  bucket              = rustfs_bucket.example.name
+  object_lock_enabled = "Enabled"
+
+  rule = {
+    default_retention = {
+      mode = "COMPLIANCE"
+      days = 365
+    }
+  }
 }
 ```
 

@@ -92,7 +92,8 @@ FEATURES:
   the `RUSTFS_ENDPOINT`, `RUSTFS_USER` and `RUSTFS_SECRET` environment variables (the environment
   wins when both are set). `access_secret` is supported as a deprecated alias of `secret_key`.
 - Optional TLS transport (`ssl`) and certificate-validation bypass (`insecure`)
-- Admin API access is AWS SigV4-signed; S3 operations use `minio-go`
+- Admin API access is AWS SigV4-signed; S3 operations use the AWS SDK for Go v2
+  (`github.com/aws/aws-sdk-go-v2/service/s3`)
 - Every resource supports import
 - Enum attributes are validated with `stringvalidator.OneOf`
 - Unit tests with `httptest`-mocked admin API responses plus `TF_ACC=1` acceptance tests against a

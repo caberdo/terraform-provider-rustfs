@@ -15,8 +15,8 @@ KMS keys and server sub-system configuration.
 
 ## Support and compatibility
 
-- The provider speaks the S3 API through the MinIO-compatible client and the RustFS admin
-  API v3 (`/rustfs/admin/v3`) with SigV4-signed requests.
+- The provider speaks the S3 API through the AWS SDK for Go v2 S3 client and the RustFS admin
+  API v3 (`/rustfs/admin/v3`), both with SigV4-signed requests.
 - Terraform 1.0 or later is required (plugin protocol 6.0).
 - Capabilities that depend on server-side sub-systems - KMS (`rustfs_kms_key`), LDAP
   (`rustfs_ldap_*`), storage tiers and ILM (`rustfs_tier`, `rustfs_rebalance`), audit
