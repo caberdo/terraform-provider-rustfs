@@ -1,4 +1,41 @@
-## 0.1.0 (Unreleased)
+## 0.2.0 (Unreleased)
+
+BREAKING CHANGES:
+- `rustfs_bucket_encryption`: the flat `algorithm`/`kms_master_key_id` attributes are replaced by a
+  `rule` list mirroring `ServerSideEncryptionRule`
+- `rustfs_bucket_object_lock`: `mode`/`days`/`years` moved under `rule.default_retention`; new
+  `object_lock_enabled` attribute
+- `rustfs_bucket_replication`: the flat single-rule attributes are replaced by a `rule` list
+  mirroring `ReplicationRule`; `delete_replication` is no longer accepted
+- `rustfs_bucket_lifecycle_configuration`: `rule`, `transition` and `noncurrent_version_transition`
+  are now (list) attributes instead of blocks; `filter` gained nested `tag`/`and`/object-size
+  predicates
+- Bucket sub-resources (`cors`, `tags`, `policy`, `public_access_block`, `lifecycle`) are now served
+  by the AWS SDK S3 client instead of hand-rolled admin XML helpers
+
+FEATURES:
+- `rustfs_bucket` exposes the full `CreateBucketInput` (`acl`, `bucket_namespace`, `object_ownership`,
+  `object_lock_enabled_for_bucket`, bucket grants and `create_bucket_configuration` with region and
+  tags) and refreshes ownership, location and tags on read
+- Bucket schemas now cover their AWS SDK structs: versioning (`mfa_delete`, `mfa`), encryption
+  (`rule[]`, `bucket_key_enabled`), replication (full `rule[]` with filters, source-selection
+  criteria and destination metrics/RTC/storage-class), notification
+  (queue/topic/lambda/event-bridge targets)
+- Multiple usage examples per resource, rendered verbatim into the registry documentation
+- Enum validators are derived from the SDK enums
+
+BUG FIXES:
+- Idempotent reads and deletes for all bucket resources; not-found detection uses structured error
+  codes instead of broad `404` substring matching
+- `Optional+Computed` attributes are read back or null-normalized so refresh no longer drifts
+- `rustfs_metrics` acceptance test skips when the server does not implement the admin metrics route
+  (RustFS 1.0.1)
+- Fixed the `rustfs_user_policy_attachment` acceptance test using `ressource` instead of `resource`
+
+CHORES:
+- Go toolchain bumped to 1.27.1; dependencies updated to latest (including `aws/smithy-go` v1.28.4)
+
+## 0.1.0 (2026-10-07)
 
 BREAKING CHANGES: None
 
