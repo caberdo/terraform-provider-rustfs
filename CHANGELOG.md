@@ -1,3 +1,19 @@
+## 0.3.0 (2026-10-08)
+
+IMPROVEMENTS:
+- Admin/S3 error responses are parsed into a structured `*APIError` (`Code`, `Message`,
+  `StatusCode`) while `Error()` keeps returning the unchanged response body, so existing
+  consumers keep working and not-found detection can use the structured codes
+- Bucket not-found detection accepts the structured error codes in addition to the SDK error
+  classes
+- Acceptance tests now run against both RustFS `1.0.1` and `latest`
+
+CHORES:
+- Bumped CI actions (`hashicorp/setup-terraform` v4, `softprops/action-gh-release` v3,
+  `anchore/sbom-action` v0.24.3)
+- Completed the README resource and data source tables
+- Removed the test-only admin bucket create/delete and `IsAdmin` helpers
+
 ## 0.2.0 (2026-10-08)
 
 BREAKING CHANGES:
