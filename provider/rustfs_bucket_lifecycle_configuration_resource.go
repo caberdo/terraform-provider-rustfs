@@ -7,12 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -20,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -46,7 +50,13 @@ type bucketLifecycleConfigurationModel struct {
 	// TransitionDefaultMinimumObjectSize is exposed as Optional+Computed so the
 	// server-side default is reflected without forcing the user to set it.
 	TransitionDefaultMinimumObjectSize types.String `tfsdk:"transition_default_minimum_object_size"`
-	Rule                               []ruleModel  `tfsdk:"rule"`
+	// Rule is held as a framework types.List (not a native []ruleModel) so the
+	// attribute can carry an unknown value. A plain Go slice cannot represent
+	// unknown, so decoding a config whose rules come from count/for_each or any
+	// other computed value fails with "Received unknown value ... Target Type:
+	// []provider.ruleModel". Decode to []ruleModel with ruleModelsFromList at
+	// each boundary instead.
+	Rule types.List `tfsdk:"rule"`
 }
 
 type ruleModel struct {
@@ -359,7 +369,13 @@ func (lifecycleFilterConfigValidator) ValidateResource(ctx context.Context, req 
 		return
 	}
 
-	for _, violation := range validateLifecycleFilters(config.Rule) {
+	rules, diags := ruleModelsFromList(ctx, config.Rule)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	for _, violation := range validateLifecycleFilters(rules) {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("rule").AtListIndex(violation.RuleIndex).AtName("filter"),
 			"Invalid lifecycle rule filter",
@@ -414,7 +430,12 @@ func (r *bucketLifecycleConfigurationResource) Read(ctx context.Context, req res
 		return
 	}
 
-	state.Rule = flattenLifecycleRules(out.Rules)
+	ruleList, diags := ruleListFromModels(ctx, flattenLifecycleRules(out.Rules))
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Rule = ruleList
 	if v := string(out.TransitionDefaultMinimumObjectSize); v != "" {
 		state.TransitionDefaultMinimumObjectSize = types.StringValue(v)
 	} else if state.TransitionDefaultMinimumObjectSize.IsUnknown() {
@@ -475,7 +496,16 @@ func (r *bucketLifecycleConfigurationResource) ImportState(ctx context.Context, 
 
 // putLifecycleConfiguration writes the planned configuration to the bucket.
 func (r *bucketLifecycleConfigurationResource) putLifecycleConfiguration(ctx context.Context, plan bucketLifecycleConfigurationModel) error {
-	rules, err := expandLifecycleRules(plan.Rule)
+	if !ruleListKnown(plan.Rule) {
+		return errors.New("the rule list is not fully known before apply: refusing to write a lifecycle configuration with unknown rules")
+	}
+
+	ruleModels, diags := ruleModelsFromList(ctx, plan.Rule)
+	if diags.HasError() {
+		return fmt.Errorf("%s", diagnosticsError(diags))
+	}
+
+	rules, err := expandLifecycleRules(ruleModels)
 	if err != nil {
 		return err
 	}
@@ -579,6 +609,101 @@ func knownStringSet(v types.String) bool {
 
 func knownIntSet(v types.Int64) bool {
 	return !v.IsNull() && !v.IsUnknown()
+}
+
+// ruleElementType is the object type of a single lifecycle rule, derived once
+// from the schema so a types.List of rules can be built and decoded. Deriving
+// it from the schema (rather than hand-writing a nested types.ObjectType)
+// keeps it in lock-step with the attribute definitions above.
+func ruleElementType(ctx context.Context) attr.Type {
+	var resp resource.SchemaResponse
+	(&bucketLifecycleConfigurationResource{}).Schema(ctx, resource.SchemaRequest{}, &resp)
+	// Fallback is never hit in practice; kept defensive.
+	if ruleAttr, ok := resp.Schema.Attributes["rule"].(schema.ListNestedAttribute); ok {
+		return ruleAttr.NestedObject.Type()
+	}
+	return types.ObjectType{}
+}
+
+// ruleModelsFromList decodes the framework list into the native []ruleModel the
+// expand/flatten/validate helpers operate on. A null or unknown list decodes to
+// a nil slice with no diagnostics, so callers can treat "no known rules yet" as
+// an empty configuration.
+//
+// An unknown element keeps its position as a zero-value ruleModel instead of
+// failing the whole decode. Terraform can resolve the list while one of its
+// elements stays unknown (`rule = [some_unknown_object]`), and config
+// validation must not reject that plan. The placeholder carries no filter, so
+// validateLifecycleFilters skips it and later violations still report their
+// original list index. A caller that writes to the server must reject an
+// unknown list first with ruleListKnown; an expand of the placeholder would
+// otherwise send an empty rule.
+func ruleModelsFromList(ctx context.Context, list types.List) ([]ruleModel, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if list.IsNull() || list.IsUnknown() {
+		return nil, diags
+	}
+
+	var objects []types.Object
+	diags.Append(list.ElementsAs(ctx, &objects, false)...)
+	if diags.HasError() {
+		return nil, diags
+	}
+
+	rules := make([]ruleModel, len(objects))
+	for i, object := range objects {
+		if object.IsNull() || object.IsUnknown() {
+			continue
+		}
+		diags.Append(object.As(ctx, &rules[i], basetypes.ObjectAsOptions{})...)
+	}
+	if diags.HasError() {
+		return nil, diags
+	}
+	return rules, diags
+}
+
+// ruleListKnown reports whether the planned rule list carries no unknown value.
+// A null list is known (there is nothing to write); an unknown list, or a list
+// with an unknown or null element, is not, and must not be sent to the server.
+func ruleListKnown(list types.List) bool {
+	if list.IsUnknown() {
+		return false
+	}
+	if list.IsNull() {
+		return true
+	}
+	for _, element := range list.Elements() {
+		if element.IsNull() || element.IsUnknown() {
+			return false
+		}
+	}
+	return true
+}
+
+// ruleListFromModels builds the framework list from the native []ruleModel
+// produced by flattenLifecycleRules.
+func ruleListFromModels(ctx context.Context, rules []ruleModel) (types.List, diag.Diagnostics) {
+	return types.ListValueFrom(ctx, ruleElementType(ctx), rules)
+}
+
+// diagnosticsError flattens error diagnostics into a single string so a helper
+// that reports plain errors can surface a decode failure. Decoding the rule
+// list only errors on a provider/schema mismatch, which is a bug, not user
+// input, so the summary+detail is enough context.
+func diagnosticsError(diags diag.Diagnostics) string {
+	var b strings.Builder
+	for i, d := range diags.Errors() {
+		if i > 0 {
+			b.WriteString("; ")
+		}
+		b.WriteString(d.Summary())
+		if detail := d.Detail(); detail != "" {
+			b.WriteString(": ")
+			b.WriteString(detail)
+		}
+	}
+	return b.String()
 }
 
 func expandLifecycleRules(rules []ruleModel) ([]s3types.LifecycleRule, error) {

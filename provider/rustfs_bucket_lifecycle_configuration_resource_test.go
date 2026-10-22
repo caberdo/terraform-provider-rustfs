@@ -14,6 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	frameworkresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -803,15 +805,19 @@ func TestBucketLifecycleConfigurationResourceLifecyclePaths(t *testing.T) {
 	t.Parallel()
 
 	newModel := func() *bucketLifecycleConfigurationModel {
+		ruleList, diags := ruleListFromModels(context.Background(), []ruleModel{{
+			Id:         types.StringValue("rule-1"),
+			Status:     types.StringValue("Enabled"),
+			Filter:     &filterModel{Prefix: types.StringValue("logs/")},
+			Expiration: &expirationModel{Days: types.Int64Value(30)},
+		}})
+		if diags.HasError() {
+			t.Fatalf("building rule list: %s", diagnosticsError(diags))
+		}
 		return &bucketLifecycleConfigurationModel{
 			Bucket: types.StringValue("tf-test"),
 			Id:     types.StringValue("tf-test"),
-			Rule: []ruleModel{{
-				Id:         types.StringValue("rule-1"),
-				Status:     types.StringValue("Enabled"),
-				Filter:     &filterModel{Prefix: types.StringValue("logs/")},
-				Expiration: &expirationModel{Days: types.Int64Value(30)},
-			}},
+			Rule:   ruleList,
 		}
 	}
 
@@ -959,4 +965,265 @@ func TestBucketLifecycleConfigurationResourceLifecyclePaths(t *testing.T) {
 
 		assertErrorDiagnostic(t, resp.Diagnostics, "Unexpected Resource Configure Type", "Expected *AllClient, got: string.")
 	})
+}
+
+// TestBucketLifecycleConfigurationRuleUnknownDecodes is the regression test for
+// the "Received unknown value ... Target Type: []provider.ruleModel" failure.
+// Before the fix, Rule was a native []ruleModel that could not hold an unknown
+// value, so a config whose rules came from count/for_each or any computed value
+// failed to decode. Now Rule is a types.List: an unknown or null list must
+// decode to no rules without diagnostics, and a known list must round-trip.
+func TestBucketLifecycleConfigurationRuleUnknownDecodes(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	elemType := ruleElementType(ctx)
+
+	t.Run("unknown rule list decodes to no rules", func(t *testing.T) {
+		rules, diags := ruleModelsFromList(ctx, types.ListUnknown(elemType))
+		if diags.HasError() {
+			t.Fatalf("unknown list must not error, got: %s", diagnosticsError(diags))
+		}
+		if rules != nil {
+			t.Fatalf("unknown list must decode to nil rules, got %d", len(rules))
+		}
+	})
+
+	t.Run("null rule list decodes to no rules", func(t *testing.T) {
+		rules, diags := ruleModelsFromList(ctx, types.ListNull(elemType))
+		if diags.HasError() {
+			t.Fatalf("null list must not error, got: %s", diagnosticsError(diags))
+		}
+		if rules != nil {
+			t.Fatalf("null list must decode to nil rules, got %d", len(rules))
+		}
+	})
+
+	t.Run("known list with an unknown element decodes to a placeholder", func(t *testing.T) {
+		known, diags := ruleListFromModels(ctx, []ruleModel{{
+			Id:     types.StringValue("known"),
+			Status: types.StringValue("Enabled"),
+		}})
+		if diags.HasError() {
+			t.Fatalf("building known rule: %s", diagnosticsError(diags))
+		}
+		list, diags := types.ListValue(elemType, []attr.Value{unknownRuleElement(t, ctx), known.Elements()[0]})
+		if diags.HasError() {
+			t.Fatalf("building mixed rule list: %s", diagnosticsError(diags))
+		}
+
+		rules, diags := ruleModelsFromList(ctx, list)
+		if diags.HasError() {
+			t.Fatalf("unknown element must not error, got: %s", diagnosticsError(diags))
+		}
+		if len(rules) != 2 {
+			t.Fatalf("expected 2 rules (unknown element replaced by a placeholder), got %d", len(rules))
+		}
+		if !rules[0].Id.IsNull() || rules[0].Filter != nil {
+			t.Errorf("unknown element must decode to a zero-value placeholder, got %+v", rules[0])
+		}
+		if rules[1].Id.ValueString() != "known" {
+			t.Errorf("known element shifted or lost: %+v", rules[1])
+		}
+	})
+
+	t.Run("absent nested options stay null", func(t *testing.T) {
+		want := []ruleModel{{
+			Id:         types.StringValue("only-expiration"),
+			Status:     types.StringValue("Enabled"),
+			Expiration: &expirationModel{Days: types.Int64Value(1)},
+		}}
+
+		list, diags := ruleListFromModels(ctx, want)
+		if diags.HasError() {
+			t.Fatalf("building list: %s", diagnosticsError(diags))
+		}
+		got, diags := ruleModelsFromList(ctx, list)
+		if diags.HasError() {
+			t.Fatalf("decoding list: %s", diagnosticsError(diags))
+		}
+		if got[0].Filter != nil {
+			t.Errorf("absent filter decoded to %+v, want nil", got[0].Filter)
+		}
+		if got[0].Transition != nil {
+			t.Errorf("absent transition decoded to %+v, want nil", got[0].Transition)
+		}
+		if got[0].NoncurrentVersionExpiration != nil {
+			t.Errorf("absent noncurrent_version_expiration decoded to %+v, want nil", got[0].NoncurrentVersionExpiration)
+		}
+		if got[0].NoncurrentVersionTransition != nil {
+			t.Errorf("absent noncurrent_version_transition decoded to %+v, want nil", got[0].NoncurrentVersionTransition)
+		}
+		if got[0].AbortIncompleteMultipartUpload != nil {
+			t.Errorf("absent abort_incomplete_multipart_upload decoded to %+v, want nil", got[0].AbortIncompleteMultipartUpload)
+		}
+	})
+
+	t.Run("known rule list round-trips", func(t *testing.T) {
+		want := []ruleModel{{
+			Id:         types.StringValue("archive-to-cold"),
+			Status:     types.StringValue("Enabled"),
+			Filter:     &filterModel{Prefix: types.StringValue("movies/"), ObjectSizeGreaterThan: types.Int64Value(1000000)},
+			Transition: []transitionModel{{Days: types.Int64Value(0), StorageClass: types.StringValue("COLD")}},
+		}}
+
+		list, diags := ruleListFromModels(ctx, want)
+		if diags.HasError() {
+			t.Fatalf("building list: %s", diagnosticsError(diags))
+		}
+		if list.IsNull() || list.IsUnknown() {
+			t.Fatal("known rules must build a known, non-null list")
+		}
+
+		got, diags := ruleModelsFromList(ctx, list)
+		if diags.HasError() {
+			t.Fatalf("decoding list: %s", diagnosticsError(diags))
+		}
+		if len(got) != 1 {
+			t.Fatalf("expected 1 rule, got %d", len(got))
+		}
+		if got[0].Id.ValueString() != "archive-to-cold" || got[0].Status.ValueString() != "Enabled" {
+			t.Errorf("identity not round-tripped: %+v", got[0])
+		}
+		if got[0].Filter == nil || got[0].Filter.Prefix.ValueString() != "movies/" {
+			t.Errorf("filter not round-tripped: %+v", got[0].Filter)
+		}
+		if len(got[0].Transition) != 1 || got[0].Transition[0].StorageClass.ValueString() != "COLD" {
+			t.Errorf("transition not round-tripped: %+v", got[0].Transition)
+		}
+	})
+}
+
+// unknownRuleElement is a rule object whose value is unknown, as happens when
+// the rule comes from a value that is not known until apply. Terraform may
+// resolve the list itself to a known list while one of its elements stays
+// unknown, so the decoder has to tolerate the element, not only the list.
+func unknownRuleElement(t *testing.T, ctx context.Context) types.Object {
+	t.Helper()
+
+	elemType, ok := ruleElementType(ctx).(types.ObjectType)
+	if !ok {
+		t.Fatalf("rule element type = %T, want types.ObjectType", ruleElementType(ctx))
+	}
+	return types.ObjectUnknown(elemType.AttrTypes)
+}
+
+// TestBucketLifecycleConfigurationValidateResourceToleratesUnknownRules is the
+// regression test for the config validator rejecting a plan whose rule list is
+// not fully known yet. The whole list can be unknown (count/for_each) or the
+// list can be known with one unknown element (`rule = [some_unknown_object]`);
+// both must validate without a "Received unknown value" error, and a real
+// violation after an unknown element must still point at its original index.
+func TestBucketLifecycleConfigurationValidateResourceToleratesUnknownRules(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	elemType := ruleElementType(ctx)
+
+	knownList := func(t *testing.T, rules []ruleModel) types.List {
+		t.Helper()
+		list, diags := ruleListFromModels(ctx, rules)
+		if diags.HasError() {
+			t.Fatalf("building rule list: %s", diagnosticsError(diags))
+		}
+		return list
+	}
+	validate := func(list types.List) *frameworkresource.ValidateConfigResponse {
+		h := newCRUDHarness(t, NewBucketLifecycleConfigurationResource(), cannedClient(t, http.StatusOK, ""))
+		resp := &frameworkresource.ValidateConfigResponse{}
+		lifecycleFilterConfigValidator{}.ValidateResource(ctx, frameworkresource.ValidateConfigRequest{
+			Config: h.config(bucketLifecycleConfigurationModel{
+				Bucket: types.StringValue("tf-test"),
+				Rule:   list,
+			}),
+		}, resp)
+		return resp
+	}
+
+	t.Run("unknown rule list", func(t *testing.T) {
+		requireNoDiagnostics(t, validate(types.ListUnknown(elemType)).Diagnostics)
+	})
+
+	t.Run("known list with an unknown rule element", func(t *testing.T) {
+		valid := knownList(t, []ruleModel{{Id: types.StringValue("ok"), Status: types.StringValue("Enabled")}})
+		list, diags := types.ListValue(elemType, []attr.Value{unknownRuleElement(t, ctx), valid.Elements()[0]})
+		if diags.HasError() {
+			t.Fatalf("building mixed rule list: %s", diagnosticsError(diags))
+		}
+		requireNoDiagnostics(t, validate(list).Diagnostics)
+	})
+
+	t.Run("violation after an unknown element keeps its index", func(t *testing.T) {
+		invalid := knownList(t, []ruleModel{{
+			Id:     types.StringValue("bad"),
+			Status: types.StringValue("Enabled"),
+			Filter: &filterModel{
+				Prefix: types.StringValue("logs/"),
+				And: &filterAndModel{Tags: []tagModel{
+					{Key: types.StringValue("a"), Value: types.StringValue("1")},
+					{Key: types.StringValue("b"), Value: types.StringValue("2")},
+				}},
+			},
+		}})
+		list, diags := types.ListValue(elemType, []attr.Value{unknownRuleElement(t, ctx), invalid.Elements()[0]})
+		if diags.HasError() {
+			t.Fatalf("building mixed rule list: %s", diagnosticsError(diags))
+		}
+
+		resp := validate(list)
+		assertErrorDiagnostic(t, resp.Diagnostics, "Invalid lifecycle rule filter", "cannot be combined")
+		withPath, ok := resp.Diagnostics[0].(diag.DiagnosticWithPath)
+		if !ok {
+			t.Fatalf("diagnostic %T carries no path", resp.Diagnostics[0])
+		}
+		want := path.Root("rule").AtListIndex(1).AtName("filter")
+		if !withPath.Path().Equal(want) {
+			t.Errorf("diagnostic path = %s, want %s", withPath.Path(), want)
+		}
+	})
+}
+
+// TestBucketLifecycleConfigurationCreateRejectsUnknownRuleList proves the write
+// path fails loudly instead of sending a lifecycle configuration with the rules
+// it could resolve. An unknown list reaching apply is a provider bug, but
+// silently writing an empty configuration would be the worst way to report it.
+func TestBucketLifecycleConfigurationCreateRejectsUnknownRuleList(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	elemType := ruleElementType(ctx)
+
+	known, diags := ruleListFromModels(ctx, []ruleModel{{Id: types.StringValue("kept"), Status: types.StringValue("Enabled")}})
+	if diags.HasError() {
+		t.Fatalf("building known rule: %s", diagnosticsError(diags))
+	}
+	mixed, diags := types.ListValue(elemType, []attr.Value{unknownRuleElement(t, ctx), known.Elements()[0]})
+	if diags.HasError() {
+		t.Fatalf("building mixed rule list: %s", diagnosticsError(diags))
+	}
+
+	cases := []struct {
+		name string
+		list types.List
+	}{
+		{"whole rule list unknown", types.ListUnknown(elemType)},
+		{"one rule element unknown", mixed},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			client, server := routedClient(t)
+			h := newCRUDHarness(t, NewBucketLifecycleConfigurationResource(), client)
+
+			plan := &bucketLifecycleConfigurationModel{
+				Bucket: types.StringValue("tf-test"),
+				Id:     types.StringValue("tf-test"),
+				Rule:   tc.list,
+			}
+			resp := h.create(plan)
+
+			assertErrorDiagnostic(t, resp.Diagnostics,
+				"Error creating bucket lifecycle configuration",
+				"not fully known before apply")
+			server.assertNoRequest(t, http.MethodPut)
+			h.assertNoPartialState(resp, plan)
+		})
+	}
 }
