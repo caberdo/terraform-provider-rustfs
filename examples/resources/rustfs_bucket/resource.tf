@@ -12,9 +12,10 @@ resource "rustfs_bucket" "example" {
   }
 }
 
-# A bucket created with a canned ACL and legacy grant recipients. Grants and the
-# ACL are only applied at creation time, so changing any of them recreates the
-# bucket.
+# A bucket created with a canned ACL and legacy grant recipients. Changing the
+# ACL or a grant updates the bucket in place with PutBucketAcl. RustFS 1.0.x
+# accepts these values but reports only the owner grant back, so Terraform keeps
+# the configured value and cannot detect an out-of-band ACL change.
 resource "rustfs_bucket" "public" {
   name             = "my-public-bucket"
   acl              = "public-read"
@@ -30,4 +31,12 @@ resource "rustfs_bucket" "public" {
 resource "rustfs_bucket" "locked" {
   name                           = "my-locked-bucket"
   object_lock_enabled_for_bucket = true
+}
+
+# A bucket Terraform may destroy while it still holds data. force_destroy
+# deletes every object, object version and incomplete multipart upload first;
+# without it a non-empty bucket fails with BucketNotEmpty.
+resource "rustfs_bucket" "scratch" {
+  name          = "my-scratch-bucket"
+  force_destroy = true
 }

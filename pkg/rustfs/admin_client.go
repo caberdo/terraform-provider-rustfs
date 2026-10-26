@@ -46,8 +46,13 @@ const (
 type RustfsAdminConfig struct {
 	AccessKey    string
 	AccessSecret string
-	Endpoint     string
-	Ssl          bool
+	// Endpoint is the host[:port] the client dials; Ssl selects the transport.
+	// A scheme in Endpoint is honoured (http/https selects the transport), so a
+	// caller cannot end up at https://https://host. The provider resolves the
+	// configured endpoint into both fields and rejects a contradiction before
+	// they reach the client.
+	Endpoint string
+	Ssl      bool
 	// HTTPClient, when set, serves every admin request. The provider passes its
 	// own client so that both API clients share one transport (proxy settings,
 	// timeouts and TLS policy, including the provider's `insecure` attribute).
@@ -204,7 +209,23 @@ func drainClose(resp *http.Response) {
 	_ = resp.Body.Close()
 }
 
-func (c *RustfsAdmin) createRootURL(endpoint string, secure bool) string {
+// RootURL composes the origin a client dials from an endpoint and the effective
+// transport. It is the only URL composer: the provider uses it for the S3
+// BaseEndpoint so both clients reach the same origin whatever form the user
+// configured. An http/https scheme already present in endpoint selects the
+// transport here as well, so a caller that passes a URL is normalized instead
+// of producing https://https://host.
+func RootURL(endpoint string, secure bool) string {
+	if i := strings.Index(endpoint, "://"); i >= 0 {
+		switch strings.ToLower(endpoint[:i]) {
+		case "http":
+			secure = false
+		case "https":
+			secure = true
+		}
+		endpoint = endpoint[i+3:]
+	}
+
 	scheme := "https"
 	if !secure {
 		scheme = "http"
@@ -219,6 +240,10 @@ func (c *RustfsAdmin) createRootURL(endpoint string, secure bool) string {
 	}
 
 	return scheme + "://" + endpoint
+}
+
+func (c *RustfsAdmin) createRootURL(endpoint string, secure bool) string {
+	return RootURL(endpoint, secure)
 }
 
 // adminURL returns the versioned admin API base a request is sent to. The

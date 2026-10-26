@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
@@ -153,6 +154,32 @@ func TestProviderConfigure(t *testing.T) {
 			wantAccessKey: configuredAccessKey,
 		},
 		{
+			name:          "https scheme selects the transport without ssl",
+			model:         RustfsProviderModel{Endpoint: types.StringValue("https://cfghost:9001"), AccessKey: types.StringValue(configuredAccessKey), SecretKey: types.StringValue(configuredSecretKey)},
+			wantEndpoint:  "https://cfghost:9001",
+			wantAccessKey: configuredAccessKey,
+		},
+		{
+			name:          "https scheme with the default port is normalized",
+			model:         RustfsProviderModel{Endpoint: types.StringValue("https://cfghost:443"), AccessKey: types.StringValue(configuredAccessKey), SecretKey: types.StringValue(configuredSecretKey)},
+			wantEndpoint:  "https://cfghost",
+			wantAccessKey: configuredAccessKey,
+		},
+		{
+			name:          "https scheme with an ipv6 literal",
+			model:         RustfsProviderModel{Endpoint: types.StringValue("https://[::1]:9001"), AccessKey: types.StringValue(configuredAccessKey), SecretKey: types.StringValue(configuredSecretKey)},
+			wantEndpoint:  "https://[::1]:9001",
+			wantAccessKey: configuredAccessKey,
+		},
+		{
+			name:          "endpoint in the environment variable may carry a scheme",
+			envEndpoint:   "https://envhost:9501",
+			envUser:       envAccessKey,
+			model:         RustfsProviderModel{Endpoint: types.StringValue("cfghost:9001"), AccessKey: types.StringValue(configuredAccessKey), SecretKey: types.StringValue(configuredSecretKey)},
+			wantEndpoint:  "https://envhost:9501",
+			wantAccessKey: envAccessKey,
+		},
+		{
 			name:          "environment variables win over the provider block",
 			envEndpoint:   "envhost:9501",
 			envUser:       envAccessKey,
@@ -187,6 +214,13 @@ func TestProviderConfigure(t *testing.T) {
 			if got := aws.ToString(client.S3.Options().BaseEndpoint); got != tc.wantEndpoint {
 				t.Errorf("s3 base endpoint = %q, want %q", got, tc.wantEndpoint)
 			}
+			// The two clients must reach the same origin whatever endpoint form
+			// the user configured: compose the admin client's endpoint with the
+			// scheme the S3 client uses and compare.
+			adminOrigin := rustfs.RootURL(client.RustClient.Endpoint(), strings.HasPrefix(tc.wantEndpoint, "https://"))
+			if adminOrigin != tc.wantEndpoint {
+				t.Errorf("admin client dials %q, s3 client dials %q; both must reach the same origin", adminOrigin, tc.wantEndpoint)
+			}
 			creds, err := client.S3.Options().Credentials.Retrieve(context.Background())
 			if err != nil {
 				t.Fatalf("retrieving credentials: %v", err)
@@ -208,6 +242,32 @@ func TestProviderConfigure(t *testing.T) {
 		if resp.ResourceData != nil || resp.DataSourceData != nil {
 			t.Error("expected no client to be handed out without an endpoint")
 		}
+	})
+
+	t.Run("a scheme that contradicts ssl is rejected", func(t *testing.T) {
+		t.Setenv("RUSTFS_ENDPOINT", "")
+
+		resp := configureProvider(t, RustfsProviderModel{
+			Endpoint: types.StringValue("https://cfghost:9001"),
+			Ssl:      types.BoolValue(false),
+		})
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Invalid RUSTFS endpoint",
+			`endpoint "https://cfghost:9001" specifies scheme "https" but ssl = false`)
+		if resp.ResourceData != nil || resp.DataSourceData != nil {
+			t.Error("expected no client to be handed out for a contradictory endpoint")
+		}
+	})
+
+	t.Run("an endpoint with a path is rejected", func(t *testing.T) {
+		t.Setenv("RUSTFS_ENDPOINT", "")
+
+		resp := configureProvider(t, RustfsProviderModel{
+			Endpoint: types.StringValue("https://cfghost:9001/admin"),
+		})
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Invalid RUSTFS endpoint",
+			"only host or host:port is accepted, without a path, query or fragment")
 	})
 }
 

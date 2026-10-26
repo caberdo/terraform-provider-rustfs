@@ -463,13 +463,14 @@ func TestAccBucketResource_full(t *testing.T) {
 			),
 		},
 		resource.TestStep{
-			// Replacement plan for a second RequiresReplace attribute (acl).
+			// acl is mutable: changing it must update the bucket in place, not
+			// replace it (a replacement would delete every object).
 			Config:             testAccBucketFullConfigWithACL(name, "BucketOwnerEnforced", "prod", "public-read"),
 			PlanOnly:           true,
 			ExpectNonEmptyPlan: true,
 			ConfigPlanChecks: resource.ConfigPlanChecks{
 				PostApplyPreRefresh: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(resourceName, plancheck.ResourceActionReplace),
+					plancheck.ExpectResourceAction(resourceName, plancheck.ResourceActionUpdate),
 				},
 			},
 		},
