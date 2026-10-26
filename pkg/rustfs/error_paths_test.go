@@ -402,6 +402,9 @@ func TestCreateRootUrl(t *testing.T) {
 		{"secure keeps other port", "host:9000", true, "https://host:9000"},
 		{"insecure strips 80", "host:80", false, "http://host"},
 		{"insecure keeps other port", "host:9000", false, "http://host:9000"},
+		{"https scheme wins over the flag", "https://host:9000", false, "https://host:9000"},
+		{"http scheme wins over the flag", "http://host:443", true, "http://host:443"},
+		{"scheme is not doubled", "https://host", true, "https://host"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

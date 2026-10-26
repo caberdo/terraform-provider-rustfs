@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -57,8 +56,11 @@ func (p *RustfsProvider) Schema(ctx context.Context, req provider.SchemaRequest,
 		MarkdownDescription: "Provider to access with RustFS",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
-				Optional:    true,
-				Description: "RUSTFS server endpoint in the format host:port. Defaults to RUSTFS_ENDPOINT environment variable.",
+				Optional: true,
+				Description: "RustFS server endpoint: host, host:port or scheme://host[:port]. " +
+					"An explicit scheme selects the transport and must agree with ssl when ssl is set; " +
+					"without a scheme the transport follows ssl (plain HTTP by default). A path, query or inline credentials are rejected. " +
+					"Defaults to RUSTFS_ENDPOINT environment variable.",
 			},
 			"access_key": schema.StringAttribute{
 				Optional:    true,
@@ -105,13 +107,22 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
+	// One endpoint reading for both clients. A scheme in the endpoint is
+	// resolved once, so the S3 client and the admin client cannot end up on
+	// different origins.
+	resolved, err := resolveEndpoint(endpoint, config.Ssl)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid RUSTFS endpoint", err.Error())
+		return
+	}
+
 	accessKey := envOrDefault("RUSTFS_USER", config.AccessKey.ValueString())
 	secretKey := envOrDefault("RUSTFS_SECRET", config.secretKey())
 
 	// One transport for both API clients: S3 requests go through the AWS SDK,
 	// admin requests through rustfs.New, and `insecure` has to reach both.
-	httpClient := &http.Client{Transport: newHTTPTransport(config.Ssl.ValueBool(), config.Insecure.ValueBool())}
-	generatedConfig := generateRustClientConfig(config, httpClient)
+	httpClient := &http.Client{Transport: newHTTPTransport(resolved.Secure, config.Insecure.ValueBool())}
+	generatedConfig := generateRustClientConfig(resolved.HostPort, resolved.Secure, config, httpClient)
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion("us-east-1"),
@@ -123,14 +134,7 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 		return
 	}
 
-	scheme := "http"
-	if config.Ssl.ValueBool() {
-		scheme = "https"
-	}
-	endpointURL := endpoint
-	if !strings.Contains(endpointURL, "://") {
-		endpointURL = scheme + "://" + endpointURL
-	}
+	endpointURL := resolved.RootURL()
 
 	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpointURL)

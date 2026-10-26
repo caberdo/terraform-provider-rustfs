@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -26,6 +27,7 @@ func TestBucketResourceSchema(t *testing.T) {
 	attrs := resp.Schema.GetAttributes()
 	for _, name := range []string{
 		"name",
+		"force_destroy",
 		"acl",
 		"bucket_namespace",
 		"object_ownership",
@@ -150,5 +152,17 @@ func TestIsBucketNotFound(t *testing.T) {
 				t.Fatalf("isBucketNotFound(%v) = %v, want %v", tt.err, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIsBucketNotFoundVariants(t *testing.T) {
+	if !isBucketNotFound(&s3types.NoSuchBucket{}) {
+		t.Error("the typed NoSuchBucket error must be recognised")
+	}
+	if !isBucketNotFound(&rustfs.APIError{Code: "NoSuchBucket"}) {
+		t.Error("the admin-style API error code must be recognised")
+	}
+	if isBucketNotFound(errors.New("AccessDenied")) {
+		t.Error("an unrelated error must not be treated as a missing bucket")
 	}
 }

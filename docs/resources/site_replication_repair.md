@@ -44,7 +44,7 @@ resource "rustfs_site_replication_repair" "repair" {
 
 ### Required
 
-- `confirm` (String) Safety interlock: must repeat the provider `endpoint` (for example `127.0.0.1:9001`). A repair reconciles every peer and can rewrite bucket targets and IAM items, so naming the cluster makes the operation deliberate and stops a configuration copied to another environment from repairing the wrong deployment.
+- `confirm` (String) Safety interlock: must repeat the provider `endpoint` without its scheme (for example `127.0.0.1:9001`, even when `endpoint` is `https://127.0.0.1:9001`). A repair reconciles every peer and can rewrite bucket targets and IAM items, so naming the cluster makes the operation deliberate and stops a configuration copied to another environment from repairing the wrong deployment.
 
 ### Optional
 

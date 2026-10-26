@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -19,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -47,6 +49,7 @@ type bucketResource struct {
 
 type bucketResourceModel struct {
 	Name                       types.String                    `tfsdk:"name"`
+	ForceDestroy               types.Bool                      `tfsdk:"force_destroy"`
 	ACL                        types.String                    `tfsdk:"acl"`
 	BucketNamespace            types.String                    `tfsdk:"bucket_namespace"`
 	ObjectOwnership            types.String                    `tfsdk:"object_ownership"`
@@ -82,14 +85,21 @@ func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
+			"force_destroy": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Description: "Delete every object, object version and incomplete multipart upload in the bucket before " +
+					"destroying it. This attribute causes data loss: without it, RustFS refuses to delete a non-empty " +
+					"bucket with BucketNotEmpty and the destroy fails.",
+			},
 			"acl": schema.StringAttribute{
-				Optional:    true,
-				Description: "Canned ACL applied to the bucket at creation time (for example private, public-read, public-read-write or authenticated-read).",
+				Optional: true,
+				Description: "Canned ACL for the bucket (for example private, public-read, public-read-write or " +
+					"authenticated-read). Applied at creation and on change; RustFS 1.0.x reports only the owner's " +
+					"FULL_CONTROL grant back, so the provider cannot verify the value or detect an out-of-band ACL change.",
 				Validators: []validator.String{
 					stringvalidator.OneOf(enumStrings(s3types.BucketCannedACL("").Values())...),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"bucket_namespace": schema.StringAttribute{
@@ -118,39 +128,29 @@ func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 			},
 			"grant_read": schema.StringAttribute{
-				Optional:    true,
-				Description: "Grantee to whom the read permission on the bucket is granted at creation time.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Optional: true,
+				Description: "Grantee to whom the read permission on the bucket is granted. Applied at creation " +
+					"and on change; RustFS 1.0.x does not report ACL grants back, so the value cannot be drift-checked.",
 			},
 			"grant_write": schema.StringAttribute{
-				Optional:    true,
-				Description: "Grantee to whom the write permission on the bucket is granted at creation time.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Optional: true,
+				Description: "Grantee to whom the write permission on the bucket is granted. Applied at creation " +
+					"and on change; RustFS 1.0.x does not report ACL grants back, so the value cannot be drift-checked.",
 			},
 			"grant_read_acp": schema.StringAttribute{
-				Optional:    true,
-				Description: "Grantee to whom the read ACL permission on the bucket is granted at creation time.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Optional: true,
+				Description: "Grantee to whom the read ACL permission on the bucket is granted. Applied at creation " +
+					"and on change; RustFS 1.0.x does not report ACL grants back, so the value cannot be drift-checked.",
 			},
 			"grant_write_acp": schema.StringAttribute{
-				Optional:    true,
-				Description: "Grantee to whom the write ACL permission on the bucket is granted at creation time.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Optional: true,
+				Description: "Grantee to whom the write ACL permission on the bucket is granted. Applied at creation " +
+					"and on change; RustFS 1.0.x does not report ACL grants back, so the value cannot be drift-checked.",
 			},
 			"grant_full_control": schema.StringAttribute{
-				Optional:    true,
-				Description: "Grantee to whom full control over the bucket is granted at creation time.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Optional: true,
+				Description: "Grantee to whom the full control permission on the bucket is granted. Applied at creation " +
+					"and on change; RustFS 1.0.x does not report ACL grants back, so the value cannot be drift-checked.",
 			},
 			"create_bucket_configuration": schema.SingleNestedAttribute{
 				Optional:    true,
@@ -318,6 +318,18 @@ func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
+	// The ACL is deliberately not read back. RustFS 1.0.x accepts the ACL on
+	// CreateBucket and PutBucketAcl but GetBucketAcl always reports only the
+	// owner's FULL_CONTROL grant, so mirroring it would turn every configured
+	// ACL into permanent drift. The configured values stay in state.
+
+	// force_destroy is not server state. An imported resource has no value for
+	// it, so adopt the schema default instead of leaving a null that differs
+	// from a configuration that does not set it.
+	if state.ForceDestroy.IsNull() {
+		state.ForceDestroy = types.BoolValue(false)
+	}
+
 	resp.Diagnostics.Append(r.applyServerState(ctx, &state, true)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -383,8 +395,26 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	// Every create-only attribute carries RequiresReplace(); object ownership
-	// is the single in-place mutable setting.
+	var state bucketResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// The ACL is applied in place rather than by replacing the bucket: a
+	// replacement would delete every object for a setting RustFS accepts but
+	// does not report back (see the schema description).
+	if bucketACLChanged(state, plan) {
+		if _, err := r.client.S3.PutBucketAcl(ctx, buildBucketACLInput(plan)); err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating bucket ACL",
+				"Could not update the bucket ACL: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	// Object ownership is the other in-place mutable setting.
 	if v := plan.ObjectOwnership.ValueString(); v != "" {
 		if _, err := r.client.S3.PutBucketOwnershipControls(ctx, &s3.PutBucketOwnershipControlsInput{
 			Bucket: aws.String(plan.Name.ValueString()),
@@ -406,6 +436,41 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
 }
 
+// bucketACLChanged reports whether any ACL attribute differs between state and
+// plan, so Update only issues PutBucketAcl for a real change.
+func bucketACLChanged(state, plan bucketResourceModel) bool {
+	return state.ACL.ValueString() != plan.ACL.ValueString() ||
+		state.GrantRead.ValueString() != plan.GrantRead.ValueString() ||
+		state.GrantWrite.ValueString() != plan.GrantWrite.ValueString() ||
+		state.GrantReadACP.ValueString() != plan.GrantReadACP.ValueString() ||
+		state.GrantWriteACP.ValueString() != plan.GrantWriteACP.ValueString() ||
+		state.GrantFullControl.ValueString() != plan.GrantFullControl.ValueString()
+}
+
+// buildBucketACLInput maps the planned ACL attributes onto PutBucketAcl.
+func buildBucketACLInput(plan bucketResourceModel) *s3.PutBucketAclInput {
+	input := &s3.PutBucketAclInput{Bucket: aws.String(plan.Name.ValueString())}
+	if v := plan.ACL.ValueString(); v != "" {
+		input.ACL = s3types.BucketCannedACL(v)
+	}
+	if v := plan.GrantRead.ValueString(); v != "" {
+		input.GrantRead = aws.String(v)
+	}
+	if v := plan.GrantWrite.ValueString(); v != "" {
+		input.GrantWrite = aws.String(v)
+	}
+	if v := plan.GrantReadACP.ValueString(); v != "" {
+		input.GrantReadACP = aws.String(v)
+	}
+	if v := plan.GrantWriteACP.ValueString(); v != "" {
+		input.GrantWriteACP = aws.String(v)
+	}
+	if v := plan.GrantFullControl.ValueString(); v != "" {
+		input.GrantFullControl = aws.String(v)
+	}
+	return input
+}
+
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data bucketResourceModel
@@ -417,8 +482,22 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
+	bucket := data.Name.ValueString()
+
+	// The destructive switch is opt-in per bucket: without it a non-empty
+	// bucket fails with BucketNotEmpty, exactly as it always has.
+	if data.ForceDestroy.ValueBool() {
+		if err := r.emptyBucket(ctx, bucket); err != nil {
+			resp.Diagnostics.AddError(
+				"Error emptying bucket before deletion",
+				"Could not empty bucket "+bucket+" before deleting it: "+err.Error(),
+			)
+			return
+		}
+	}
+
 	_, err := r.client.S3.DeleteBucket(ctx, &s3.DeleteBucketInput{
-		Bucket: aws.String(data.Name.ValueString()),
+		Bucket: aws.String(bucket),
 	})
 	if err != nil {
 		if isBucketNotFound(err) {
@@ -429,6 +508,162 @@ func (r *bucketResource) Delete(ctx context.Context, req resource.DeleteRequest,
 			"Could not delete bucket, unexpected error: "+err.Error(),
 		)
 	}
+}
+
+// deleteObjectsBatchSize is the DeleteObjects limit per request.
+const deleteObjectsBatchSize = 1000
+
+// emptyBucket removes everything that keeps DeleteBucket from succeeding:
+// in-flight multipart uploads, current objects, and on a versioned bucket the
+// object versions and delete markers the object pass leaves behind. Every step
+// treats a vanished bucket as "already empty".
+func (r *bucketResource) emptyBucket(ctx context.Context, bucket string) error {
+	if err := r.abortMultipartUploads(ctx, bucket); err != nil {
+		return err
+	}
+	if err := r.deleteCurrentObjects(ctx, bucket); err != nil {
+		return err
+	}
+	versioned, err := r.bucketIsVersioned(ctx, bucket)
+	if err != nil {
+		return err
+	}
+	if !versioned {
+		return nil
+	}
+	return r.deleteObjectVersions(ctx, bucket)
+}
+
+// abortMultipartUploads aborts every unfinished upload: a leftover upload
+// blocks DeleteBucket just like an object does.
+func (r *bucketResource) abortMultipartUploads(ctx context.Context, bucket string) error {
+	paginator := s3.NewListMultipartUploadsPaginator(r.client.S3, &s3.ListMultipartUploadsInput{
+		Bucket: aws.String(bucket),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			if isBucketNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		for _, upload := range page.Uploads {
+			_, err := r.client.S3.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+				Bucket:   aws.String(bucket),
+				Key:      upload.Key,
+				UploadId: upload.UploadId,
+			})
+			if err != nil {
+				if isBucketNotFound(err) {
+					return nil
+				}
+				// Another operator may have aborted it already.
+				if isNoSuchUpload(err) {
+					continue
+				}
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// deleteCurrentObjects deletes the listed objects of an unversioned listing.
+func (r *bucketResource) deleteCurrentObjects(ctx context.Context, bucket string) error {
+	paginator := s3.NewListObjectsV2Paginator(r.client.S3, &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			if isBucketNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		ids := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+		for _, object := range page.Contents {
+			ids = append(ids, s3types.ObjectIdentifier{Key: object.Key})
+		}
+		if err := r.deleteObjects(ctx, bucket, ids); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteObjectVersions deletes every version and delete marker. On a versioned
+// bucket the object pass alone leaves delete markers behind, so this pass is
+// what actually empties it.
+func (r *bucketResource) deleteObjectVersions(ctx context.Context, bucket string) error {
+	paginator := s3.NewListObjectVersionsPaginator(r.client.S3, &s3.ListObjectVersionsInput{
+		Bucket: aws.String(bucket),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			if isBucketNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		ids := make([]s3types.ObjectIdentifier, 0, len(page.Versions)+len(page.DeleteMarkers))
+		for _, version := range page.Versions {
+			ids = append(ids, s3types.ObjectIdentifier{Key: version.Key, VersionId: version.VersionId})
+		}
+		for _, marker := range page.DeleteMarkers {
+			ids = append(ids, s3types.ObjectIdentifier{Key: marker.Key, VersionId: marker.VersionId})
+		}
+		if err := r.deleteObjects(ctx, bucket, ids); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deleteObjects deletes identifiers in DeleteObjects-sized batches. A per-object
+// error is reported: silently ignoring it would leave the bucket non-empty and
+// make the following DeleteBucket fail without saying why.
+func (r *bucketResource) deleteObjects(ctx context.Context, bucket string, ids []s3types.ObjectIdentifier) error {
+	for start := 0; start < len(ids); start += deleteObjectsBatchSize {
+		end := start + deleteObjectsBatchSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		out, err := r.client.S3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &s3types.Delete{
+				Objects: ids[start:end],
+				Quiet:   aws.Bool(true),
+			},
+		})
+		if err != nil {
+			if isBucketNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		if len(out.Errors) > 0 {
+			first := out.Errors[0]
+			return fmt.Errorf("%d object(s) could not be deleted, first: %s: %s",
+				len(out.Errors), aws.ToString(first.Key), aws.ToString(first.Message))
+		}
+	}
+	return nil
+}
+
+func (r *bucketResource) bucketIsVersioned(ctx context.Context, bucket string) (bool, error) {
+	out, err := r.client.S3.GetBucketVersioning(ctx, &s3.GetBucketVersioningInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		if isBucketNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return out.Status != "", nil
 }
 
 func (r *bucketResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
@@ -466,6 +701,20 @@ func isBucketNotFound(err error) bool {
 		return true
 	}
 	return false
+}
+
+// isNoSuchUpload reports the structured code for an already-aborted multipart
+// upload. It stays narrow on purpose: a blanket "not found" match would make a
+// failed abort look successful.
+func isNoSuchUpload(err error) bool {
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) && apiErr.ErrorCode() == "NoSuchUpload" {
+		return true
+	}
+	if rustfs.IsAPIErrorCode(err, "NoSuchUpload") {
+		return true
+	}
+	return strings.Contains(err.Error(), "NoSuchUpload")
 }
 
 func init() {

@@ -605,8 +605,10 @@ func testAccAssumeRole(t *testing.T) string {
 	hashed := sha256.Sum256([]byte(body))
 	payloadHash := hex.EncodeToString(hashed[:])
 
+	// RootURL is the same composer the provider uses, so a scheme-carrying
+	// RUSTFS_ENDPOINT does not become http://http://....
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
-		"http://"+os.Getenv("RUSTFS_ENDPOINT")+"/", strings.NewReader(body))
+		rustfs.RootURL(os.Getenv("RUSTFS_ENDPOINT"), false)+"/", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("building the AssumeRole request: %v", err)
 	}

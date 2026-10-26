@@ -27,12 +27,16 @@ func (m RustfsProviderModel) secretKey() string {
 	return m.AccessSecret.ValueString()
 }
 
-func generateRustClientConfig(model RustfsProviderModel, httpClient *http.Client) *rustfs.RustfsAdminConfig {
+// generateRustClientConfig builds the admin client configuration from the
+// already-resolved endpoint: hostPort is scheme-less and ssl is the effective
+// transport, so the admin client composes exactly the origin the S3 client was
+// given.
+func generateRustClientConfig(hostPort string, ssl bool, model RustfsProviderModel, httpClient *http.Client) *rustfs.RustfsAdminConfig {
 	config := &rustfs.RustfsAdminConfig{
-		Endpoint:     envOrDefault("RUSTFS_ENDPOINT", model.Endpoint.ValueString()),
+		Endpoint:     hostPort,
 		AccessKey:    envOrDefault("RUSTFS_USER", model.AccessKey.ValueString()),
 		AccessSecret: envOrDefault("RUSTFS_SECRET", model.secretKey()),
-		Ssl:          model.Ssl.ValueBool(),
+		Ssl:          ssl,
 		HTTPClient:   httpClient,
 	}
 	return config
