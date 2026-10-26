@@ -2,8 +2,8 @@
 
 What this project intends to do — and deliberately not do — over the next twelve months. It is
 maintained in the open: the living version of the near-term work is the
-[issue list](https://github.com/caberdo/terraform-provider-rustfs/issues), and this file records the
-direction those issues add up to. It is reviewed once per release (`CHANGELOG.md` records what
+[issue tracker](https://github.com/caberdo/terraform-provider-rustfs/issues), and this file records
+the direction those issues add up to. It is reviewed once per release (`CHANGELOG.md` records what
 actually shipped).
 
 ## What the project is
@@ -15,52 +15,50 @@ ILM, audit/notification targets, cluster config and health) through Terraform st
 resource and data source list is in the README; the provider is tested against RustFS `1.0.1`,
 `1.0.2`, `1.0.3` and `latest`.
 
-## Now — supply-chain and process hardening
+## Landed — supply-chain and process hardening
 
-The current cycle is about making the project's own guarantees as strong as the ones it configures
-in RustFS. Landed so far:
+The supply-chain cycle is complete. Every GitHub Action is pinned to a commit SHA, the parsers are
+fuzzed with a committed seed corpus and a weekly `Fuzz` workflow, releases carry SLSA v1.0 build
+provenance next to the GPG-signed checksums, and `rustfs_policy` supports `Sid`, `Condition`,
+`NotAction` and `NotResource`. The OSV advisories were cleared with `govulncheck` in CI, branch
+protection and the OpenSSF Best Practices badge were put in place, and the scorecard records the
+result. These are maintained, not pending; regressions belong in the issue tracker.
 
-* **Every GitHub Action is pinned to a commit SHA** ([#48](https://github.com/caberdo/terraform-provider-rustfs/issues/48)),
-  including the actions added by the later workflow changes.
-* **The parsers are fuzzed**: `FuzzPolicyDocument`, `FuzzAdminErrorBody` and `FuzzConfigKV` in
-  `pkg/rustfs` and `FuzzTargetConfig` in `provider`, backed by a committed seed corpus and a weekly
-  `Fuzz` workflow ([#50](https://github.com/caberdo/terraform-provider-rustfs/issues/50), closed).
-* **Releases carry SLSA v1.0 build provenance** next to the GPG-signed checksums
-  ([#52](https://github.com/caberdo/terraform-provider-rustfs/issues/52)), so `gh attestation verify`
-  works on a downloaded artifact.
-* **IAM policy statements are complete**: `Sid`, `Condition`, `NotAction` and `NotResource` are
-  supported in `rustfs_policy`
-  ([#59](https://github.com/caberdo/terraform-provider-rustfs/issues/59), closed).
+## Now — provider coverage and correctness
 
-Still open in this cycle, roughly in the order they unblock each other:
+The current cycle closes the remaining distance between the provider and what RustFS serves. The
+work is tracked in epic [#146](https://github.com/caberdo/terraform-provider-rustfs/issues/146) and
+its lane epics; the directions are:
 
-| Work | Issue |
-|---|---|
-| Clear the OSV advisories (`x/net`, `goldmark`, Go 1.27.2) and add `govulncheck` to CI | [#49](https://github.com/caberdo/terraform-provider-rustfs/issues/49) |
-| Make branch protection maximal within a single-maintainer setup | [#51](https://github.com/caberdo/terraform-provider-rustfs/issues/51) |
-| Earn and maintain the OpenSSF Best Practices badge | [#53](https://github.com/caberdo/terraform-provider-rustfs/issues/53) |
-| Decide how code review gets a second reviewer | [#54](https://github.com/caberdo/terraform-provider-rustfs/issues/54) |
-| Track the OpenSSF Scorecard climb | [#55](https://github.com/caberdo/terraform-provider-rustfs/issues/55) |
+* **S3 bucket surfaces** — model bucket website, logging, accelerate and request-payment settings,
+  make the bucket ACL updatable, and add the policy-status read surface.
+* **Read parity** — data sources next to existing resources: buckets, storage tiers, KMS keys and
+  service accounts.
+* **Object data plane** — decide whether `rustfs_object` belongs in the provider at all, or is a
+  documented non-goal. The decision comes before any implementation.
+* **Heal, resync and MRF** — decide whether heal belongs in the provider, then expose
+  site-replication status, metainfo and resync as the decision allows. MRF counters are read-only
+  today; queue actions are declined in the non-goals table.
+* **Remaining admin jobs** — config-history clearing, quota statistics and quota checks, and the
+  read surfaces those routes need.
+* **Developer experience** — resolve the endpoint scheme once so both clients reach the same
+  origin, and add `force_destroy` to `rustfs_bucket`.
+* **Version matrix** — extend `.github/rustfs-versions.txt` when a new RustFS release implements an
+  admin route the provider already maps.
 
-## Next — correctness and coverage
-
-* **Fix the group-policy attachment** that currently replaces every other policy on a group
-  ([#58](https://github.com/caberdo/terraform-provider-rustfs/issues/58)).
-* **Raise statement coverage**: the acceptance suite is now instrumented, so the merged number is
-  visible in CI (~67% as of the badge work). The target is 80% merged, which is what the badge's
-  silver level asks for.
-* **Keep the RustFS matrix honest**: extend `.github/rustfs-versions.txt` when a new RustFS release
-  implements an admin route the provider already maps, starting with the metrics stream
-  (`GET /rustfs/admin/v3/metrics`, registered but unimplemented in `1.0.1`–`1.0.3`).
+Statement coverage is gated on every pull request. The current merged measurement is 90.2% total
+(`pkg/rustfs` 97.8%, `provider` 88.0%) against a floor of 89.5%, 97.3% and 87.5% respectively;
+`.github/coverage-baseline.txt` is the source of truth and `README.md` carries the generated table.
+The 90% milestone is met; the floor moves only with a fresh unit-plus-acceptance measurement.
 
 ## Later — structure and reach
 
-* **Optional Go layout migration** to `internal/client`, `internal/resources/<name>`,
-  `internal/datasources/<name>` and `internal/models` as described in [`AGENTS.md`](./AGENTS.md).
-  This is a Go-only refactor: Terraform type names are public API and do not change.
+* **Keep the flat layout.** `pkg/rustfs` and the flat `provider` package are the settled structure.
+  The `internal/` move proposed in
+  [#2](https://github.com/caberdo/terraform-provider-rustfs/issues/2) was dropped; a future move
+  needs its own accepted issue, and Terraform type names remain public API either way.
 * **Discoverability**: keep the provider listed in the OpenTofu registry and the relevant
-  awesome-lists, and track the RustFS documentation cross-links
-  ([#56](https://github.com/caberdo/terraform-provider-rustfs/issues/56)).
+  awesome-lists, and keep the RustFS documentation cross-links current.
 * **Release cadence**: patch releases for RustFS compatibility and bug fixes, minor releases for new
   resources and data sources, deprecations announced one minor release ahead of removal.
 

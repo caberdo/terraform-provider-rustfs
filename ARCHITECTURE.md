@@ -35,7 +35,7 @@ Terraform CLI ──plugin protocol 6.0──► terraform-provider-rustfs (one 
 | Provider identity | `provider/provider.go` `Metadata` | `TypeName = "rustfs"`, version from the binary. |
 | Schema | `provider/provider.go` `Schema` | Six optional attributes: `endpoint`, `access_key`, `secret_key` (sensitive), `access_secret` (deprecated alias, sensitive), `ssl`, `insecure`. |
 | Configure | `provider/provider.go` `Configure` | Resolves each attribute through `envOrDefault` (`RUSTFS_ENDPOINT`, `RUSTFS_USER`, `RUSTFS_SECRET` win over the block), fails with an explicit diagnostic when the endpoint is empty, then builds `*AllClient` and hands the *same* value to both `resp.ResourceData` and `resp.DataSourceData`. |
-| Registration | `provider/provider.go` `Resources()` / `DataSources()` | 36 constructors and 18 constructors; every resource implements `ResourceWithImportState` except the three action-style resources (`rustfs_iam_backup_import`, `rustfs_bucket_metadata_backup_import`, `rustfs_rebalance`), which deliberately do not support import. |
+| Registration | `provider/registry.go` `registerResource()` / `registerDataSource()`, called from `init()` in each type's own file | Every resource and data source self-registers; `provider/provider.go` only returns the registry. Every resource implements `ResourceWithImportState` except the nine that are actions or write-only: `rustfs_bucket_metadata_backup_import`, `rustfs_config_restore`, `rustfs_iam_backup_import`, `rustfs_kms_backup`, `rustfs_object_data_cache_flush`, `rustfs_scanner_cycle_state_reset`, `rustfs_scanner_usage_state_reset`, `rustfs_tls_certificate` and `rustfs_token_revocation`. |
 
 `AllClient` (`provider/all_client.go`) is the whole runtime state a resource gets: an `*s3.Client`
 and a `rustfs.RustfsAdmin`. Resources are structs holding that pointer; there is no global state.
@@ -106,10 +106,10 @@ scripts/                       validate-examples, coverage summary
 .github/                       workflows, golangci/goreleaser/dependabot configs, SECURITY/CONTRIBUTING
 ```
 
-[`AGENTS.md`](./AGENTS.md) documents a possible move to an `internal/` layout
-(`internal/client`, `internal/resources/<name>`, `internal/datasources/<name>`, `internal/models`)
-aligned with `terraform-provider-gravitino`. That refactor is layout-only: Terraform type names
-(`rustfs_bucket`, …) are part of the provider's public contract and never change.
+The flat layout above is authoritative. The `internal/` proposal tracked in
+[#2](https://github.com/caberdo/terraform-provider-rustfs/issues/2) was dropped and its attempt
+branches were never merged; a future move needs its own accepted issue and must keep Terraform type
+names (`rustfs_bucket`, …) unchanged, because they are part of the provider's public contract.
 
 ## Test layers
 

@@ -24,7 +24,7 @@ cluster health all live in the same Terraform state as the rest of your infrastr
 | | |
 |---|---|
 | 🎯 **Broadest RustFS coverage** | Buckets, IAM (users, groups, policies, service accounts, LDAP), KMS keys, quotas, bucket + site replication, storage tiers and ILM, audit and notification targets, durability, module switches, cluster health, metrics and diagnostics |
-| 🧪 **Tested against real servers** | 356 unit tests (four of them fuzz targets replaying a seed corpus) plus 62 acceptance tests that run against RustFS in Docker, on a version matrix (RustFS `1.0.1`, `1.0.2`, `1.0.3` and `latest`) |
+| 🧪 **Tested against real servers** | Unit tests for every client method and resource lifecycle path (four fuzz targets replay a committed seed corpus), plus acceptance tests against RustFS in Docker on a version matrix (`1.0.1`, `1.0.2`, `1.0.3` and `latest`) |
 | 🔐 **Verifiable supply chain** | GPG-signed release tags, signed `SHA256SUMS`, SLSA build provenance for every artifact, SPDX SBOM and the Terraform registry manifest in every release |
 | 🚚 **Drop-in successor** | 12 of the 16 resources of `weinmann-emt/rustfs` migrate with **zero** config changes, 1 has a rename, 3 need a small edit — see [Migrating](#migrating-from-weinmann-emtrustfs) |
 | ⚡ **Modern internals** | terraform-plugin-framework (plugin protocol 6.0), AWS SDK for Go v2, Go 1.27, Docker/Podman acceptance harness |
@@ -54,7 +54,7 @@ terraform {
   required_providers {
     rustfs = {
       source  = "caberdo/rustfs"
-      version = "~> 0.4"
+      version = "~> 0.7"
     }
   }
 }
@@ -166,14 +166,17 @@ its own error, which the provider surfaces verbatim.
 ## Non-goals
 
 The provider models objects with a Terraform lifecycle. Some RustFS capabilities are deliberately
-outside that model. Gaps that are merely **not built yet** are tracked in epic
-[#92](https://github.com/caberdo/terraform-provider-rustfs/issues/92) and its child issues; the
-areas below are **declined**, not pending.
+outside that model. Gaps that are merely **not built yet** are tracked in the
+[issue tracker](https://github.com/caberdo/terraform-provider-rustfs/issues); the areas below are
+**declined**, not pending.
 
 | Area | Not modeled | Why it is out of scope |
 |---|---|---|
 | Diagnostics and one-shot actions | `top/locks`, `force-unlock`, `trace`, profiling/pprof, console `log`, `speedtest/*`, `inspect/archive`, `gateway-key-inventory`, `inspect-data`, `object-zip-downloads`, `POST /update` | They are imperative queries or operator actions with no durable desired state. `force-unlock` and update/restart mutate ephemeral server state that `plan`/`apply`/`destroy` cannot represent honestly; `top/locks`, profiling, tracing and speed tests report on demand. Use `mc` or the console. |
 | Server-launch and environment-only features | WebDAV, FTP(S), SFTP, Swift, `RUSTFS_HTTP3_ENABLE`, scanner knobs exposed only as `RUSTFS_SCANNER_*` variables | They are enabled or tuned by the server process environment or launch flags, not through an admin API route. The provider talks to a running server over HTTP and does not control its process, container or command line; manage these with the deployment tooling that starts RustFS. The `scanner` subsystem of `rustfs_config` is still managed by `rustfs_config`; only knobs without a config-kv key are out of scope. |
+| KMS service lifecycle | `POST /rustfs/admin/v3/kms/start`, `POST /rustfs/admin/v3/kms/stop`, `POST /rustfs/admin/v3/kms/reload`, `POST /rustfs/admin/v3/kms/configure`, `POST /rustfs/admin/v3/kms/reconfigure` | These control the KMS process or its configuration: start, stop and reload are process lifecycle, and configure/reconfigure edit backend configuration outside the declarative key model. The provider talks to a running server over HTTP; manage these with the deployment tooling that starts RustFS. `rustfs_kms_key`, `rustfs_kms_rekey`, `rustfs_kms_backup`, `rustfs_kms_config` and `rustfs_kms_status` cover the key, sweep, backup and read surfaces. |
+| KMS one-shot and data-plane actions | `POST /rustfs/admin/v3/kms/clear-cache`, `POST /rustfs/admin/v3/kms/generate-data-key`, `POST /rustfs/admin/v3/kms/keys/cancel-deletion` | `clear-cache` is a one-shot performance mutation with no durable desired state; `generate-data-key` is a data-plane crypto operation, not infrastructure; `cancel-deletion` is a time-critical recovery action that must not become desired state — an apply could undo a deliberate key deletion. `rustfs_kms_key` guards the destructive path with `skip_destroy`; use `mc`, the console or the KMS backend's own tooling to recover a scheduled deletion. |
+| v4 heal and MRF queue actions | `POST /rustfs/admin/v4/heal/mrf/responsibilities`, `POST /rustfs/admin/v4/heal/mrf/responsibilities/actions`, `/rustfs/admin/v4/heal/replacement-recovery` | They mutate the server's repair queue and replacement state, with no durable object Terraform can read back. `rustfs_replication_mrf` only reads the counters. Use `mc`, the console or the deployment tooling; whether heal becomes a provider type is tracked in the heal decision issue ([#158](https://github.com/caberdo/terraform-provider-rustfs/issues/158)). |
 | Console self-service | `account/*`, `mfa/challenge` | These endpoints serve a signed-in human through browser sessions: account self-service and an interactive MFA challenge. They are not part of the SigV4 admin API and expose no declarative object for Terraform to own. The RustFS Console and the configured identity provider handle them. |
 | Other products | RustFS Console UI, MCP server, operator/Helm charts | They are separate deliverables with their own repositories and release cadence. This provider is an API client; install, configure and upgrade those products with their own tooling. |
 | Iceberg catalog data | Namespaces, tables, views, refs and credentials; catalog backup/restore | The catalog's contents are application data, not infrastructure. Catalog backup returns an opaque server-side snapshot with no read/list/delete route, so it has no Terraform lifecycle; restore is destructive and must not happen as a side effect of `apply`. Only the bucket-level switch is modeled, by `rustfs_table_bucket`. |
@@ -335,7 +338,7 @@ configuration change.
      required_providers {
        rustfs = {
          source  = "caberdo/rustfs"
-         version = "~> 0.4"
+         version = "~> 0.7"
        }
      }
    }
@@ -379,12 +382,13 @@ GitHub-verified tag, and ships:
 | `terraform-provider-rustfs_<version>_manifest.json` | Terraform registry manifest (plugin protocol versions) |
 | `sbom.spdx.json` | SPDX software bill of materials |
 
-The release signing key is committed as [`.github/release-signing-key.asc`](./.github/release-signing-key.asc):
+The release signing key is committed as [`.github/release-signing-key.asc`](./.github/release-signing-key.asc).
+Replace `<version>` with the release you are verifying — for example `0.7.0` for the current release:
 
 ```bash
 gpg --import .github/release-signing-key.asc     # fingerprint 77BEB69E5C039CB69017B060DFE36652ADCC2259
-gpg --verify terraform-provider-rustfs_0.4.1_SHA256SUMS.sig \
-             terraform-provider-rustfs_0.4.1_SHA256SUMS
+gpg --verify terraform-provider-rustfs_<version>_SHA256SUMS.sig \
+             terraform-provider-rustfs_<version>_SHA256SUMS
 ```
 
 The checksum signature proves the checksums are ours; the build provenance proves *where the
@@ -393,7 +397,7 @@ binaries come from*. It is generated in the release workflow by
 the repository's attestation record, so it is checkable with the GitHub CLI:
 
 ```bash
-gh attestation verify terraform-provider-rustfs_0.4.1_linux_amd64.zip \
+gh attestation verify terraform-provider-rustfs_<version>_linux_amd64.zip \
     --repo caberdo/terraform-provider-rustfs
 ```
 
@@ -403,9 +407,9 @@ the file was rebuilt or modified after the fact. The same provenance is attached
 verifies without a lookup in the attestation record:
 
 ```bash
-gh attestation verify terraform-provider-rustfs_0.4.1_linux_amd64.zip \
+gh attestation verify terraform-provider-rustfs_<version>_linux_amd64.zip \
     --repo caberdo/terraform-provider-rustfs \
-    --bundle terraform-provider-rustfs_0.4.1_provenance.intoto.jsonl
+    --bundle terraform-provider-rustfs_<version>_provenance.intoto.jsonl
 ```
 
 Terraform itself verifies the checksums when it installs a provider and records them in
@@ -423,15 +427,15 @@ registered to the releasing account.
 | `make testacc-live` | Starts RustFS with `podman-compose` and runs the acceptance suite against it |
 | `make coverage-merge` | Merges the unit profile with the acceptance profile (`coverage-acceptance.out`, written by the acceptance container) into one statement-coverage table |
 
-The suite is 356 unit tests (10 of them skip themselves without a live server, and the four fuzz
-targets replay their committed seed corpus) and 62 acceptance tests, 57 of which run against RustFS
-`latest` — the other 5 skip when the server cannot provide what they need (no LDAP identity provider
-is configurable on RustFS `1.0.x`, a single-pool deployment has nothing to rebalance, and the
-metrics stream is not implemented). CI runs the unit tests with
-`-race`, then the acceptance matrix (`.github/rustfs-versions.txt`) against real RustFS servers; the
-acceptance job merges both coverage profiles and publishes a per-package table in the job summary of
-every run. A weekly `Fuzz` workflow runs each fuzz target for a minute — deeper campaigns are
-`make fuzz FUZZTIME=10m`.
+The suite covers every `pkg/rustfs` client method and every resource lifecycle path. Four fuzz
+targets replay their committed seed corpus, and the live CRUD tests skip themselves when
+`RUSTFS_ENDPOINT` is unset. Acceptance tests run against real RustFS servers on the
+`.github/rustfs-versions.txt` matrix (`1.0.1`, `1.0.2`, `1.0.3` and `latest`); a few skip when the
+server cannot provide what they need (no LDAP identity provider is configurable on RustFS `1.0.x`,
+a single-pool deployment has nothing to rebalance, and the metrics stream is not implemented). CI
+runs the unit tests with `-race`, then the acceptance matrix; the acceptance job merges both
+coverage profiles and publishes a per-package table in the job summary of every run. A weekly
+`Fuzz` workflow runs each fuzz target for a minute — deeper campaigns are `make fuzz FUZZTIME=10m`.
 
 Statement coverage of this repository, merged from the unit and acceptance profiles:
 
@@ -482,8 +486,7 @@ provider_installation {
 
 `main` is protected: every change lands through a pull request with green CI, and
 [`AGENTS.md`](./AGENTS.md) describes the repository conventions (schema rules, coding patterns,
-how resources are added, and the code-layout migration tracked in
-[#2](https://github.com/caberdo/terraform-provider-rustfs/issues/2)).
+how resources are added, and the settled flat package layout).
 
 ## Troubleshooting and FAQ
 
