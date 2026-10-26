@@ -79,6 +79,13 @@ services:
       # Native-TLS listener for rustfs_tls_certificate. The other instances
       # serve plain HTTP, where RustFS refuses certificate management.
       RUSTFS_TLS_ENDPOINT: "rustfs-tls:9001"
+      # Optional happy-path inputs for the KMS acceptance tests. They only take
+      # effect on a deployment whose KMS backend supports the operation (Vault
+      # for rekey, RUSTFS_KMS_BACKUP_DIR et al. for backup); every stock cell
+      # reports the capability as absent and those cases skip with the server's
+      # reason. Empty by default so a stock run is unchanged.
+      RUSTFS_ACC_KMS_REKEY_BUCKET: "${RUSTFS_ACC_KMS_REKEY_BUCKET:-}"
+      RUSTFS_ACC_KMS_BACKUP_ID: "${RUSTFS_ACC_KMS_BACKUP_ID:-}"
       TEST_FILTER: "${TEST_FILTER:-TestAcc}"
     depends_on:
       rustfs:

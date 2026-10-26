@@ -4,12 +4,19 @@
 package provider
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestKmsBackupResourceSchema(t *testing.T) {
@@ -86,11 +93,42 @@ func TestKmsBackupResourceLifecyclePaths(t *testing.T) {
 		assertStateString(t, resp.State, path.Root("manifest_digest"), "abc123")
 	})
 
-	t.Run("create reports an unsupported backend", func(t *testing.T) {
-		client, _ := routedClient(t, requestRoute{
-			method: http.MethodPost, pathContains: "kms/backup", status: http.StatusNotImplemented,
-			body: `{"message":"backend aws cannot export a RustFS bundle"}`,
+	t.Run("create refuses to write when the server reports export as disabled", func(t *testing.T) {
+		client, rec := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "kms/backup", status: http.StatusOK,
+			body: kmsBackupStatusBody(false, `"RUSTFS_KMS_BACKUP_DIR is not set; KMS backup and restore are disabled until it is"`),
 		})
+		h := newCRUDHarness(t, NewKmsBackupResource(), client)
+
+		resp := h.create(kmsBackupLifecycleModel())
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "KMS backup export is disabled", "no bundle was written")
+		for _, want := range []string{"RUSTFS_KMS_BACKUP_DIR", "RUSTFS_KMS_BACKUP_KEK_ID", "restart RustFS"} {
+			assertDiagnosticDetail(t, resp.Diagnostics, want)
+		}
+		rec.assertNoRequest(t, "POST /rustfs/admin/v3/kms/backup")
+	})
+
+	t.Run("create reports a status read failure before writing", func(t *testing.T) {
+		client, rec := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "kms/backup", status: http.StatusInternalServerError,
+			body: s3ErrorXML("InternalError", "kms service is not running"),
+		})
+		h := newCRUDHarness(t, NewKmsBackupResource(), client)
+
+		resp := h.create(kmsBackupLifecycleModel())
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error creating KMS backup",
+			"Could not check whether this server can export a KMS backup bundle")
+		rec.assertNoRequest(t, "POST /rustfs/admin/v3/kms/backup")
+	})
+
+	t.Run("create reports an unsupported backend", func(t *testing.T) {
+		client, _ := routedClient(t,
+			requestRoute{method: http.MethodGet, pathContains: "kms/backup", status: http.StatusOK, body: kmsBackupStatusBody(true, "null")},
+			requestRoute{method: http.MethodPost, pathContains: "kms/backup", status: http.StatusNotImplemented,
+				body: `{"message":"backend aws cannot export a RustFS bundle"}`},
+		)
 		h := newCRUDHarness(t, NewKmsBackupResource(), client)
 
 		resp := h.create(kmsBackupLifecycleModel())
@@ -134,4 +172,126 @@ func TestKmsBackupResourceLifecyclePaths(t *testing.T) {
 		requireNoDiagnostics(t, resp.Diagnostics)
 		rec.assertNoRequest(t, "kms/backup")
 	})
+}
+
+// testAccKmsBackupSkipUnlessExport asserts the deployment's export readiness
+// and skips with the server's own reason when it does not match. The stock
+// acceptance deployment has no RUSTFS_KMS_BACKUP_DIR, so it reports
+// export_supported=false; a backup-capable deployment reports true.
+func testAccKmsBackupSkipUnlessExport(t *testing.T, want bool) {
+	t.Helper()
+
+	client := testAccRustClient()
+	status, err := client.GetKmsBackupStatus()
+	if err != nil {
+		t.Skipf("this deployment does not serve the KMS backup status route: %v", err)
+	}
+	if status.ExportSupported != want {
+		reason := "the server reports no reason"
+		if status.UnavailableReason != nil && *status.UnavailableReason != "" {
+			reason = *status.UnavailableReason
+		}
+		backend := "unknown"
+		if status.Backend != nil && *status.Backend != "" {
+			backend = *status.Backend
+		}
+		t.Skipf("KMS backup export_supported=%t (backend %s, reason: %s); this case needs export_supported=%t",
+			status.ExportSupported, backend, reason, want)
+	}
+}
+
+// TestAccKmsBackupResource_exportDisabled asserts that Create refuses to write
+// when the server reports export_supported=false and explains which server
+// environment variables enable the subsystem. The stock acceptance deployment
+// has no RUSTFS_KMS_BACKUP_DIR, so this case runs on every cell.
+func TestAccKmsBackupResource_exportDisabled(t *testing.T) {
+	testAccPreCheck(t)
+	testAccKmsBackupSkipUnlessExport(t, false)
+
+	tfresource.Test(t, tfresource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []tfresource.TestStep{
+			{
+				Config: testAccKmsBackupConfig("tf-acc-export-disabled"),
+				ExpectError: regexp.MustCompile(
+					`(?s)KMS backup export is disabled.*` +
+						`RUSTFS_KMS_BACKUP_DIR.*` +
+						`RUSTFS_KMS_BACKUP_KEK_ID`,
+				),
+			},
+		},
+	})
+}
+
+// TestAccKmsBackupResource_create writes a real bundle. It is opt-in: set the
+// server's backup root (RUSTFS_KMS_BACKUP_DIR, RUSTFS_KMS_BACKUP_KEK and
+// RUSTFS_KMS_BACKUP_KEK_ID) so the server reports export_supported=true. The
+// bundle name is random unless RUSTFS_ACC_KMS_BACKUP_ID names it, because a
+// destination that already holds a bundle refuses to mix in a second one.
+func TestAccKmsBackupResource_create(t *testing.T) {
+	testAccPreCheck(t)
+	testAccKmsBackupSkipUnlessExport(t, true)
+
+	backupID := os.Getenv("RUSTFS_ACC_KMS_BACKUP_ID")
+	if backupID == "" {
+		backupID = fmt.Sprintf("tf-acc-%d", acctest.RandInt())
+	}
+	resourceName := "rustfs_kms_backup.test"
+
+	tfresource.Test(t, tfresource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKmsBackupDestroyLeavesBundle,
+		Steps: []tfresource.TestStep{
+			{
+				Config: testAccKmsBackupConfig(backupID),
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttr(resourceName, "backup_id", backupID),
+					tfresource.TestCheckResourceAttrPair(resourceName, "id", resourceName, "backup_id"),
+					tfresource.TestCheckResourceAttrSet(resourceName, "snapshot_generation"),
+					tfresource.TestCheckResourceAttrSet(resourceName, "manifest_digest"),
+					tfresource.TestCheckResourceAttrSet(resourceName, "artifact_count"),
+					tfresource.TestCheckResourceAttrSet(resourceName, "backup_kek_id"),
+					tfresource.TestCheckResourceAttr(resourceName, "export_supported", "true"),
+				),
+			},
+			{
+				// The bundle is write-once server state; a refresh only reports
+				// subsystem readiness, so the unchanged configuration plans
+				// nothing.
+				Config:   testAccKmsBackupConfig(backupID),
+				PlanOnly: true,
+				ConfigPlanChecks: tfresource.ConfigPlanChecks{
+					PostApplyPreRefresh: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
+	})
+}
+
+func testAccKmsBackupConfig(backupID string) string {
+	return testAccProviderConfig() + fmt.Sprintf(`
+resource "rustfs_kms_backup" "test" {
+  backup_id = %q
+}
+`, backupID)
+}
+
+// testAccCheckKmsBackupDestroyLeavesBundle asserts the subsystem still reports
+// export readiness after destroy. The server exposes no route that reads,
+// verifies or deletes an individual bundle, so the bundle itself cannot be
+// addressed from a test; what destroy promises is that it only forgets the
+// record and leaves the backup subsystem (and therefore the bundle on disk)
+// untouched.
+func testAccCheckKmsBackupDestroyLeavesBundle(_ *terraform.State) error {
+	client := testAccRustClient()
+	status, err := client.GetKmsBackupStatus()
+	if err != nil {
+		return fmt.Errorf("reading KMS backup status after destroy: %w", err)
+	}
+	if !status.ExportSupported {
+		return fmt.Errorf("destroy left the KMS backup subsystem unable to export; the bundle may be gone")
+	}
+	return nil
 }
