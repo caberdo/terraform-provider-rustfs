@@ -502,6 +502,294 @@ func TestIntegrityJobResourceImportStateRejectsMalformedID(t *testing.T) {
 	assertErrorDiagnostic(t, resp.Diagnostics, "Invalid import ID", "<bucket>/<job_id>")
 }
 
+// TestIntegrityJobResourceLifecyclePaths pins the cross-method contract in one
+// place: a create records the job it started and writes nothing when any step
+// fails, a job the server no longer holds is removed from state, a missing
+// route is a capability gap rather than a vanished job, and destroy both
+// cancels and stays idempotent for a stale record.
+func TestIntegrityJobResourceLifecyclePaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configure rejects unexpected provider data", func(t *testing.T) {
+		h := newCRUDHarness(t, NewIntegrityJobResource(), cannedClient(t, http.StatusOK, ""))
+		resp := h.configure("not-a-client")
+		assertErrorDiagnostic(t, resp.Diagnostics, "Unexpected Resource Configure Type", "Expected *AllClient")
+	})
+
+	createCases := []struct {
+		name        string
+		plan        func(t *testing.T) IntegrityJobResourceModel
+		routes      []requestRoute
+		wantSummary string
+		wantDetail  []string
+		wantNoJobs  bool
+		wantControl int
+	}{
+		{
+			name: "a migrate job without activated writes is refused before creating",
+			plan: func(t *testing.T) IntegrityJobResourceModel {
+				plan := integrityJobTestPlan(t)
+				plan.Mode = types.StringValue("migrate")
+				plan.Items = integrityJobItemsWithTarget(t)
+				return plan
+			},
+			routes: []requestRoute{
+				{method: http.MethodGet, pathContains: "/integrity/readiness", status: http.StatusOK, body: integrityJobTestReadinessPayload},
+			},
+			wantSummary: "Data-integrity writes are not activated",
+			wantDetail:  []string{"new_writes_enabled_here", "RUSTFS_SHARD_INTEGRITY_WRITE"},
+			wantNoJobs:  true,
+		},
+		{
+			name: "a missing route names the route and the server version",
+			plan: integrityJobTestPlan,
+			routes: []requestRoute{
+				{method: http.MethodGet, pathContains: "/healthinfo", status: http.StatusOK, body: `{"version":"1.0.3"}`},
+				{method: http.MethodPost, pathContains: "/integrity/logs/jobs", status: http.StatusNotImplemented, body: s3ErrorXML("NotImplemented", "not implemented")},
+			},
+			wantSummary: "Data-integrity jobs are not available on this RustFS server",
+			wantDetail:  []string{"RustFS 1.0.3", "POST /rustfs/admin/v3/integrity/{bucket}/jobs", "Upgrade RustFS"},
+		},
+		{
+			name: "a job without an id is reported instead of tracked",
+			plan: integrityJobTestPlan,
+			routes: []requestRoute{
+				{method: http.MethodPost, pathContains: "/integrity/logs/jobs", status: http.StatusCreated, body: `{"id":"","state":"paused"}`},
+			},
+			wantSummary: "Error creating integrity job",
+			wantDetail:  []string{"without an id"},
+		},
+		{
+			name: "a refused resume cancels the paused job and reports why",
+			plan: integrityJobTestPlan,
+			routes: []requestRoute{
+				{method: http.MethodPost, pathContains: "/control", status: http.StatusTooManyRequests,
+					body: s3ErrorXML("SlowDown", "an integrity worker is already active; retry resume later")},
+				{method: http.MethodPost, pathContains: "/integrity/logs/jobs", status: http.StatusCreated, body: integrityJobTestPausedPayload},
+			},
+			wantSummary: "Error starting integrity job",
+			wantDetail:  []string{"an integrity worker is already active", "refused to resume it"},
+			wantControl: 2,
+		},
+		{
+			name: "a rejected create carries the server detail",
+			plan: integrityJobTestPlan,
+			routes: []requestRoute{
+				{method: http.MethodPost, pathContains: "/integrity/logs/jobs", status: http.StatusBadRequest,
+					body: s3ErrorXML("InvalidArgument", "a job requires 1..=64 explicit source versions")},
+			},
+			wantSummary: "Error creating integrity job",
+			wantDetail:  []string{"explicit source versions"},
+		},
+	}
+
+	for _, tc := range createCases {
+		t.Run("create: "+tc.name, func(t *testing.T) {
+			client, recorder := routedClient(t, tc.routes...)
+			h := newCRUDHarness(t, NewIntegrityJobResource(), client)
+			plan := tc.plan(t)
+
+			resp := h.create(plan)
+
+			if len(resp.Diagnostics) != 1 {
+				t.Fatalf("expected exactly one diagnostic, got %d: %v", len(resp.Diagnostics), resp.Diagnostics)
+			}
+			assertDiagnosticDetail(t, resp.Diagnostics, tc.wantDetail[0])
+			for _, want := range tc.wantDetail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+			if got := resp.Diagnostics[0].Summary(); got != tc.wantSummary {
+				t.Errorf("diagnostic summary = %q, want %q", got, tc.wantSummary)
+			}
+			h.assertNoPartialState(resp, plan)
+			if tc.wantNoJobs {
+				recorder.assertNoRequest(t, "/jobs")
+			}
+			if tc.wantControl > 0 {
+				controlCalls := 0
+				for _, request := range recorder.snapshot() {
+					if strings.Contains(request, "/control") {
+						controlCalls++
+					}
+				}
+				if controlCalls != tc.wantControl {
+					t.Errorf("control calls = %d, want %d: %v", controlCalls, tc.wantControl, recorder.snapshot())
+				}
+			}
+		})
+	}
+
+	t.Run("create: resumes the paused job and records it", func(t *testing.T) {
+		client, recorder := routedClient(t,
+			requestRoute{method: http.MethodPost, pathContains: "/control", status: http.StatusOK, body: integrityJobTestRunningPayload},
+			requestRoute{method: http.MethodPost, pathContains: "/integrity/logs/jobs", status: http.StatusCreated, body: integrityJobTestPausedPayload},
+		)
+		h := newCRUDHarness(t, NewIntegrityJobResource(), client)
+
+		resp := h.create(integrityJobTestPlan(t))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		assertStateString(t, resp.State, path.Root("id"), integrityJobTestID)
+		assertStateString(t, resp.State, path.Root("state"), "running")
+		assertStateString(t, resp.State, path.Root("bucket_incarnation"), "7f1d2c3b-4a59-4687-9a01-2b3c4d5e6f70")
+		recorder.assertRequest(t, "POST /rustfs/admin/v3/integrity/logs/jobs")
+		recorder.assertRequest(t, "POST /rustfs/admin/v3/integrity/logs/jobs/"+integrityJobTestID+"/control")
+	})
+
+	readCases := []struct {
+		name        string
+		routes      []requestRoute
+		wantRemoved bool
+		wantSummary string
+		wantDetail  []string
+	}{
+		{
+			name: "an existing job is mirrored into state",
+			routes: []requestRoute{
+				{method: http.MethodGet, pathContains: "/integrity/logs/jobs/" + integrityJobTestID, status: http.StatusOK, body: integrityJobTestRunningPayload},
+			},
+		},
+		{
+			name: "a job the server no longer holds is removed from state",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchKey", "integrity job not found")},
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "a changed bucket generation is removed from state",
+			routes: []requestRoute{
+				{status: http.StatusPreconditionFailed, body: s3ErrorXML("PreconditionFailed", "integrity job or target changed")},
+			},
+			wantRemoved: true,
+		},
+		{
+			// A 404 whose body names no job code means the route was never
+			// registered; dropping the record would silently forget a job the
+			// server may still hold after an upgrade.
+			name: "a missing route keeps the record",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: "Not Found"},
+			},
+			wantSummary: "Error reading integrity job",
+			wantDetail:  []string{"Could not read job " + integrityJobTestID, "Not Found"},
+		},
+		{
+			name: "an unexpected failure keeps the record",
+			routes: []requestRoute{
+				{status: http.StatusInternalServerError, body: s3ErrorXML("InternalError", "boom")},
+			},
+			wantSummary: "Error reading integrity job",
+			wantDetail:  []string{"Could not read job " + integrityJobTestID, "boom"},
+		},
+	}
+
+	for _, tc := range readCases {
+		t.Run("read: "+tc.name, func(t *testing.T) {
+			client, recorder := routedClient(t, tc.routes...)
+			h := newCRUDHarness(t, NewIntegrityJobResource(), client)
+
+			resp := h.read(integrityJobImportedModel())
+
+			if tc.wantRemoved {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStateRemoved(t, resp.State)
+				return
+			}
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStatePresent(t, resp.State)
+				assertStateString(t, resp.State, path.Root("state"), "running")
+				recorder.assertRequest(t, "GET /rustfs/admin/v3/integrity/logs/jobs/"+integrityJobTestID)
+				return
+			}
+			if len(resp.Diagnostics) != 1 {
+				t.Fatalf("expected exactly one diagnostic, got %d: %v", len(resp.Diagnostics), resp.Diagnostics)
+			}
+			assertDiagnosticDetail(t, resp.Diagnostics, tc.wantDetail[0])
+			for _, want := range tc.wantDetail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+			if got := resp.Diagnostics[0].Summary(); got != tc.wantSummary {
+				t.Errorf("diagnostic summary = %q, want %q", got, tc.wantSummary)
+			}
+			assertStatePresent(t, resp.State)
+		})
+	}
+
+	t.Run("update copies the plan without calling the server", func(t *testing.T) {
+		client, recorder := routedClient(t)
+		h := newCRUDHarness(t, NewIntegrityJobResource(), client)
+
+		resp := h.update(integrityJobTestPlan(t), integrityJobTestPlan(t))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		assertStatePresent(t, resp.State)
+		if len(recorder.snapshot()) != 0 {
+			t.Fatalf("update issued requests: %v", recorder.snapshot())
+		}
+	})
+
+	deleteCases := []struct {
+		name        string
+		routes      []requestRoute
+		wantSummary string
+		wantDetail  []string
+	}{
+		{
+			name: "cancel goes through the control route",
+			routes: []requestRoute{
+				{method: http.MethodPost, pathContains: "/control", status: http.StatusOK, body: integrityJobTestPausedPayload},
+			},
+		},
+		{
+			name: "a missing job needs no cancel",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchKey", "integrity job not found")},
+			},
+		},
+		{
+			name: "a stale generation needs no cancel",
+			routes: []requestRoute{
+				{method: http.MethodPost, pathContains: "/control", status: http.StatusPreconditionFailed, body: s3ErrorXML("PreconditionFailed", "integrity job or target changed")},
+				{method: http.MethodGet, pathContains: "/integrity/logs/jobs/" + integrityJobTestID, status: http.StatusPreconditionFailed, body: s3ErrorXML("PreconditionFailed", "integrity job or target changed")},
+			},
+		},
+		{
+			name: "an unexpected cancel failure is surfaced",
+			routes: []requestRoute{
+				{status: http.StatusInternalServerError, body: s3ErrorXML("InternalError", "boom")},
+			},
+			wantSummary: "Error cancelling integrity job",
+			wantDetail:  []string{"Could not cancel job " + integrityJobTestID, "boom"},
+		},
+	}
+
+	for _, tc := range deleteCases {
+		t.Run("destroy: "+tc.name, func(t *testing.T) {
+			client, _ := routedClient(t, tc.routes...)
+			h := newCRUDHarness(t, NewIntegrityJobResource(), client)
+
+			resp := h.delete(integrityJobImportedModel())
+
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				return
+			}
+			if len(resp.Diagnostics) != 1 {
+				t.Fatalf("expected exactly one diagnostic, got %d: %v", len(resp.Diagnostics), resp.Diagnostics)
+			}
+			assertDiagnosticDetail(t, resp.Diagnostics, tc.wantDetail[0])
+			for _, want := range tc.wantDetail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+			if got := resp.Diagnostics[0].Summary(); got != tc.wantSummary {
+				t.Errorf("diagnostic summary = %q, want %q", got, tc.wantSummary)
+			}
+		})
+	}
+}
+
 // testAccIntegritySkipUnlessSupported skips when the running server does not
 // implement the integrity routes, so the suite stays green on older releases.
 func testAccIntegritySkipUnlessSupported(t *testing.T) {

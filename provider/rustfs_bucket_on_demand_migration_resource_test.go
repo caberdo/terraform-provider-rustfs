@@ -626,6 +626,348 @@ func TestBucketOnDemandMigrationResourceDelete(t *testing.T) {
 	}
 }
 
+// odmLifecycleClient answers one successful create/update sequence: the
+// dry-run probe, the save, and the read-back. puts counts the PUTs so a case
+// can assert the save follows a successful dry run.
+func odmLifecycleClient(t *testing.T, puts *int, enabled bool) *AllClient {
+	t.Helper()
+	return httptestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPut && r.URL.Query().Get("dry-run") == "true":
+			*puts++
+			_, _ = fmt.Fprint(w, `{"bucket":"photos","dry_run":true,"config":`+odmConfigJSON(enabled)+
+				`,"updated_at":null,"probe":{"reachable":true,"listable":true,"sample_key":null}}`)
+		case r.Method == http.MethodPut:
+			*puts++
+			_, _ = fmt.Fprint(w, `{"bucket":"photos","dry_run":false,"config":`+odmConfigJSON(enabled)+
+				`,"updated_at":"2026-10-20T10:00:00Z","probe":{"reachable":true,"listable":true,"sample_key":null}}`)
+		case r.Method == http.MethodGet:
+			_, _ = fmt.Fprint(w, `{"bucket":"photos","config":`+odmConfigJSON(enabled)+`,"updated_at":"2026-10-20T10:00:00Z"}`)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+}
+
+// TestBucketOnDemandMigrationResourceLifecyclePaths pins the cross-method
+// contract in one place: the dry run gates the save, a failed apply writes no
+// state, a vanished configuration is removed from state, a missing route is a
+// capability gap that keeps state, and destroy stays idempotent while surfacing
+// a disabled module.
+func TestBucketOnDemandMigrationResourceLifecyclePaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configure rejects unexpected provider data", func(t *testing.T) {
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), cannedClient(t, http.StatusOK, "{}"))
+		resp := h.configure("not-a-client")
+		assertErrorDiagnostic(t, resp.Diagnostics, "Unexpected Resource Configure Type", "Expected *AllClient")
+	})
+
+	t.Run("create: the dry run gates the save and the read-back fills the state", func(t *testing.T) {
+		var puts int
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), odmLifecycleClient(t, &puts, true))
+
+		plan := odmValidPlan()
+		resp := h.create(plan)
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		if puts != 2 {
+			t.Errorf("PUTs = %d, want a dry run followed by the save", puts)
+		}
+		assertStateString(t, resp.State, path.Root("id"), "photos")
+		assertStateString(t, resp.State, path.Root("updated_at"), "2026-10-20T10:00:00Z")
+		var state bucketOnDemandMigrationResourceModel
+		requireNoDiagnostics(t, resp.State.Get(context.Background(), &state))
+		if state.Version.ValueInt64() != 1 {
+			t.Errorf("version = %d, want 1", state.Version.ValueInt64())
+		}
+	})
+
+	createCases := []struct {
+		name   string
+		status int
+		body   string
+		detail []string
+	}{
+		{
+			name:   "a disabled module names the environment switch",
+			status: http.StatusBadRequest,
+			body:   s3ErrorXML("OnDemandMigrationDisabled", "disabled"),
+			detail: []string{"RUSTFS_ON_DEMAND_MIGRATION_ENABLED", "nothing was saved"},
+		},
+		{
+			name:   "an unreachable source names the probe call",
+			status: http.StatusBadRequest,
+			body:   s3ErrorXML("OnDemandMigrationSourceUnreachable", "source bucket probe failed: access_denied"),
+			detail: []string{"source bucket probe failed (access_denied)", "source.endpoint", "nothing was saved"},
+		},
+		{
+			name:   "a licence or permission refusal names the admin action",
+			status: http.StatusForbidden,
+			body:   s3ErrorXML("AccessDenied", "Access Denied."),
+			detail: []string{"license", "admin:SetBucketOnDemandMigration", "nothing was saved"},
+		},
+		{
+			name:   "a backend that is not compiled names the build feature",
+			status: http.StatusNotImplemented,
+			body:   s3ErrorXML("OnDemandMigrationBackendNotCompiled", "gcs support is not compiled in"),
+			detail: []string{"gcs feature", "nothing was saved"},
+		},
+	}
+
+	for _, tc := range createCases {
+		t.Run("create: "+tc.name, func(t *testing.T) {
+			h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), cannedClient(t, tc.status, tc.body))
+			plan := odmValidPlan()
+
+			resp := h.create(plan)
+
+			assertErrorDiagnostic(t, resp.Diagnostics, "Error creating bucket on-demand migration", tc.detail[0])
+			for _, want := range tc.detail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+			h.assertNoPartialState(resp, plan)
+		})
+	}
+
+	t.Run("create: a failed save after the dry run writes no state", func(t *testing.T) {
+		var puts int
+		client := httptestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == http.MethodPut && r.URL.Query().Get("dry-run") == "true":
+				puts++
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprint(w, `{"bucket":"photos","dry_run":true,"config":`+odmConfigJSON(true)+
+					`,"updated_at":null,"probe":{"reachable":true,"listable":true,"sample_key":null}}`)
+			case r.Method == http.MethodPut:
+				puts++
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = fmt.Fprint(w, s3ErrorXML("InternalError", "boom"))
+			default:
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), client)
+		plan := odmValidPlan()
+
+		resp := h.create(plan)
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error creating bucket on-demand migration",
+			"Could not create on-demand migration for bucket photos")
+		if puts != 2 {
+			t.Errorf("PUTs = %d, want the dry run and the failed save", puts)
+		}
+		h.assertNoPartialState(resp, plan)
+	})
+
+	t.Run("create: a failed read-back says the configuration was saved", func(t *testing.T) {
+		client := httptestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == http.MethodGet {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = fmt.Fprint(w, s3ErrorXML("InternalError", "boom"))
+				return
+			}
+			_, _ = fmt.Fprint(w, `{"bucket":"photos","dry_run":false,"config":`+odmConfigJSON(true)+
+				`,"updated_at":"2026-10-20T10:00:00Z","probe":{"reachable":true,"listable":true,"sample_key":null}}`)
+		}))
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), client)
+		plan := odmValidPlan()
+
+		resp := h.create(plan)
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error creating bucket on-demand migration", "reading it back failed")
+		h.assertNoPartialState(resp, plan)
+	})
+
+	readCases := []struct {
+		name        string
+		routes      []requestRoute
+		wantRemoved bool
+		wantSummary string
+		wantDetail  []string
+	}{
+		{
+			name: "a configured bucket is refreshed",
+			routes: []requestRoute{
+				{method: http.MethodGet, status: http.StatusOK,
+					body: `{"bucket":"photos","config":` + odmConfigJSON(true) + `,"updated_at":"2026-10-20T10:00:00Z"}`},
+			},
+		},
+		{
+			name: "an unset configuration is removed from state",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchConfiguration", "not configured")},
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "a deleted bucket is removed from state",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchBucket", "gone")},
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "a permission failure keeps state",
+			routes: []requestRoute{
+				{status: http.StatusForbidden, body: s3ErrorXML("AccessDenied", "denied")},
+			},
+			wantSummary: "Error reading bucket on-demand migration",
+			wantDetail:  []string{"license", "admin:GetBucketOnDemandMigration"},
+		},
+		{
+			// A bare 404 is the route missing, not the configuration: dropping
+			// the record would forget a configuration the server still holds.
+			name: "a missing route keeps state and names the route",
+			routes: []requestRoute{
+				{method: http.MethodGet, pathContains: "/healthinfo", status: http.StatusOK, body: `{"version":"1.0.3"}`},
+				{status: http.StatusNotFound, body: "Not Found"},
+			},
+			wantSummary: "Error reading bucket on-demand migration",
+			wantDetail:  []string{"RustFS 1.0.3 does not implement", "PUT|GET|DELETE /rustfs/admin/v3/on-demand-migration/{bucket}"},
+		},
+	}
+
+	for _, tc := range readCases {
+		t.Run("read: "+tc.name, func(t *testing.T) {
+			client, _ := routedClient(t, tc.routes...)
+			h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), client)
+
+			resp := h.read(odmStateFromPlan(odmValidPlan(), true))
+
+			if tc.wantRemoved {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStateRemoved(t, resp.State)
+				return
+			}
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStatePresent(t, resp.State)
+				var state bucketOnDemandMigrationResourceModel
+				requireNoDiagnostics(t, resp.State.Get(context.Background(), &state))
+				if state.Source == nil || state.Source.Credentials == nil {
+					t.Fatal("read dropped the source credentials")
+				}
+				if got := state.Source.Credentials.SecretKey.ValueString(); got != "source-secret" {
+					t.Errorf("secret_key = %q, want the configured value despite the redacted read", got)
+				}
+				assertStateString(t, resp.State, path.Root("updated_at"), "2026-10-20T10:00:00Z")
+				return
+			}
+			assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail[0])
+			for _, want := range tc.wantDetail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+			assertStatePresent(t, resp.State)
+		})
+	}
+
+	t.Run("update: disabling the source keeps the credentials and updates the stamp", func(t *testing.T) {
+		var puts int
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), odmLifecycleClient(t, &puts, false))
+		plan := odmStateFromPlan(odmValidPlan(), false)
+		plan.Enabled = types.BoolValue(false)
+
+		resp := h.update(plan, odmStateFromPlan(odmValidPlan(), true))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		if puts != 2 {
+			t.Errorf("PUTs = %d, want the dry run and the save", puts)
+		}
+		var state bucketOnDemandMigrationResourceModel
+		requireNoDiagnostics(t, resp.State.Get(context.Background(), &state))
+		if state.Enabled.ValueBool() {
+			t.Error("enabled = true after disabling the source")
+		}
+		if state.Source == nil || state.Source.Credentials == nil ||
+			state.Source.Credentials.SecretKey.ValueString() != "source-secret" {
+			t.Error("the configured secret was lost by disabling the source")
+		}
+		assertStateString(t, resp.State, path.Root("updated_at"), "2026-10-20T10:00:00Z")
+	})
+
+	t.Run("update: a failed dry run reports the update and writes no state", func(t *testing.T) {
+		h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), cannedClient(t, http.StatusBadRequest,
+			s3ErrorXML("OnDemandMigrationSourceUnreachable", "source bucket probe failed: access_denied")))
+		previous := odmStateFromPlan(odmValidPlan(), true)
+		plan := odmStateFromPlan(odmValidPlan(), false)
+
+		resp := h.update(plan, previous)
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error updating bucket on-demand migration", "nothing was saved")
+		var state bucketOnDemandMigrationResourceModel
+		requireNoDiagnostics(t, resp.State.Get(context.Background(), &state))
+		if !state.Enabled.ValueBool() {
+			t.Error("a failed update disabled the source in state")
+		}
+	})
+
+	deleteCases := []struct {
+		name        string
+		routes      []requestRoute
+		wantSummary string
+		wantDetail  []string
+	}{
+		{
+			name: "an existing configuration is deleted",
+			routes: []requestRoute{
+				{method: http.MethodDelete, status: http.StatusNoContent},
+			},
+		},
+		{
+			name: "an already-deleted bucket needs no error",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchBucket", "gone")},
+			},
+		},
+		{
+			name: "an already-cleared configuration needs no error",
+			routes: []requestRoute{
+				{status: http.StatusNotFound, body: s3ErrorXML("NoSuchConfiguration", "not configured")},
+			},
+		},
+		{
+			name: "a disabled module is surfaced, not swallowed",
+			routes: []requestRoute{
+				{status: http.StatusBadRequest, body: s3ErrorXML("OnDemandMigrationDisabled", "disabled")},
+			},
+			wantSummary: "Error deleting bucket on-demand migration",
+			wantDetail:  []string{"RUSTFS_ON_DEMAND_MIGRATION_ENABLED"},
+		},
+		{
+			name: "a missing route is surfaced, not treated as cleared",
+			routes: []requestRoute{
+				{method: http.MethodGet, pathContains: "/healthinfo", status: http.StatusOK, body: `{"version":"1.0.3"}`},
+				{status: http.StatusNotFound, body: "Not Found"},
+			},
+			wantSummary: "Error deleting bucket on-demand migration",
+			wantDetail:  []string{"RustFS 1.0.3 does not implement", "on-demand-migration/{bucket}"},
+		},
+	}
+
+	for _, tc := range deleteCases {
+		t.Run("destroy: "+tc.name, func(t *testing.T) {
+			client, _ := routedClient(t, tc.routes...)
+			h := newCRUDHarness(t, NewBucketOnDemandMigrationResource(), client)
+
+			resp := h.delete(odmStateFromPlan(odmValidPlan(), true))
+
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				return
+			}
+			assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail[0])
+			for _, want := range tc.wantDetail[1:] {
+				assertDiagnosticDetail(t, resp.Diagnostics, want)
+			}
+		})
+	}
+}
+
 func TestBucketOnDemandMigrationResourceImportState(t *testing.T) {
 	r := NewBucketOnDemandMigrationResource()
 	importer, ok := r.(resource.ResourceWithImportState)

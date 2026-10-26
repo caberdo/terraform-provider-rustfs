@@ -957,6 +957,313 @@ func TestPoolDecommissionDelete(t *testing.T) {
 	})
 }
 
+// TestPoolDecommissionResourceLifecyclePaths pins the cross-method contract in
+// one place: a create writes the state a refresh can consume, a failed create
+// writes nothing, a drain the server no longer reports is removed from state,
+// and destroy is idempotent for an absent or completed drain while still
+// surfacing the topology gap that must not be swallowed.
+func TestPoolDecommissionResourceLifecyclePaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("configure rejects unexpected provider data", func(t *testing.T) {
+		h := newCRUDHarness(t, NewPoolDecommissionResource(), cannedClient(t, http.StatusOK, ""))
+
+		resp := h.configure("not-a-client")
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Unexpected Resource Configure Type", "Expected *AllClient")
+	})
+
+	createCases := []struct {
+		name        string
+		pool        string
+		responses   []scriptedResponse
+		wantStatus  string
+		wantSummary string
+		wantDetail  string
+	}{
+		{
+			name: "none starts the drain and records the re-read progress",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "none", "active", "null"),
+					)},
+				{method: http.MethodPost, pathContains: "pools/decommission", queryPool: decommissionPoolB, status: http.StatusOK},
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "running", "decommissioning", decommissionRunningInfo),
+					)},
+			},
+			wantStatus: "running",
+		},
+		{
+			name: "an existing drain is adopted without a second start",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "complete", "decommissioned", decommissionCompleteInfo),
+					)},
+			},
+			wantStatus: "complete",
+		},
+		{
+			name: "an unknown pool names the current pools and writes no state",
+			pool: "/missing{1...2}",
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(0, decommissionPoolA, "none", "active", "null"),
+					)},
+			},
+			wantSummary: "Error starting pool decommission",
+			wantDetail:  `does not report a storage pool named "/missing{1...2}"`,
+		},
+		{
+			name: "a failed start writes no state",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "none", "active", "null"),
+					)},
+				{method: http.MethodPost, pathContains: "pools/decommission", queryPool: decommissionPoolB,
+					status: http.StatusInternalServerError, body: s3ErrorXML("InternalError", "boom")},
+			},
+			wantSummary: "Error starting pool decommission",
+			wantDetail:  "Could not start a decommission of pool " + fmt.Sprintf("%q", decommissionPoolB),
+		},
+		{
+			name: "a single-pool deployment explains the topology requirement",
+			pool: "/data",
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusNotImplemented,
+					body: `<Error><Code>NotImplemented</Code><Message>A header you provided implies functionality that is not implemented</Message></Error>`},
+				{method: http.MethodGet, pathContains: "healthinfo", status: http.StatusOK, body: `{"version":"refs/tags/1.0.3"}`},
+				{method: http.MethodGet, pathContains: "pools/list", status: http.StatusOK,
+					body: `[{"id":0,"cmdline":"/data","status":"active"}]`},
+			},
+			wantSummary: "Error starting pool decommission",
+			wantDetail:  "only on a deployment with at least two storage pools",
+		},
+	}
+
+	for _, tc := range createCases {
+		t.Run("create: "+tc.name, func(t *testing.T) {
+			client, server := scriptedClient(t, tc.responses...)
+			h := newCRUDHarness(t, NewPoolDecommissionResource(), client)
+			plan := poolDecommissionPlan(tc.pool)
+
+			resp := h.create(plan)
+
+			if tc.wantSummary != "" {
+				assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail)
+				h.assertNoPartialState(resp, plan)
+				server.assertAllConsumed(t)
+				return
+			}
+			requireNoDiagnostics(t, resp.Diagnostics)
+			assertStateString(t, resp.State, path.Root("id"), tc.pool)
+			assertStateString(t, resp.State, path.Root("pool"), tc.pool)
+			assertStateString(t, resp.State, path.Root("status"), tc.wantStatus)
+			server.assertAllConsumed(t)
+		})
+	}
+
+	readCases := []struct {
+		name        string
+		pool        string
+		responses   []scriptedResponse
+		wantRemoved bool
+		wantSummary string
+		wantDetail  string
+	}{
+		{
+			name: "a running drain is mirrored into state",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "running", "decommissioning", decommissionRunningInfo),
+					)},
+			},
+		},
+		{
+			name: "a pool the server no longer reports is removed from state",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(0, decommissionPoolA, "none", "active", "null"),
+					)},
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "a cleared record is removed from state",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "none", "active", "null"),
+					)},
+			},
+			wantRemoved: true,
+		},
+		{
+			name: "a permission failure keeps state and names the call",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{status: http.StatusForbidden, body: s3ErrorXML("AccessDenied", "nope")},
+			},
+			wantSummary: "Error reading pool decommission",
+			wantDetail:  "Could not read the decommission of pool " + fmt.Sprintf("%q", decommissionPoolB),
+		},
+		{
+			name: "a single-pool 501 keeps state and explains the topology",
+			pool: "/data",
+			responses: []scriptedResponse{
+				{status: http.StatusNotImplemented,
+					body: `<Error><Code>NotImplemented</Code><Message>A header you provided implies functionality that is not implemented</Message></Error>`},
+				{method: http.MethodGet, pathContains: "healthinfo", status: http.StatusOK, body: `{"version":"refs/tags/1.0.3"}`},
+				{method: http.MethodGet, pathContains: "pools/list", status: http.StatusOK,
+					body: `[{"id":0,"cmdline":"/data","status":"active"}]`},
+			},
+			wantSummary: "Error reading pool decommission",
+			wantDetail:  "only on a deployment with at least two storage pools",
+		},
+	}
+
+	for _, tc := range readCases {
+		t.Run("read: "+tc.name, func(t *testing.T) {
+			client, server := scriptedClient(t, tc.responses...)
+			h := newCRUDHarness(t, NewPoolDecommissionResource(), client)
+
+			resp := h.read(poolDecommissionState(tc.pool))
+
+			if tc.wantRemoved {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStateRemoved(t, resp.State)
+				server.assertAllConsumed(t)
+				return
+			}
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+				assertStatePresent(t, resp.State)
+				assertStateString(t, resp.State, path.Root("status"), "running")
+				assertStateString(t, resp.State, path.Root("object"), "config/config.json")
+				server.assertAllConsumed(t)
+				return
+			}
+			assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail)
+			assertStatePresent(t, resp.State)
+			server.assertAllConsumed(t)
+		})
+	}
+
+	t.Run("update copies the plan without calling the server", func(t *testing.T) {
+		client, server := scriptedClient(t)
+		h := newCRUDHarness(t, NewPoolDecommissionResource(), client)
+		plan := poolDecommissionPlan(decommissionPoolB)
+		plan.Status = types.StringValue("running")
+
+		resp := h.update(plan, poolDecommissionState(decommissionPoolB))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		assertStateString(t, resp.State, path.Root("status"), "running")
+		server.assertAllConsumed(t)
+	})
+
+	deleteCases := []struct {
+		name        string
+		pool        string
+		responses   []scriptedResponse
+		wantSummary string
+		wantDetail  string
+	}{
+		{
+			name: "an absent pool needs no mutation",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(0, decommissionPoolA, "none", "active", "null"),
+					)},
+			},
+		},
+		{
+			name: "a completed drain is terminal and is left alone",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "complete", "decommissioned", decommissionCompleteInfo),
+					)},
+			},
+		},
+		{
+			name: "a running drain is canceled and its record cleared",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "running", "decommissioning", decommissionRunningInfo),
+					)},
+				{method: http.MethodPost, pathContains: "pools/cancel", queryPool: decommissionPoolB, status: http.StatusOK},
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "canceled", "blocked", decommissionCanceledInfo),
+					)},
+				{method: http.MethodPost, pathContains: "pools/clear", queryPool: decommissionPoolB, status: http.StatusOK},
+			},
+		},
+		{
+			name: "a refused cancel is surfaced, not swallowed",
+			pool: decommissionPoolB,
+			responses: []scriptedResponse{
+				{method: http.MethodGet, pathContains: "decommission/status", status: http.StatusOK,
+					body: decommissionStatusBody(
+						decommissionPoolBody(1, decommissionPoolB, "running", "decommissioning", decommissionRunningInfo),
+					)},
+				{method: http.MethodPost, pathContains: "pools/cancel", queryPool: decommissionPoolB,
+					status: http.StatusInternalServerError, body: s3ErrorXML("InternalError", "boom")},
+			},
+			wantSummary: "Error canceling pool decommission",
+			wantDetail:  "Could not cancel the decommission of pool " + fmt.Sprintf("%q", decommissionPoolB),
+		},
+		{
+			name: "a single-pool 501 is surfaced with the topology explanation",
+			pool: "/data",
+			responses: []scriptedResponse{
+				{status: http.StatusNotImplemented,
+					body: `<Error><Code>NotImplemented</Code><Message>A header you provided implies functionality that is not implemented</Message></Error>`},
+				{method: http.MethodGet, pathContains: "healthinfo", status: http.StatusOK, body: `{"version":"refs/tags/1.0.3"}`},
+				{method: http.MethodGet, pathContains: "pools/list", status: http.StatusOK,
+					body: `[{"id":0,"cmdline":"/data","status":"active"}]`},
+			},
+			wantSummary: "Error canceling pool decommission",
+			wantDetail:  "only on a deployment with at least two storage pools",
+		},
+	}
+
+	for _, tc := range deleteCases {
+		t.Run("destroy: "+tc.name, func(t *testing.T) {
+			client, server := scriptedClient(t, tc.responses...)
+			h := newCRUDHarness(t, NewPoolDecommissionResource(), client)
+
+			resp := h.delete(poolDecommissionState(tc.pool))
+
+			if tc.wantSummary == "" {
+				requireNoDiagnostics(t, resp.Diagnostics)
+			} else {
+				assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail)
+			}
+			server.assertAllConsumed(t)
+		})
+	}
+}
+
 func TestPoolDecommissionErrorHelpers(t *testing.T) {
 	r := NewPoolDecommissionResource().(*PoolDecommissionResource)
 
