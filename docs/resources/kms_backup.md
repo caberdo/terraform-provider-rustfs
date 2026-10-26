@@ -4,6 +4,7 @@ subcategory: ""
 description: |-
   Create one RustFS KMS backup bundle under the server's configured backup root.
   This records the bundle's metadata. The server exposes no route to read, verify or delete a specific bundle, so refresh only reports whether the backup subsystem is still available, and destroy only forgets the record; the bundle stays on the server.
+  Create first asks GET /rustfs/admin/v3/kms/backup whether the server can export. When it reports export_supported = false the apply fails with the server's reason and names RUSTFS_KMS_BACKUP_DIR, RUSTFS_KMS_BACKUP_KEK and RUSTFS_KMS_BACKUP_KEK_ID, and no bundle is written.
   The create route returns identifiers and metadata only, never key material, so no secret enters state. Supplying an explicit backup_id is required: the server refuses to mix bundles in a non-empty destination, so a deterministic name is what makes a retry fail loudly instead of leaving a second orphan bundle.
   Restore is not managed by this provider. It destroys and replaces key material, requires the backup id and conflict policy as separate confirmations, and needs the KMS master key out of band.
 ---
@@ -13,6 +14,8 @@ description: |-
 Create one RustFS KMS backup bundle under the server's configured backup root.
 
 This records the bundle's metadata. The server exposes no route to read, verify or delete a specific bundle, so refresh only reports whether the backup subsystem is still available, and destroy only forgets the record; the bundle stays on the server.
+
+Create first asks `GET /rustfs/admin/v3/kms/backup` whether the server can export. When it reports `export_supported = false` the apply fails with the server's reason and names `RUSTFS_KMS_BACKUP_DIR`, `RUSTFS_KMS_BACKUP_KEK` and `RUSTFS_KMS_BACKUP_KEK_ID`, and no bundle is written.
 
 The create route returns identifiers and metadata only, never key material, so no secret enters state. Supplying an explicit `backup_id` is required: the server refuses to mix bundles in a non-empty destination, so a deterministic name is what makes a retry fail loudly instead of leaving a second orphan bundle.
 

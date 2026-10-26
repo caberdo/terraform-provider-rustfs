@@ -54,6 +54,10 @@ func (r *kmsBackupResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"This records the bundle's metadata. The server exposes no route to read, verify or " +
 			"delete a specific bundle, so refresh only reports whether the backup subsystem is still " +
 			"available, and destroy only forgets the record; the bundle stays on the server.\n\n" +
+			"Create first asks `GET /rustfs/admin/v3/kms/backup` whether the server can export. When " +
+			"it reports `export_supported = false` the apply fails with the server's reason and names " +
+			"`RUSTFS_KMS_BACKUP_DIR`, `RUSTFS_KMS_BACKUP_KEK` and `RUSTFS_KMS_BACKUP_KEK_ID`, and no " +
+			"bundle is written.\n\n" +
 			"The create route returns identifiers and metadata only, never key material, so no secret " +
 			"enters state. Supplying an explicit `backup_id` is required: the server refuses to mix " +
 			"bundles in a non-empty destination, so a deterministic name is what makes a retry " +
@@ -140,6 +144,25 @@ func (r *kmsBackupResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	status, statusErr := r.client.RustClient.GetKmsBackupStatus()
+	if statusErr != nil {
+		resp.Diagnostics.AddError(
+			"Error creating KMS backup",
+			"Could not check whether this server can export a KMS backup bundle: "+statusErr.Error(),
+		)
+		return
+	}
+	if !status.ExportSupported {
+		detail := "KMS backup export is disabled on this server, so no bundle was written."
+		if status.UnavailableReason != nil && *status.UnavailableReason != "" {
+			detail += " The server reports: " + *status.UnavailableReason + "."
+		}
+		detail += " Set RUSTFS_KMS_BACKUP_DIR, RUSTFS_KMS_BACKUP_KEK and RUSTFS_KMS_BACKUP_KEK_ID on " +
+			"every node, restart RustFS, and retry."
+		resp.Diagnostics.AddError("KMS backup export is disabled", detail)
+		return
+	}
+
 	bundle, err := r.client.RustClient.CreateKmsBackup(plan.BackupID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -158,15 +181,8 @@ func (r *kmsBackupResource) Create(ctx context.Context, req resource.CreateReque
 	plan.BackupKEKID = types.StringValue(bundle.BackupKEKID)
 	plan.BackupKEKVersion = types.Int64Value(int64(bundle.BackupKEKVersion))
 	plan.SanitizedConfigIncluded = types.BoolValue(bundle.SanitizedConfigIncluded)
-
-	if status, statusErr := r.client.RustClient.GetKmsBackupStatus(); statusErr != nil {
-		tflog.Warn(ctx, "created KMS backup but could not read backup status", map[string]any{"error": statusErr.Error()})
-		plan.ExportSupported = types.BoolValue(true)
-		plan.UnavailableReason = types.StringNull()
-	} else {
-		plan.ExportSupported = types.BoolValue(status.ExportSupported)
-		plan.UnavailableReason = stringFromPtr(status.UnavailableReason)
-	}
+	plan.ExportSupported = types.BoolValue(status.ExportSupported)
+	plan.UnavailableReason = stringFromPtr(status.UnavailableReason)
 
 	tflog.Trace(ctx, "created a KMS backup bundle", map[string]any{"backup_id": bundle.BackupID})
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

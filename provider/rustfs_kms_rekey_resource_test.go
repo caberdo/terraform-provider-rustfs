@@ -5,13 +5,22 @@ package provider
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"regexp"
 	"testing"
+	"time"
 
+	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	frameworkresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestKmsRekeyResourceSchema(t *testing.T) {
@@ -95,15 +104,22 @@ func TestKmsRekeyResourceLifecyclePaths(t *testing.T) {
 	})
 
 	t.Run("create reports an unsupported backend", func(t *testing.T) {
-		client, _ := routedClient(t, requestRoute{
-			method: http.MethodPost, pathContains: "kms/keys/rekey", status: http.StatusNotImplemented,
-			body: `{"error":"unsupported"}`,
-		})
+		client, _ := routedClient(t,
+			requestRoute{method: http.MethodGet, pathContains: "/healthinfo", status: http.StatusOK, body: `{"version":"refs/tags/1.0.3"}`},
+			requestRoute{method: http.MethodGet, pathContains: "kms/config", status: http.StatusOK,
+				body: `{"backend":"local","cache_enabled":true,"cache_max_keys":1000,"cache_ttl_seconds":300,"default_key_id":"rustfs-default-key"}`},
+			requestRoute{method: http.MethodPost, pathContains: "kms/keys/rekey", status: http.StatusNotImplemented,
+				body: `{"error":"unsupported"}`},
+		)
 		h := newCRUDHarness(t, NewKmsRekeyResource(), client)
 
 		resp := h.create(kmsRekeyLifecycleModel())
 
-		assertErrorDiagnostic(t, resp.Diagnostics, "Error starting KMS rekey", "does not support rewrapping data-key envelopes")
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error starting KMS rekey",
+			"POST /rustfs/admin/v3/kms/keys/rekey is served, but the local KMS backend does not support rewrapping data-key envelopes")
+		for _, want := range []string{"Vault KV2", "RustFS server version: 1.0.3"} {
+			assertDiagnosticDetail(t, resp.Diagnostics, want)
+		}
 	})
 
 	t.Run("create reports an already running sweep", func(t *testing.T) {
@@ -219,4 +235,135 @@ func TestKmsRekeyResourceImportState(t *testing.T) {
 	requireNoDiagnostics(t, resp.Diagnostics)
 	assertStateString(t, resp.State, path.Root("id"), "job-9")
 	assertStateString(t, resp.State, path.Root("job_id"), "job-9")
+}
+
+// testAccKmsRekeySkipUnlessCapability skips unless the deployment's KMS backend
+// reports the given rewrap capability. The capability is server state, not an
+// environment variable the test can set, and the skip prints what the server
+// reported so an operator knows which backend the cell ran with.
+func testAccKmsRekeySkipUnlessCapability(t *testing.T, want bool) {
+	t.Helper()
+
+	client := testAccRustClient()
+	status, err := client.GetKmsStatus()
+	if err != nil {
+		t.Skipf("this deployment does not serve the KMS status route: %v", err)
+	}
+	if got := status.Capabilities["rewrap"]; got != want {
+		t.Skipf("KMS backend %q reports rewrap=%t; this case needs rewrap=%t", status.BackendType, got, want)
+	}
+}
+
+// TestAccKmsRekeyResource_unsupportedBackend asserts that a backend which
+// cannot re-wrap envelopes produces the provider's capability diagnostic
+// instead of the raw 501 answer. The stock acceptance deployment (RustFS_KMS_
+// BACKEND=local) is exactly such a backend, so this case runs on every cell.
+func TestAccKmsRekeyResource_unsupportedBackend(t *testing.T) {
+	testAccPreCheck(t)
+	testAccKmsRekeySkipUnlessCapability(t, false)
+
+	tfresource.Test(t, tfresource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []tfresource.TestStep{
+			{
+				// The scope is a prefix no acceptance object uses, so a server
+				// that unexpectedly accepts the start cannot move real data.
+				Config: testAccKmsRekeyUnsupportedConfig(),
+				// Terraform wraps the detail, so the pattern joins the
+				// fragments it must contain instead of matching the layout.
+				ExpectError: regexp.MustCompile(
+					`(?s)Error starting KMS rekey` +
+						`.*POST /rustfs/admin/v3/kms/keys/rekey` +
+						`.*does not support rewrapping data-key\s+envelopes` +
+						`.*Vault KV2 and Vault Transit can` +
+						`.*RustFS server version: \d+\.\d+\.\d+`,
+				),
+			},
+		},
+	})
+}
+
+// TestAccKmsRekeyResource_start drives a real sweep on a backend that supports
+// re-wrapping. It is opt-in: set RUSTFS_ACC_KMS_REKEY_BUCKET to a disposable
+// bucket on a Vault-backed deployment. Without it the case skips, because a
+// rekey sweep writes envelope metadata for every matched object.
+func TestAccKmsRekeyResource_start(t *testing.T) {
+	testAccPreCheck(t)
+	testAccKmsRekeySkipUnlessCapability(t, true)
+
+	bucket := os.Getenv("RUSTFS_ACC_KMS_REKEY_BUCKET")
+	if bucket == "" {
+		t.Skip("set RUSTFS_ACC_KMS_REKEY_BUCKET to a disposable bucket on a backend that supports rewrap")
+	}
+
+	resourceName := "rustfs_kms_rekey.test"
+
+	tfresource.Test(t, tfresource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckKmsRekeyDestroyed,
+		Steps: []tfresource.TestStep{
+			{
+				Config: testAccKmsRekeyConfig(bucket),
+				Check: tfresource.ComposeTestCheckFunc(
+					tfresource.TestCheckResourceAttrSet(resourceName, "job_id"),
+					tfresource.TestCheckResourceAttrSet(resourceName, "state"),
+					tfresource.TestCheckResourceAttrPair(resourceName, "id", resourceName, "job_id"),
+					tfresource.TestCheckResourceAttr(resourceName, "buckets.#", "1"),
+					tfresource.TestCheckResourceAttr(resourceName, "buckets.0", bucket),
+				),
+			},
+			{
+				// Progress counters are server state, so an unchanged
+				// configuration must not produce a plan after a refresh.
+				Config:   testAccKmsRekeyConfig(bucket),
+				PlanOnly: true,
+				ConfigPlanChecks: tfresource.ConfigPlanChecks{
+					PostApplyPreRefresh: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
+	})
+}
+
+func testAccKmsRekeyUnsupportedConfig() string {
+	return testAccProviderConfig() + `
+resource "rustfs_kms_rekey" "test" {
+  prefix = "tf-acc-kms-rekey-never-taken/"
+}
+`
+}
+
+func testAccKmsRekeyConfig(bucket string) string {
+	return testAccProviderConfig() + fmt.Sprintf(`
+resource "rustfs_kms_rekey" "test" {
+  buckets = [%q]
+}
+`, bucket)
+}
+
+// testAccCheckKmsRekeyDestroyed accepts the two states destroy can leave: no
+// sweep record at all (the server keeps it in memory only), or a record that is
+// no longer running. Cancellation is cooperative, so the residual "running"
+// state is polled briefly instead of failing immediately.
+func testAccCheckKmsRekeyDestroyed(_ *terraform.State) error {
+	client := testAccRustClient()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		status, err := client.GetKmsRekeyStatus()
+		if errors.Is(err, rustfs.ErrKmsRekeyNotRun) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("reading rekey status after destroy: %w", err)
+		}
+		if status.State != "running" {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("rekey sweep %s is still running after destroy", status.JobID)
+		}
+		time.Sleep(time.Second)
+	}
 }

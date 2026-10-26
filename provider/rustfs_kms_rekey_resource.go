@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -159,7 +160,7 @@ func (r *kmsRekeyResource) Create(ctx context.Context, req resource.CreateReques
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error starting KMS rekey",
-			"Could not start KMS rekey sweep: "+err.Error(),
+			r.startFailureDetail(err),
 		)
 		return
 	}
@@ -257,6 +258,37 @@ func (r *kmsRekeyResource) ImportState(ctx context.Context, req resource.ImportS
 	// Import takes the server's job id as the state id; Read needs job_id to
 	// tell "this sweep" from a later one.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("job_id"), req.ID)...)
+}
+
+// kmsRekeyRoute is the start route named in a capability diagnostic.
+const kmsRekeyRoute = "POST /rustfs/admin/v3/kms/keys/rekey"
+
+// startFailureDetail explains a refused start. A 501 is not a missing route:
+// the route exists and the configured KMS backend cannot re-wrap envelopes, so
+// the detail names the route, the backend and the server version instead of
+// echoing the raw capability answer. Every other error keeps the server text.
+func (r *kmsRekeyResource) startFailureDetail(err error) string {
+	var apiErr *rustfs.APIError
+	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusNotImplemented {
+		return "Could not start KMS rekey sweep: " + err.Error()
+	}
+
+	backend := "the configured KMS backend"
+	if config, configErr := r.client.RustClient.GetKmsConfig(); configErr == nil && config.Backend != "" {
+		backend = "the " + config.Backend + " KMS backend"
+	}
+
+	detail := "Could not start KMS rekey sweep: " + kmsRekeyRoute + " is served, but " + backend +
+		" does not support rewrapping data-key envelopes. Local, Static and AWS cannot; " +
+		"Vault KV2 and Vault Transit can."
+	version, raw, versionErr := r.client.RustClient.ServerVersion()
+	switch {
+	case versionErr == nil:
+		detail += " RustFS server version: " + version.String() + "."
+	case raw != "":
+		detail += " RustFS server version: " + raw + "."
+	}
+	return detail
 }
 
 // applyKmsRekeyStatus copies server progress into model. The configured scope
