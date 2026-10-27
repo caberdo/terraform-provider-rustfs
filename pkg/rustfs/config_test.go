@@ -326,3 +326,78 @@ func TestRestoreConfigHistoryUnsupportedFeature(t *testing.T) {
 		t.Errorf("error should name the server version and route: %v", err)
 	}
 }
+
+func TestClearConfigHistory(t *testing.T) {
+	var gotMethod, gotPath, gotQuery string
+	client := newTestConfigAdminServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotQuery = r.Method, r.URL.Path, r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// An empty history clears to the same empty 200, so the method must not
+	// invent a failure when there is nothing to delete.
+	if err := client.ClearConfigHistory(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotMethod != http.MethodDelete {
+		t.Errorf("method = %q, want DELETE", gotMethod)
+	}
+	if gotPath != "/rustfs/admin/v3/clear-config-history-kv" {
+		t.Errorf("path = %q", gotPath)
+	}
+	if gotQuery != "restoreId=all" {
+		t.Errorf("query = %q, want restoreId=all", gotQuery)
+	}
+}
+
+func TestClearConfigHistoryServerError(t *testing.T) {
+	client := newTestConfigAdminServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code><Message>denied by admin gate</Message></Error>`))
+	})
+
+	err := client.ClearConfigHistory()
+	if err == nil || !strings.Contains(err.Error(), "denied by admin gate") {
+		t.Fatalf("expected the server error, got %v", err)
+	}
+}
+
+func TestClearConfigHistoryUnsupportedFeature(t *testing.T) {
+	client := newTestConfigAdminServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "healthinfo") {
+			_, _ = w.Write([]byte(`{"version":"refs/tags/1.0.3"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotImplemented)
+		_, _ = w.Write([]byte(`<Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`))
+	})
+
+	err := client.ClearConfigHistory()
+	if err == nil || !rustfs.IsUnsupportedFeature(err) {
+		t.Fatalf("expected an unsupported feature error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "RustFS 1.0.3") || !strings.Contains(err.Error(), "clear-config-history-kv") {
+		t.Errorf("error should name the server version and route: %v", err)
+	}
+}
+
+// A missing entry is a semantic 404 (NoSuchKey), not an unimplemented route, so
+// restoring a cleared id must report the server's answer instead of asking for
+// an upgrade.
+func TestRestoreConfigHistoryMissingEntry(t *testing.T) {
+	client := newTestConfigAdminServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`<Error><Code>NoSuchKey</Code><Message>config history entry not found</Message></Error>`))
+	})
+
+	err := client.RestoreConfigHistory("cleared-entry")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if rustfs.IsUnsupportedFeature(err) {
+		t.Fatalf("a missing entry must not be reported as an unimplemented route: %v", err)
+	}
+	if !strings.Contains(err.Error(), "NoSuchKey") {
+		t.Errorf("error should keep the server code, got %v", err)
+	}
+}

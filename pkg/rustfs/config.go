@@ -22,6 +22,10 @@ const FeatureConfigHistory Feature = "config history"
 // resource (PUT restore-config-history-kv).
 const FeatureConfigRestore Feature = "config restore"
 
+// FeatureConfigHistoryClear is the history purge performed by the
+// rustfs_config_history_clear resource (DELETE clear-config-history-kv).
+const FeatureConfigHistoryClear Feature = "config history clear"
+
 func init() {
 	registerFeature(FeatureConfigHistory, featureSpec{
 		route: "GET /rustfs/admin/v3/list-config-history-kv",
@@ -30,6 +34,9 @@ func init() {
 	})
 	registerFeature(FeatureConfigRestore, featureSpec{
 		route: "PUT /rustfs/admin/v3/restore-config-history-kv",
+	})
+	registerFeature(FeatureConfigHistoryClear, featureSpec{
+		route: "DELETE /rustfs/admin/v3/clear-config-history-kv",
 	})
 }
 
@@ -191,7 +198,35 @@ func (c *RustfsAdmin) RestoreConfigHistory(restoreID string) error {
 	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.featureError(err, FeatureConfigRestore)
+		// A missing entry is a semantic 404 (NoSuchKey); only a bare 404/501
+		// means the route is not implemented.
+		return c.featureErrorPreservingCode(err, FeatureConfigRestore)
+	}
+	drainClose(resp)
+	return nil
+}
+
+// ClearConfigHistory deletes every stored config snapshot via
+// DELETE clear-config-history-kv with restoreId=all.
+//
+// The route always clears the whole history: it takes no per-entry identifier
+// and returns an empty 200 without a count, so the provider cannot report how
+// many entries it removed. The operation is idempotent; clearing an already
+// empty history succeeds. Clearing removes the rollback points the restore
+// resource reaches, so a later restore can no longer roll back to them.
+func (c *RustfsAdmin) ClearConfigHistory() error {
+	query := make(url.Values)
+	query.Set("restoreId", "all")
+	reqData := RequestData{
+		Method:      "DELETE",
+		RelPath:     "clear-config-history-kv",
+		QueryValues: query,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return c.featureError(err, FeatureConfigHistoryClear)
 	}
 	drainClose(resp)
 	return nil

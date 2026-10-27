@@ -3,6 +3,7 @@ page_title: "rustfs_temporary_accounts Data Source - rustfs"
 subcategory: ""
 description: |-
   List the temporary (STS) access keys RustFS reports, optionally including service accounts.
+  rustfs_service_accounts lists the IAM service accounts instead: those are the persisted, long-lived API keys a parent user owns, while this data source lists STS temporary keys (set include_service_accounts to add the service accounts to this listing).
   RustFS has no route that lists every temporary account: temporary-account-info takes one access key, so the listing comes from list-access-keys-bulk. The provider reads that route once per identity provider to attribute each key: the idp/ldap and idp/openid routes only report keys whose claims match, so a key the generic route reports and neither scoped route does is builtin.
   The server enumerates IAM users, so an external identity that RustFS does not persist as an IAM user is only listed when parent_user names it.
   No secret key or session token is ever returned for a listed access key. Set include_policies to read each key's effective policy as well; that costs one lookup per key.
@@ -11,6 +12,8 @@ description: |-
 # rustfs_temporary_accounts Data Source
 
 List the temporary (STS) access keys RustFS reports, optionally including service accounts.
+
+`rustfs_service_accounts` lists the IAM service accounts instead: those are the persisted, long-lived API keys a parent user owns, while this data source lists STS temporary keys (set `include_service_accounts` to add the service accounts to this listing).
 
 RustFS has no route that lists every temporary account: `temporary-account-info` takes one access key, so the listing comes from `list-access-keys-bulk`. The provider reads that route once per identity provider to attribute each key: the `idp/ldap` and `idp/openid` routes only report keys whose claims match, so a key the generic route reports and neither scoped route does is `builtin`.
 

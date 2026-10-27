@@ -12,6 +12,16 @@ import (
 	"strings"
 )
 
+// FeatureKmsKeyList is the KMS key listing read by the rustfs_kms_keys data
+// source (GET /rustfs/admin/v3/kms/keys).
+const FeatureKmsKeyList Feature = "KMS key listing"
+
+func init() {
+	registerFeature(FeatureKmsKeyList, featureSpec{
+		route: "GET /rustfs/admin/v3/kms/keys",
+	})
+}
+
 // KmsCacheStats holds KMS key cache counters reported by /kms/status.
 type KmsCacheStats struct {
 	HitCount      uint64 `json:"hit_count"`
@@ -221,7 +231,7 @@ func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
 	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, err
+		return nil, c.featureErrorPreservingCode(err, FeatureKmsKeyList)
 	}
 	defer drainClose(resp)
 	var out kmsListResponse

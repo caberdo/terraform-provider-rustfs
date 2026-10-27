@@ -76,7 +76,9 @@ func (d *BucketUsageDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 		"not contribute, so the counters are a lower bound. A newly created bucket can report zeros until the first " +
 		"cycle covers it. An unknown bucket fails the read instead of reporting zeros. The read also performs an " +
 		"S3 `HeadBucket` existence check, so the provider credentials need `s3:ListBucket` (or equivalent) on the " +
-		"bucket in addition to the admin permission that serves the usage route."
+		"bucket in addition to the admin permission that serves the usage route. This is the scanner's " +
+		"eventually-consistent accounting, not the quota subsystem's view: use `rustfs_quota_stats` for the " +
+		"configured quota limit, the quota subsystem's usage and the remaining headroom."
 	resp.Schema = schema.Schema{
 		Description:         "Read a bucket's (or prefix's) usage accounting",
 		MarkdownDescription: description,

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -74,9 +75,25 @@ func TestListTiers(t *testing.T) {
 			status: http.StatusOK,
 			body:   `[{"type":"rustfs","rustfs":{"name":"COLD","endpoint":"https://cold.example.org"}},{"type":"s3","s3":{"name":"ARCHIVE"}}]`,
 			want: []TierInfo{
-				{Name: "COLD", TierType: "rustfs"},
-				{Name: "ARCHIVE", TierType: "s3"},
+				{Name: "ARCHIVE", TierType: "s3", Config: `{"name":"ARCHIVE"}`},
+				{Name: "COLD", TierType: "rustfs", Config: `{"endpoint":"https://cold.example.org","name":"COLD"}`},
 			},
+		},
+		{
+			// The provider redacts every known credential key on its own side,
+			// including one nested in a sub-object, and keeps the rest of the
+			// backend intact.
+			name:   "redacts credentials in the backend config",
+			status: http.StatusOK,
+			body: `[{"type":"s3","s3":{"name":"COLD","access_key":"AK","secret_key":"super-secret",` +
+				`"session_token":"session","extra":{"clientSecret":"nested-secret","region":"eu-west-1"},` +
+				`"account_key":""}}]`,
+			want: []TierInfo{{
+				Name:     "COLD",
+				TierType: "s3",
+				Config: `{"access_key":"AK","account_key":"","extra":{"clientSecret":"REDACTED","region":"eu-west-1"},` +
+					`"name":"COLD","secret_key":"REDACTED","session_token":"REDACTED"}`,
+			}},
 		},
 		{
 			name:   "no tiers",
@@ -107,7 +124,7 @@ func TestListTiers(t *testing.T) {
 			name:   "malformed entries are skipped",
 			status: http.StatusOK,
 			body:   `[{"type":{"nested":true}},{"type":"rustfs","rustfs":"not-an-object"},{"type":"s3","s3":{"name":"ARCHIVE"}}]`,
-			want:   []TierInfo{{Name: "ARCHIVE", TierType: "s3"}},
+			want:   []TierInfo{{Name: "ARCHIVE", TierType: "s3", Config: `{"name":"ARCHIVE"}`}},
 		},
 		{
 			name:    "server failure",
@@ -221,4 +238,45 @@ func TestTierExists(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestListTiersCapabilityError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+		_, _ = w.Write([]byte(`{"error":"not implemented"}`))
+	}))
+	defer server.Close()
+
+	client := New(&RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
+
+	if _, err := client.ListTiers(); !IsUnsupportedFeature(err) {
+		t.Fatalf("expected an unsupported-feature error, got %v", err)
+	}
+}
+
+func TestRedactTierSecretsCoversArraysAndMarshalFailure(t *testing.T) {
+	encoded := redactTierSecrets(map[string]any{
+		"targets": []any{
+			map[string]any{"secretKey": "nested-secret", "accessKey": "AK"},
+		},
+	})
+	if encoded == "" {
+		t.Fatal("expected the array value to be encoded")
+	}
+	if !containsAll(encoded, `"secretKey":"REDACTED"`, `"accessKey":"AK"`) {
+		t.Errorf("array credential was not redacted: %s", encoded)
+	}
+
+	if encoded := redactTierSecrets(make(chan int)); encoded != "" {
+		t.Errorf("an unencodable value must yield an empty config, got %q", encoded)
+	}
+}
+
+func containsAll(value string, parts ...string) bool {
+	for _, part := range parts {
+		if !strings.Contains(value, part) {
+			return false
+		}
+	}
+	return true
 }

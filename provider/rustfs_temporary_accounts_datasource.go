@@ -57,6 +57,9 @@ func (d *TemporaryAccountsDataSource) Schema(_ context.Context, _ datasource.Sch
 		Description: "List RustFS temporary (STS) access keys",
 		MarkdownDescription: "List the temporary (STS) access keys RustFS reports, optionally including service " +
 			"accounts.\n\n" +
+			"`rustfs_service_accounts` lists the IAM service accounts instead: those are the persisted, " +
+			"long-lived API keys a parent user owns, while this data source lists STS temporary keys (set " +
+			"`include_service_accounts` to add the service accounts to this listing).\n\n" +
 			"RustFS has no route that lists every temporary account: `temporary-account-info` takes one access " +
 			"key, so the listing comes from `list-access-keys-bulk`. The provider reads that route once per " +
 			"identity provider to attribute each key: the `idp/ldap` and `idp/openid` routes only report keys " +

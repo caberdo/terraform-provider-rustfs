@@ -404,3 +404,221 @@ func readRequestBody(r *http.Request) string {
 	b, _ := io.ReadAll(r.Body)
 	return string(b)
 }
+
+// siteReplicationStatusReply mirrors the wire shape of
+// site-replication/status: sites keyed by deployment ID (PeerInfo values),
+// PascalCase summary counters, peer errors and the retry queue.
+const siteReplicationStatusReply = `{"enabled":true,"MaxBuckets":7,"MaxUsers":3,"MaxGroups":2,` +
+	`"MaxPolicies":4,"MaxILMExpiryRules":1,` +
+	`"Sites":{"dep-a":{"name":"alpha","endpoint":"http://alpha:9000","deploymentID":"dep-a",` +
+	`"sync":"enable","skipTlsVerify":true,"replicate-ilm-expiry":true},` +
+	`"dep-b":{"name":"beta","endpoint":"http://beta:9000","deploymentID":"dep-b",` +
+	`"sync":"disable","skipTlsVerify":false,"replicate-ilm-expiry":false}},` +
+	`"StatsSummary":{"dep-a":{"ReplicatedBuckets":7,"ReplicatedTags":2,"TotalBucketsCount":9,` +
+	`"TotalCorsConfigCount":1,"apiVersion":"1"},"dep-b":{"ReplicatedBuckets":0}},` +
+	`"PeerErrors":{"dep-b":{"name":"beta","endpoint":"http://beta:9000","error":"connection refused"}},` +
+	`"RetryStats":{"pending":2,"failed":1,"lastError":"dial tcp: refused"},"apiVersion":"1"}`
+
+func TestSiteReplicationStatus(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(siteReplicationStatusReply))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	status, err := c.SiteReplicationStatus()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(gotPath, "/site-replication/status") {
+		t.Errorf("wrong path: %s", gotPath)
+	}
+	if !status.Enabled {
+		t.Error("enabled = false, want true")
+	}
+	if status.MaxBuckets != 7 || status.MaxUsers != 3 || status.MaxGroups != 2 ||
+		status.MaxPolicies != 4 || status.MaxILMExpiryRules != 1 {
+		t.Errorf("max counters = %+v", status)
+	}
+	if status.APIVersion != "1" {
+		t.Errorf("api version = %q, want 1", status.APIVersion)
+	}
+
+	alpha, ok := status.Sites["dep-a"]
+	if !ok {
+		t.Fatalf("sites missing dep-a: %+v", status.Sites)
+	}
+	if alpha.Name != "alpha" || alpha.Endpoint != "http://alpha:9000" ||
+		alpha.SyncState != "enable" || !alpha.SkipTLSVerify || !alpha.ReplicateILMExpiry {
+		t.Errorf("alpha = %+v", alpha)
+	}
+	beta, ok := status.Sites["dep-b"]
+	if !ok || beta.SyncState != "disable" {
+		t.Errorf("beta = %+v, want sync disable", beta)
+	}
+
+	summary, ok := status.StatsSummary["dep-a"]
+	if !ok {
+		t.Fatalf("stats summary missing dep-a: %+v", status.StatsSummary)
+	}
+	if summary.ReplicatedBuckets != 7 || summary.ReplicatedTags != 2 ||
+		summary.TotalBucketsCount != 9 || summary.TotalCorsConfigCount != 1 {
+		t.Errorf("dep-a summary = %+v", summary)
+	}
+
+	peerErr, ok := status.PeerErrors["dep-b"]
+	if !ok {
+		t.Fatalf("peer errors missing dep-b: %+v", status.PeerErrors)
+	}
+	if peerErr.Name != "beta" || peerErr.Error != "connection refused" {
+		t.Errorf("peer error = %+v", peerErr)
+	}
+
+	if status.RetryStats == nil {
+		t.Fatal("retry stats missing")
+	}
+	if status.RetryStats.Pending != 2 || status.RetryStats.Failed != 1 ||
+		status.RetryStats.LastError != "dial tcp: refused" {
+		t.Errorf("retry stats = %+v", status.RetryStats)
+	}
+}
+
+func TestSiteReplicationStatusUnsupported(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+		_, _ = w.Write([]byte("not implemented"))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	_, err := c.SiteReplicationStatus()
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if !IsUnsupportedFeature(err) {
+		t.Fatalf("error = %v, want an unsupported-feature error", err)
+	}
+	if !strings.Contains(err.Error(), "site-replication/status") {
+		t.Errorf("error does not name the route: %v", err)
+	}
+}
+
+// siteReplicationMetaInfoReply carries the full SRInfo document with one
+// bucket, one policy, two users, one group, one mapping of each kind and one
+// ILM expiry rule.
+const siteReplicationMetaInfoReply = `{"enabled":true,"name":"alpha","deploymentID":"dep-a",` +
+	`"apiVersion":"1","buckets":{"photos":{}},"policies":{"readonly":{}},` +
+	`"userPolicies":{"alice":{"policy":"readonly"}},"userInfoMap":{"alice":{},"bob":{}},` +
+	`"groupDescMap":{"auditors":{}},"groupPolicies":{"auditors":{"policy":"readonly"}},` +
+	`"replicationCfg":{"photos":{"role":"arn"}},` +
+	`"ilmExpiryRules":{"rule-1":{"bucket":"photos"}},` +
+	`"state":{"name":"alpha","peers":{"dep-a":{},"dep-b":{}},"updatedAt":"2026-01-02T03:04:05Z"}}`
+
+func TestSiteReplicationMetaInfo(t *testing.T) {
+	var gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(siteReplicationMetaInfoReply))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	info, err := c.SiteReplicationMetaInfo()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasSuffix(gotPath, "/site-replication/metainfo") {
+		t.Errorf("wrong path: %s", gotPath)
+	}
+
+	want := SiteReplicationMetaInfo{
+		Enabled:                true,
+		Name:                   "alpha",
+		DeploymentID:           "dep-a",
+		APIVersion:             "1",
+		StateName:              "alpha",
+		StateUpdatedAt:         "2026-01-02T03:04:05Z",
+		PeerCount:              2,
+		BucketCount:            1,
+		PolicyCount:            1,
+		UserCount:              2,
+		GroupCount:             1,
+		UserPolicyCount:        1,
+		GroupPolicyCount:       1,
+		ILMExpiryRuleCount:     1,
+		ReplicationConfigCount: 1,
+	}
+	if info != want {
+		t.Errorf("metainfo = %+v, want %+v", info, want)
+	}
+}
+
+func TestSiteReplicationMetaInfoArrayILMExpiryRules(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"enabled":true,"ilmExpiryRules":[{"bucket":"a"},{"bucket":"b"}]}`))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	info, err := c.SiteReplicationMetaInfo()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.ILMExpiryRuleCount != 2 {
+		t.Errorf("ilm expiry rule count = %d, want 2 (array form)", info.ILMExpiryRuleCount)
+	}
+}
+
+func TestSiteReplicationMetaInfoError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte("access denied"))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	_, err := c.SiteReplicationMetaInfo()
+	if err == nil || !strings.Contains(err.Error(), "access denied") {
+		t.Fatalf("error = %v, want the server message", err)
+	}
+}
+
+func TestSiteReplicationResyncOpError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("invalid deployment id"))
+	}))
+	defer server.Close()
+	c := testSiteReplicationClient(server)
+
+	_, err := c.SiteReplicationResyncOp("start", SiteReplicationPeer{DeploymentID: "dep-a"})
+	if err == nil || !strings.Contains(err.Error(), "invalid deployment id") {
+		t.Fatalf("error = %v, want the server message", err)
+	}
+}
+
+func TestJSONCollectionLen(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{name: "empty", raw: "", want: 0},
+		{name: "object", raw: `{"a":{},"b":{}}`, want: 2},
+		{name: "array", raw: `[{},{}]`, want: 2},
+		{name: "neither", raw: `"scalar"`, want: 0},
+		{name: "invalid", raw: `{`, want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := jsonCollectionLen(json.RawMessage(tc.raw)); got != tc.want {
+				t.Errorf("jsonCollectionLen(%q) = %d, want %d", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
