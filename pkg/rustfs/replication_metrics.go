@@ -85,7 +85,7 @@ type s3ErrorXML struct {
 // bucket. When the bucket has no replication configuration configured the
 // server reports ReplicationConfigurationNotFoundError, which is treated as
 // an empty result rather than an error.
-func (c *RustfsAdmin) ReplicationMetrics(bucket string) (ReplicationMetrics, error) {
+func (c *RustfsAdmin) ReplicationMetrics(ctx context.Context, bucket string) (ReplicationMetrics, error) {
 	if bucket == "" {
 		return ReplicationMetrics{}, errors.New("bucket is required")
 	}
@@ -96,8 +96,6 @@ func (c *RustfsAdmin) ReplicationMetrics(bucket string) (ReplicationMetrics, err
 			"bucket": {bucket},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		if replicationErrorCode(err) == "ReplicationConfigurationNotFoundError" {

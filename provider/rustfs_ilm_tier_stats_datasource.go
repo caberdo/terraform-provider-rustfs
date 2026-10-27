@@ -99,7 +99,7 @@ func (d *IlmTierStatsDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	stats, err := d.client.RustClient.TierStats()
+	stats, err := d.client.RustClient.TierStats(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading tier stats",

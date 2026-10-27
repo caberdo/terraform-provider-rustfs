@@ -159,7 +159,7 @@ func (d *ReplicationDiffDataSource) Read(ctx context.Context, req datasource.Rea
 	}
 
 	prefix := config.Prefix.ValueString()
-	diff, err := d.client.RustClient.ReplicationDiff(bucket, prefix)
+	diff, err := d.client.RustClient.ReplicationDiff(ctx, bucket, prefix)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

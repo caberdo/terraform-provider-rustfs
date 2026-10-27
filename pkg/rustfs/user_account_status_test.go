@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +39,7 @@ func TestUpdateUserAccountWithStatus(t *testing.T) {
 	client.accessSecret = "secret"
 
 	// Pass no policy so only user-info is called
-	err := client.UpdateUserAccount(UserAccount{
+	err := client.UpdateUserAccount(context.Background(), UserAccount{
 		AccessKey: "testuser",
 		SecretKey: "newsecret",
 		Status:    "disabled",
@@ -67,7 +68,7 @@ func TestUpdateUserAccountWithoutStatus(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.UpdateUserAccount(UserAccount{
+	err := client.UpdateUserAccount(context.Background(), UserAccount{
 		AccessKey: "testuser",
 		SecretKey: "newsecret",
 	})

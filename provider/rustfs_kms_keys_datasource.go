@@ -130,7 +130,7 @@ func (d *KmsKeysDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	keys, err := d.client.RustClient.ListKmsKeys()
+	keys, err := d.client.RustClient.ListKmsKeys(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing KMS keys",

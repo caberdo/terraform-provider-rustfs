@@ -141,7 +141,7 @@ func (r *ScannerCycleStateResetResource) runReset(
 	diagnostics *diag.Diagnostics,
 ) {
 	result, err := resetWithScannerLeaderRetry(ctx, func() (rustfs.ScannerCycleStateResetResult, error) {
-		return r.client.RustClient.ResetScannerCycleState()
+		return r.client.RustClient.ResetScannerCycleState(ctx)
 	})
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError

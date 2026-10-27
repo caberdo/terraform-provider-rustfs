@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestListBatchJobs(t *testing.T) {
 		_, _ = w.Write([]byte(`{"jobs":[{"ID":"job-1","Type":"replicate","Status":"failed"}]}`))
 	})
 
-	jobs, err := client.ListBatchJobs("replicate")
+	jobs, err := client.ListBatchJobs(context.Background(), "replicate")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestListBatchJobsEmptyListIsNotNil(t *testing.T) {
 		_, _ = w.Write([]byte(`{"jobs":[]}`))
 	})
 
-	jobs, err := client.ListBatchJobs("")
+	jobs, err := client.ListBatchJobs(context.Background(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +70,7 @@ func TestListBatchJobsUnsupportedRouteBecomesFeatureError(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("NotImplemented", "not implemented")))
 	})
 
-	_, err := client.ListBatchJobs("")
+	_, err := client.ListBatchJobs(context.Background(), "")
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -90,7 +91,7 @@ func TestDescribeAndStatusBatchJob(t *testing.T) {
 		{
 			name: "describe",
 			call: func(c *RustfsAdmin, id string) ([]byte, error) {
-				document, err := c.DescribeBatchJob(id)
+				document, err := c.DescribeBatchJob(context.Background(), id)
 				return document, err
 			},
 			path: "/rustfs/admin/v3/describe-job",
@@ -98,7 +99,7 @@ func TestDescribeAndStatusBatchJob(t *testing.T) {
 		{
 			name: "status",
 			call: func(c *RustfsAdmin, id string) ([]byte, error) {
-				document, err := c.StatusBatchJob(id)
+				document, err := c.StatusBatchJob(context.Background(), id)
 				return document, err
 			},
 			path: "/rustfs/admin/v3/status-job",
@@ -135,12 +136,12 @@ func TestBatchJobDocumentNotFound(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("NoSuchKey", "no such batch job: job-1")))
 	})
 
-	_, err := client.DescribeBatchJob("job-1")
+	_, err := client.DescribeBatchJob(context.Background(), "job-1")
 	if !IsNoSuchBatchJob(err) {
 		t.Fatalf("expected a no-such-job error, got %T: %v", err, err)
 	}
 
-	_, err = client.StatusBatchJob("job-1")
+	_, err = client.StatusBatchJob(context.Background(), "job-1")
 	if !IsNoSuchBatchJob(err) {
 		t.Fatalf("expected a no-such-job error, got %T: %v", err, err)
 	}
@@ -158,10 +159,10 @@ func TestIsNoSuchBatchJobIgnoresSubstringMatches(t *testing.T) {
 func TestBatchJobDocumentRequiresID(t *testing.T) {
 	client := New(&RustfsAdminConfig{})
 
-	if _, err := client.DescribeBatchJob(""); err == nil {
+	if _, err := client.DescribeBatchJob(context.Background(), ""); err == nil {
 		t.Fatal("expected an error for an empty job id")
 	}
-	if _, err := client.StatusBatchJob(""); err == nil {
+	if _, err := client.StatusBatchJob(context.Background(), ""); err == nil {
 		t.Fatal("expected an error for an empty job id")
 	}
 }
@@ -175,10 +176,10 @@ func TestBatchJobEndpointsRejectMalformedAnswers(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if _, err := client.ListBatchJobs(""); err == nil {
+	if _, err := client.ListBatchJobs(context.Background(), ""); err == nil {
 		t.Fatal("expected a decode error for the job list")
 	}
-	if _, err := client.DescribeBatchJob("job-1"); err == nil {
+	if _, err := client.DescribeBatchJob(context.Background(), "job-1"); err == nil {
 		t.Fatal("expected an error for an empty job document")
 	}
 }
@@ -189,7 +190,7 @@ func TestListBatchJobsPreservesSemanticErrors(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("NoSuchBucket", "The specified bucket does not exist")))
 	})
 
-	_, err := client.ListBatchJobs("")
+	_, err := client.ListBatchJobs(context.Background(), "")
 	if !IsAPIErrorCode(err, "NoSuchBucket") {
 		t.Errorf("semantic code was lost: %T: %v", err, err)
 	}

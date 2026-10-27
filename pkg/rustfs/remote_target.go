@@ -33,7 +33,7 @@ type RemoteTarget struct {
 
 // AddRemoteTarget registers (or, when the ARN is set, updates) a remote target
 // on the given source bucket and returns the server-assigned ARN.
-func (c *RustfsAdmin) AddRemoteTarget(bucket string, target RemoteTarget) (string, error) {
+func (c *RustfsAdmin) AddRemoteTarget(ctx context.Context, bucket string, target RemoteTarget) (string, error) {
 	body, err := json.Marshal(target)
 	if err != nil {
 		return "", err
@@ -53,8 +53,6 @@ func (c *RustfsAdmin) AddRemoteTarget(bucket string, target RemoteTarget) (strin
 		QueryValues: query,
 		Content:     body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return "", err
@@ -69,14 +67,12 @@ func (c *RustfsAdmin) AddRemoteTarget(bucket string, target RemoteTarget) (strin
 
 // ListRemoteTargets returns the remote targets registered on the given source
 // bucket.
-func (c *RustfsAdmin) ListRemoteTargets(bucket string) ([]RemoteTarget, error) {
+func (c *RustfsAdmin) ListRemoteTargets(ctx context.Context, bucket string) ([]RemoteTarget, error) {
 	reqData := RequestData{
 		Method:      "GET",
 		RelPath:     "list-remote-targets",
 		QueryValues: url.Values{"bucket": []string{bucket}},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -89,14 +85,12 @@ func (c *RustfsAdmin) ListRemoteTargets(bucket string) ([]RemoteTarget, error) {
 
 // DeleteRemoteTarget removes the remote target identified by arn from the given
 // source bucket.
-func (c *RustfsAdmin) DeleteRemoteTarget(bucket, arn string) error {
+func (c *RustfsAdmin) DeleteRemoteTarget(ctx context.Context, bucket, arn string) error {
 	reqData := RequestData{
 		Method:      "DELETE",
 		RelPath:     "remove-remote-target",
 		QueryValues: url.Values{"bucket": []string{bucket}, "arn": []string{arn}},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

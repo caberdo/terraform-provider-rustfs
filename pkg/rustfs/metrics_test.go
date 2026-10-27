@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func TestGetMetrics(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(srv.URL, "http://"),
 	})
 
-	raw, err := client.GetMetrics()
+	raw, err := client.GetMetrics(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

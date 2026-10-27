@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -68,7 +69,7 @@ func TestListOIDCConfig(t *testing.T) {
 		_, _ = io.WriteString(w, oidcProviderPayload)
 	})
 
-	config, err := client.ListOIDCConfig()
+	config, err := client.ListOIDCConfig(context.Background())
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestGetOIDCProvider(t *testing.T) {
 		_, _ = io.WriteString(w, oidcProviderPayload)
 	})
 
-	provider, found, err := client.GetOIDCProvider("keycloak")
+	provider, found, err := client.GetOIDCProvider(context.Background(), "keycloak")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestGetOIDCProvider(t *testing.T) {
 		t.Errorf("found = %v, provider = %+v", found, provider)
 	}
 
-	_, found, err = client.GetOIDCProvider("missing")
+	_, found, err = client.GetOIDCProvider(context.Background(), "missing")
 	if err != nil {
 		t.Fatalf("get missing: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestUpsertOIDCProvider(t *testing.T) {
 		UsernameClaim:      "preferred_username",
 	}
 
-	if err := client.UpsertOIDCProvider("keycloak", input); err != nil {
+	if err := client.UpsertOIDCProvider(context.Background(), "keycloak", input); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
@@ -184,7 +185,7 @@ func TestDeleteOIDCProviderMissingStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InvalidRequest</Code><Message>provider not found</Message></Error>`)
 	})
 
-	err := client.DeleteOIDCProvider("missing")
+	err := client.DeleteOIDCProvider(context.Background(), "missing")
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -212,7 +213,7 @@ func TestValidateOIDCProvider(t *testing.T) {
 			`"token_endpoint":"https://oauth2.googleapis.com/token"}`)
 	})
 
-	result, err := client.ValidateOIDCProvider(rustfs.OIDCProviderValidationInput{
+	result, err := client.ValidateOIDCProvider(context.Background(), rustfs.OIDCProviderValidationInput{
 		ProviderID: "probe",
 		OIDCProviderInput: rustfs.OIDCProviderInput{
 			ConfigURL: "https://accounts.google.com/.well-known/openid-configuration",
@@ -240,7 +241,7 @@ func TestListOIDCConfigInvalidJSON(t *testing.T) {
 		_, _ = io.WriteString(w, `{`)
 	})
 
-	if _, err := client.ListOIDCConfig(); err == nil {
+	if _, err := client.ListOIDCConfig(context.Background()); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -256,7 +257,7 @@ func TestListOIDCConfigNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 		_, _ = io.WriteString(w, notImplementedBody)
 	})
 
-	_, err := client.ListOIDCConfig()
+	_, err := client.ListOIDCConfig(context.Background())
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
@@ -272,7 +273,7 @@ func TestGetOIDCProviderListError(t *testing.T) {
 		_, _ = io.WriteString(w, `{"error":{"message":"boom","type":"InternalError","code":500}}`)
 	})
 
-	if _, _, err := client.GetOIDCProvider("keycloak"); err == nil {
+	if _, _, err := client.GetOIDCProvider(context.Background(), "keycloak"); err == nil {
 		t.Fatal("expected the list error to propagate")
 	}
 }
@@ -283,7 +284,7 @@ func TestUpsertOIDCProviderForbiddenStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, oidcAccessDeniedBody)
 	})
 
-	err := client.UpsertOIDCProvider("keycloak", rustfs.OIDCProviderInput{})
+	err := client.UpsertOIDCProvider(context.Background(), "keycloak", rustfs.OIDCProviderInput{})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -302,7 +303,7 @@ func TestDeleteOIDCProviderSuccessAndForbidden(t *testing.T) {
 			_, _ = io.WriteString(w, `{"success":true,"message":"OIDC provider deleted","restart_required":true}`)
 		})
 
-		if err := client.DeleteOIDCProvider("keycloak"); err != nil {
+		if err := client.DeleteOIDCProvider(context.Background(), "keycloak"); err != nil {
 			t.Fatalf("delete: %v", err)
 		}
 	})
@@ -313,7 +314,7 @@ func TestDeleteOIDCProviderSuccessAndForbidden(t *testing.T) {
 			_, _ = io.WriteString(w, oidcAccessDeniedBody)
 		})
 
-		err := client.DeleteOIDCProvider("keycloak")
+		err := client.DeleteOIDCProvider(context.Background(), "keycloak")
 		if err == nil {
 			t.Fatal("expected an error")
 		}
@@ -329,7 +330,7 @@ func TestValidateOIDCProviderInvalidJSON(t *testing.T) {
 		_, _ = io.WriteString(w, `{`)
 	})
 
-	if _, err := client.ValidateOIDCProvider(rustfs.OIDCProviderValidationInput{}); err == nil {
+	if _, err := client.ValidateOIDCProvider(context.Background(), rustfs.OIDCProviderValidationInput{}); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -340,7 +341,7 @@ func TestValidateOIDCProviderForbiddenStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, oidcAccessDeniedBody)
 	})
 
-	_, err := client.ValidateOIDCProvider(rustfs.OIDCProviderValidationInput{})
+	_, err := client.ValidateOIDCProvider(context.Background(), rustfs.OIDCProviderValidationInput{})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -364,7 +365,7 @@ func TestOIDCNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 		}
 	})
 
-	err := client.UpsertOIDCProvider("probe", rustfs.OIDCProviderInput{})
+	err := client.UpsertOIDCProvider(context.Background(), "probe", rustfs.OIDCProviderInput{})
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)

@@ -73,18 +73,18 @@ func TestNewStoresRootAndAdminBase(t *testing.T) {
 	if client.adminBaseURL != "http://rustfs.example.com:9000/rustfs/admin" {
 		t.Errorf("adminBaseURL = %q", client.adminBaseURL)
 	}
-	if got, err := client.adminURL(""); err != nil {
+	if got, err := client.adminURL(context.Background(), ""); err != nil {
 		t.Errorf("adminURL(\"\") error: %v", err)
 	} else if got != "http://rustfs.example.com:9000/rustfs/admin/v3" {
 		t.Errorf("adminURL(\"\") = %q", got)
 	}
-	if got, err := client.adminURL("v4"); err != nil {
+	if got, err := client.adminURL(context.Background(), "v4"); err != nil {
 		t.Errorf("adminURL(\"v4\") error: %v", err)
 	} else if got != "http://rustfs.example.com:9000/rustfs/admin/v4" {
 		t.Errorf("adminURL(\"v4\") = %q", got)
 	}
 	for _, version := range []string{"v5", "V4", "4", "v4/extra"} {
-		if _, err := client.adminURL(version); err == nil {
+		if _, err := client.adminURL(context.Background(), version); err == nil {
 			t.Errorf("adminURL(%q) accepted an unsupported version", version)
 		}
 	}

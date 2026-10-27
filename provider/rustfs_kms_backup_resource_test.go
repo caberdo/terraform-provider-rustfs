@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -182,7 +183,7 @@ func testAccKmsBackupSkipUnlessExport(t *testing.T, want bool) {
 	t.Helper()
 
 	client := testAccRustClient()
-	status, err := client.GetKmsBackupStatus()
+	status, err := client.GetKmsBackupStatus(context.Background())
 	if err != nil {
 		t.Skipf("this deployment does not serve the KMS backup status route: %v", err)
 	}
@@ -286,7 +287,7 @@ resource "rustfs_kms_backup" "test" {
 // untouched.
 func testAccCheckKmsBackupDestroyLeavesBundle(_ *terraform.State) error {
 	client := testAccRustClient()
-	status, err := client.GetKmsBackupStatus()
+	status, err := client.GetKmsBackupStatus(context.Background())
 	if err != nil {
 		return fmt.Errorf("reading KMS backup status after destroy: %w", err)
 	}

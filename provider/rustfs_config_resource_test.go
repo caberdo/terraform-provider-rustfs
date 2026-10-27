@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -45,8 +46,8 @@ func TestAccConfigResource(t *testing.T) {
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 		Ssl:          false,
 	})
-	_ = client.DeleteConfig(scope)
-	_ = client.DeleteConfig(replacementScope)
+	_ = client.DeleteConfig(context.Background(), scope)
+	_ = client.DeleteConfig(context.Background(), replacementScope)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -207,7 +208,7 @@ func testAccCheckConfigDestroy(s *terraform.State) error {
 			Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 			Ssl:          false,
 		})
-		_, err := client.GetConfig(scope)
+		_, err := client.GetConfig(context.Background(), scope)
 		if err == nil {
 			return fmt.Errorf("config scope %s still exists after destroy", scope)
 		}
@@ -223,7 +224,7 @@ func testAccCheckConfigDestroy(s *terraform.State) error {
 func testAccCheckConfigServerExists(scope string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig(scope)
+		kvs, err := client.GetConfig(context.Background(), scope)
 		if err != nil {
 			return fmt.Errorf("config scope %s is not readable from the server: %w", scope, err)
 		}
@@ -240,7 +241,7 @@ func testAccCheckConfigServerExists(scope string) resource.TestCheckFunc {
 func testAccCheckConfigServerAbsent(scope string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig(scope)
+		kvs, err := client.GetConfig(context.Background(), scope)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
 				return nil
@@ -257,7 +258,7 @@ func testAccCheckConfigServerAbsent(scope string) resource.TestCheckFunc {
 func testAccCheckConfigServerSetting(scope, key, want string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig(scope)
+		kvs, err := client.GetConfig(context.Background(), scope)
 		if err != nil {
 			return fmt.Errorf("failed to read config scope %s from the server: %w", scope, err)
 		}
@@ -281,7 +282,7 @@ func testAccCheckConfigServerSetting(scope, key, want string) resource.TestCheck
 func testAccMutateConfigOutOfBand(scope, key, value string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig(scope)
+		kvs, err := client.GetConfig(context.Background(), scope)
 		if err != nil {
 			return fmt.Errorf("failed to read config scope %s before the out-of-band change: %w", scope, err)
 		}
@@ -295,7 +296,7 @@ func testAccMutateConfigOutOfBand(scope, key, value string) resource.TestCheckFu
 		if !replaced {
 			kvs = append(kvs, rustfs.ConfigKV{Key: key, Value: value})
 		}
-		if err := client.SetConfig(scope, kvs); err != nil {
+		if err := client.SetConfig(context.Background(), scope, kvs); err != nil {
 			return fmt.Errorf("failed to change config scope %s out of band: %w", scope, err)
 		}
 		return nil

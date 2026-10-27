@@ -361,7 +361,7 @@ func (d *ILMExpiryStatusDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	status, err := d.client.RustClient.ILMExpiryStatus()
+	status, err := d.client.RustClient.ILMExpiryStatus(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

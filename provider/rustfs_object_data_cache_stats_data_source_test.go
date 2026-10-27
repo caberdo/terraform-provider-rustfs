@@ -206,7 +206,7 @@ data "rustfs_object_data_cache_stats" "test" {}
 func testAccObjectDataCacheStatsPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.GetObjectDataCacheStats(); err != nil {
+	if _, err := client.GetObjectDataCacheStats(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("object data cache statistics are not implemented by the running RustFS, skipping: %v", err)
 		}

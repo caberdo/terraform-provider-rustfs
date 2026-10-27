@@ -55,13 +55,13 @@ type SiteReplicationResync struct {
 	ErrDetail string `json:"errorDetail,omitempty"`
 }
 
-func (c *RustfsAdmin) SiteReplicationAdd(site SiteReplicationSite) error {
+func (c *RustfsAdmin) SiteReplicationAdd(ctx context.Context, site SiteReplicationSite) error {
 	//#nosec G117 — AccessKey is a public identifier, not a secret
 	body, err := json.Marshal([]SiteReplicationSite{site})
 	if err != nil {
 		return err
 	}
-	return c.siteReplicationWrite("site-replication/add", body)
+	return c.siteReplicationWrite(ctx, "site-replication/add", body)
 }
 
 // SiteReplicationPeerEdit is the wire shape of the public site-replication/edit
@@ -92,33 +92,33 @@ type SiteReplicationPeerEdit struct {
 // endpoint or TLS settings in place is what the existing rustfs_site_replication
 // resource does on update, so Terraform does not have to destroy and recreate
 // the group.
-func (c *RustfsAdmin) EditPeer(peer SiteReplicationPeerEdit) error {
+func (c *RustfsAdmin) EditPeer(ctx context.Context, peer SiteReplicationPeerEdit) error {
 	//#nosec G117 — AccessKey is a public identifier, not a secret
 	body, err := json.Marshal(peer)
 	if err != nil {
 		return err
 	}
-	return c.siteReplicationWrite("site-replication/edit", body)
+	return c.siteReplicationWrite(ctx, "site-replication/edit", body)
 }
 
 // RemovePeer removes peers from the site-replication group. The public remove
 // route notifies every remaining peer; site-replication/peer/remove is the
 // peer-side delivery used by that notification and is not a substitute.
-func (c *RustfsAdmin) RemovePeer(names []string) error {
+func (c *RustfsAdmin) RemovePeer(ctx context.Context, names []string) error {
 	body, err := json.Marshal(struct {
 		Sites []string `json:"sites"`
 	}{Sites: names})
 	if err != nil {
 		return err
 	}
-	return c.siteReplicationWrite("site-replication/remove", body)
+	return c.siteReplicationWrite(ctx, "site-replication/remove", body)
 }
 
 // SiteReplicationEdit edits one peer in the group.
 //
 // Deprecated: use EditPeer, which takes SiteReplicationPeerEdit.
-func (c *RustfsAdmin) SiteReplicationEdit(site SiteReplicationSite) error {
-	return c.EditPeer(SiteReplicationPeerEdit{
+func (c *RustfsAdmin) SiteReplicationEdit(ctx context.Context, site SiteReplicationSite) error {
+	return c.EditPeer(ctx, SiteReplicationPeerEdit{
 		Name:          site.Name,
 		Endpoint:      site.Endpoint,
 		AccessKey:     site.AccessKey,
@@ -131,17 +131,15 @@ func (c *RustfsAdmin) SiteReplicationEdit(site SiteReplicationSite) error {
 // SiteReplicationRemove removes peers from the group.
 //
 // Deprecated: use RemovePeer.
-func (c *RustfsAdmin) SiteReplicationRemove(names []string) error {
-	return c.RemovePeer(names)
+func (c *RustfsAdmin) SiteReplicationRemove(ctx context.Context, names []string) error {
+	return c.RemovePeer(ctx, names)
 }
 
-func (c *RustfsAdmin) SiteReplicationInfo() (SiteReplicationInfo, error) {
+func (c *RustfsAdmin) SiteReplicationInfo(ctx context.Context) (SiteReplicationInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "site-replication/info",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return SiteReplicationInfo{}, err
@@ -155,7 +153,7 @@ func (c *RustfsAdmin) SiteReplicationInfo() (SiteReplicationInfo, error) {
 // SiteReplicationResyncOp triggers, cancels, or inspects a resync against a
 // peer site. operation is one of "start", "cancel", or "status". The server
 // identifies the target peer by deploymentID.
-func (c *RustfsAdmin) SiteReplicationResyncOp(operation string, peer SiteReplicationPeer) (SiteReplicationResync, error) {
+func (c *RustfsAdmin) SiteReplicationResyncOp(ctx context.Context, operation string, peer SiteReplicationPeer) (SiteReplicationResync, error) {
 	body, err := json.Marshal(peer)
 	if err != nil {
 		return SiteReplicationResync{}, err
@@ -168,11 +166,9 @@ func (c *RustfsAdmin) SiteReplicationResyncOp(operation string, peer SiteReplica
 		},
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return SiteReplicationResync{}, c.featureError(err, FeatureSiteReplicationResync)
+		return SiteReplicationResync{}, c.featureError(ctx, err, FeatureSiteReplicationResync)
 	}
 	defer drainClose(resp)
 	var resync SiteReplicationResync
@@ -262,7 +258,7 @@ type SiteReplicationRepairTask struct {
 
 // SiteReplicationRepairPreflight asks the server to plan a repair without
 // changing anything and returns the token an execute must present.
-func (c *RustfsAdmin) SiteReplicationRepairPreflight() (SiteReplicationRepairPreflight, error) {
+func (c *RustfsAdmin) SiteReplicationRepairPreflight(ctx context.Context) (SiteReplicationRepairPreflight, error) {
 	body, err := json.Marshal(SiteReplicationRepairRequest{Mode: SiteReplicationRepairDryRun})
 	if err != nil {
 		return SiteReplicationRepairPreflight{}, err
@@ -272,8 +268,6 @@ func (c *RustfsAdmin) SiteReplicationRepairPreflight() (SiteReplicationRepairPre
 		RelPath: "site-replication/repair",
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return SiteReplicationRepairPreflight{}, err
@@ -288,7 +282,7 @@ func (c *RustfsAdmin) SiteReplicationRepairPreflight() (SiteReplicationRepairPre
 // returned operation is already terminal unless the server failed mid-flight.
 // Re-sending the same operation id and token is safe; RustFS retires the token
 // once the operation succeeds.
-func (c *RustfsAdmin) SiteReplicationRepairExecute(preflightToken, operationID string) (SiteReplicationRepairOperation, error) {
+func (c *RustfsAdmin) SiteReplicationRepairExecute(ctx context.Context, preflightToken, operationID string) (SiteReplicationRepairOperation, error) {
 	body, err := json.Marshal(SiteReplicationRepairRequest{
 		Mode:           SiteReplicationRepairExecute,
 		PreflightToken: preflightToken,
@@ -302,8 +296,6 @@ func (c *RustfsAdmin) SiteReplicationRepairExecute(preflightToken, operationID s
 		RelPath: "site-replication/repair",
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return SiteReplicationRepairOperation{}, err
@@ -319,7 +311,7 @@ func (c *RustfsAdmin) SiteReplicationRepairExecute(preflightToken, operationID s
 // missing operation is not unusual for an old id; the error names it
 // explicitly ("repair operation was not found") so callers can tell it apart
 // from a genuine failure.
-func (c *RustfsAdmin) SiteReplicationRepairStatus(operationID string) (SiteReplicationRepairOperation, error) {
+func (c *RustfsAdmin) SiteReplicationRepairStatus(ctx context.Context, operationID string) (SiteReplicationRepairOperation, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "site-replication/repair/status",
@@ -327,8 +319,6 @@ func (c *RustfsAdmin) SiteReplicationRepairStatus(operationID string) (SiteRepli
 			"operation-id": {operationID},
 		},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return SiteReplicationRepairOperation{}, err
@@ -339,14 +329,12 @@ func (c *RustfsAdmin) SiteReplicationRepairStatus(operationID string) (SiteRepli
 	return operation, err
 }
 
-func (c *RustfsAdmin) siteReplicationWrite(relPath string, body []byte) error {
+func (c *RustfsAdmin) siteReplicationWrite(ctx context.Context, relPath string, body []byte) error {
 	reqData := RequestData{
 		Method:  "PUT",
 		RelPath: relPath,
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -482,16 +470,14 @@ type SiteReplicationMetaInfo struct {
 }
 
 // SiteReplicationStatus reads GET /v3/site-replication/status.
-func (c *RustfsAdmin) SiteReplicationStatus() (SiteReplicationStatusInfo, error) {
+func (c *RustfsAdmin) SiteReplicationStatus(ctx context.Context) (SiteReplicationStatusInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "site-replication/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return SiteReplicationStatusInfo{}, c.featureError(err, FeatureSiteReplicationStatus)
+		return SiteReplicationStatusInfo{}, c.featureError(ctx, err, FeatureSiteReplicationStatus)
 	}
 	defer drainClose(resp)
 	var info SiteReplicationStatusInfo
@@ -503,16 +489,14 @@ func (c *RustfsAdmin) SiteReplicationStatus() (SiteReplicationStatusInfo, error)
 
 // SiteReplicationMetaInfo reads GET /v3/site-replication/metainfo and reports
 // only the counts. The full payload is decoded into raw messages and dropped.
-func (c *RustfsAdmin) SiteReplicationMetaInfo() (SiteReplicationMetaInfo, error) {
+func (c *RustfsAdmin) SiteReplicationMetaInfo(ctx context.Context) (SiteReplicationMetaInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "site-replication/metainfo",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return SiteReplicationMetaInfo{}, c.featureError(err, FeatureSiteReplicationMetaInfo)
+		return SiteReplicationMetaInfo{}, c.featureError(ctx, err, FeatureSiteReplicationMetaInfo)
 	}
 	defer drainClose(resp)
 

@@ -8,13 +8,11 @@ import (
 	"io"
 )
 
-func (c *RustfsAdmin) ExportIam() ([]byte, error) {
+func (c *RustfsAdmin) ExportIam(ctx context.Context) ([]byte, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "export-iam",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -23,14 +21,12 @@ func (c *RustfsAdmin) ExportIam() ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (c *RustfsAdmin) ImportIam(data []byte) error {
+func (c *RustfsAdmin) ImportIam(ctx context.Context, data []byte) error {
 	reqData := RequestData{
 		Method:  "PUT",
 		RelPath: "import-iam",
 		Content: data,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

@@ -100,7 +100,7 @@ func (d *TLSCertificateStateDataSource) Read(ctx context.Context, req datasource
 		return
 	}
 
-	certificateState, err := d.client.RustClient.GetTLSCertificateState()
+	certificateState, err := d.client.RustClient.GetTLSCertificateState(ctx)
 	if err != nil {
 		addTLSCertificateDiagnostic(&resp.Diagnostics, "Error reading TLS certificate state",
 			"Could not read the TLS certificate state: ", err)

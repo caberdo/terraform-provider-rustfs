@@ -132,7 +132,7 @@ func (d *ConfigHistoryDataSource) Read(ctx context.Context, req datasource.ReadR
 		maxEntries = int(config.MaxEntries.ValueInt64())
 	}
 
-	entries, err := d.client.RustClient.ListConfigHistory(maxEntries)
+	entries, err := d.client.RustClient.ListConfigHistory(ctx, maxEntries)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading config history",

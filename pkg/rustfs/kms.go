@@ -64,13 +64,11 @@ type KmsConfig struct {
 }
 
 // GetKmsStatus returns the current KMS service status.
-func (c *RustfsAdmin) GetKmsStatus() (*KmsStatus, error) {
+func (c *RustfsAdmin) GetKmsStatus(ctx context.Context) (*KmsStatus, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -85,13 +83,11 @@ func (c *RustfsAdmin) GetKmsStatus() (*KmsStatus, error) {
 }
 
 // GetKmsConfig returns the current KMS backend configuration.
-func (c *RustfsAdmin) GetKmsConfig() (*KmsConfig, error) {
+func (c *RustfsAdmin) GetKmsConfig(ctx context.Context) (*KmsConfig, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/config",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -167,7 +163,7 @@ type kmsLifecycleResponse struct {
 // The key name is carried as the `name` tag, which the RustFS create handler
 // turns into the key id for backends that support named keys (Local backend)
 // or into a server-generated key id for production backends.
-func (c *RustfsAdmin) CreateKmsKey(name string) (KmsKey, error) {
+func (c *RustfsAdmin) CreateKmsKey(ctx context.Context, name string) (KmsKey, error) {
 	body := struct {
 		Tags map[string]string `json:"tags"`
 	}{Tags: map[string]string{"name": name}}
@@ -181,8 +177,6 @@ func (c *RustfsAdmin) CreateKmsKey(name string) (KmsKey, error) {
 		RelPath: "kms/keys",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsKey{}, err
@@ -199,13 +193,11 @@ func (c *RustfsAdmin) CreateKmsKey(name string) (KmsKey, error) {
 }
 
 // DescribeKmsKey describes a KMS master key by its key id.
-func (c *RustfsAdmin) DescribeKmsKey(keyID string) (KmsKey, error) {
+func (c *RustfsAdmin) DescribeKmsKey(ctx context.Context, keyID string) (KmsKey, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/keys/" + keyID,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsKey{}, err
@@ -222,16 +214,14 @@ func (c *RustfsAdmin) DescribeKmsKey(keyID string) (KmsKey, error) {
 }
 
 // ListKmsKeys lists the KMS master keys known to the server.
-func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
+func (c *RustfsAdmin) ListKmsKeys(ctx context.Context) ([]KmsKeyInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "kms/keys",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureErrorPreservingCode(err, FeatureKmsKeyList)
+		return nil, c.featureErrorPreservingCode(ctx, err, FeatureKmsKeyList)
 	}
 	defer drainClose(resp)
 	var out kmsListResponse
@@ -242,16 +232,16 @@ func (c *RustfsAdmin) ListKmsKeys() ([]KmsKeyInfo, error) {
 }
 
 // EnableKmsKey enables a KMS master key.
-func (c *RustfsAdmin) EnableKmsKey(keyID string) error {
-	return c.setKmsKeyState(keyID, "kms/keys/enable")
+func (c *RustfsAdmin) EnableKmsKey(ctx context.Context, keyID string) error {
+	return c.setKmsKeyState(ctx, keyID, "kms/keys/enable")
 }
 
 // DisableKmsKey disables a KMS master key.
-func (c *RustfsAdmin) DisableKmsKey(keyID string) error {
-	return c.setKmsKeyState(keyID, "kms/keys/disable")
+func (c *RustfsAdmin) DisableKmsKey(ctx context.Context, keyID string) error {
+	return c.setKmsKeyState(ctx, keyID, "kms/keys/disable")
 }
 
-func (c *RustfsAdmin) setKmsKeyState(keyID, relPath string) error {
+func (c *RustfsAdmin) setKmsKeyState(ctx context.Context, keyID, relPath string) error {
 	body := struct {
 		KeyID string `json:"key_id"`
 	}{KeyID: keyID}
@@ -265,8 +255,6 @@ func (c *RustfsAdmin) setKmsKeyState(keyID, relPath string) error {
 		RelPath: relPath,
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -302,27 +290,27 @@ type KmsRekeyStatus struct {
 
 // StartKmsRekey starts a bulk data-key-envelope rewrap sweep. An empty buckets
 // slice sweeps every bucket; an empty prefix covers the whole bucket.
-func (c *RustfsAdmin) StartKmsRekey(buckets []string, prefix string) (KmsRekeyStatus, error) {
+func (c *RustfsAdmin) StartKmsRekey(ctx context.Context, buckets []string, prefix string) (KmsRekeyStatus, error) {
 	body := struct {
 		Buckets []string `json:"buckets,omitempty"`
 		Prefix  string   `json:"prefix,omitempty"`
 	}{Buckets: buckets, Prefix: prefix}
-	return c.kmsRekeyCall(http.MethodPost, "kms/keys/rekey", body)
+	return c.kmsRekeyCall(ctx, http.MethodPost, "kms/keys/rekey", body)
 }
 
 // GetKmsRekeyStatus returns the current or most recent sweep.
-func (c *RustfsAdmin) GetKmsRekeyStatus() (KmsRekeyStatus, error) {
-	return c.kmsRekeyCall(http.MethodGet, "kms/keys/rekey/status", nil)
+func (c *RustfsAdmin) GetKmsRekeyStatus(ctx context.Context) (KmsRekeyStatus, error) {
+	return c.kmsRekeyCall(ctx, http.MethodGet, "kms/keys/rekey/status", nil)
 }
 
 // CancelKmsRekey asks the running sweep to stop. Cancellation is cooperative:
 // the returned snapshot may still report "running" until the current object
 // finishes.
-func (c *RustfsAdmin) CancelKmsRekey() (KmsRekeyStatus, error) {
-	return c.kmsRekeyCall(http.MethodPost, "kms/keys/rekey/cancel", nil)
+func (c *RustfsAdmin) CancelKmsRekey(ctx context.Context) (KmsRekeyStatus, error) {
+	return c.kmsRekeyCall(ctx, http.MethodPost, "kms/keys/rekey/cancel", nil)
 }
 
-func (c *RustfsAdmin) kmsRekeyCall(method, relPath string, body any) (KmsRekeyStatus, error) {
+func (c *RustfsAdmin) kmsRekeyCall(ctx context.Context, method, relPath string, body any) (KmsRekeyStatus, error) {
 	var content []byte
 	if body != nil {
 		//#nosec G117 — the sweep scope is bucket names and a prefix, not a secret
@@ -337,8 +325,6 @@ func (c *RustfsAdmin) kmsRekeyCall(method, relPath string, body any) (KmsRekeySt
 		RelPath: relPath,
 		Content: content,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		var apiErr *APIError
@@ -390,13 +376,11 @@ type KmsBackupBundle struct {
 }
 
 // GetKmsBackupStatus returns whether this server can export a bundle.
-func (c *RustfsAdmin) GetKmsBackupStatus() (KmsBackupStatus, error) {
+func (c *RustfsAdmin) GetKmsBackupStatus(ctx context.Context) (KmsBackupStatus, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "kms/backup",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsBackupStatus{}, err
@@ -411,7 +395,7 @@ func (c *RustfsAdmin) GetKmsBackupStatus() (KmsBackupStatus, error) {
 
 // CreateKmsBackup writes one bundle under the server's configured backup root
 // and returns its metadata. backupID must be a single validated name.
-func (c *RustfsAdmin) CreateKmsBackup(backupID string) (KmsBackupBundle, error) {
+func (c *RustfsAdmin) CreateKmsBackup(ctx context.Context, backupID string) (KmsBackupBundle, error) {
 	body := struct {
 		BackupID string `json:"backup_id,omitempty"`
 	}{BackupID: backupID}
@@ -425,8 +409,6 @@ func (c *RustfsAdmin) CreateKmsBackup(backupID string) (KmsBackupBundle, error) 
 		RelPath: "kms/backup",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsBackupBundle{}, kmsCapabilityError(err, "KMS backup")
@@ -441,35 +423,35 @@ func (c *RustfsAdmin) CreateKmsBackup(backupID string) (KmsBackupBundle, error) 
 
 // UpdateKmsKeyDescription replaces the description stored on a KMS master key.
 // An empty description clears it.
-func (c *RustfsAdmin) UpdateKmsKeyDescription(keyID, description string) (KmsKey, error) {
+func (c *RustfsAdmin) UpdateKmsKeyDescription(ctx context.Context, keyID, description string) (KmsKey, error) {
 	body := struct {
 		KeyID       string `json:"key_id"`
 		Description string `json:"description"`
 	}{KeyID: keyID, Description: description}
-	return c.kmsKeyMetadataMutation("kms/keys/update-description", body)
+	return c.kmsKeyMetadataMutation(ctx, "kms/keys/update-description", body)
 }
 
 // TagKmsKey adds or overwrites the given tags on a KMS master key. Tags outside
 // the map are left untouched.
-func (c *RustfsAdmin) TagKmsKey(keyID string, tags map[string]string) (KmsKey, error) {
+func (c *RustfsAdmin) TagKmsKey(ctx context.Context, keyID string, tags map[string]string) (KmsKey, error) {
 	body := struct {
 		KeyID string            `json:"key_id"`
 		Tags  map[string]string `json:"tags"`
 	}{KeyID: keyID, Tags: tags}
-	return c.kmsKeyMetadataMutation("kms/keys/tag", body)
+	return c.kmsKeyMetadataMutation(ctx, "kms/keys/tag", body)
 }
 
 // UntagKmsKey removes the named tags from a KMS master key. Tag keys that are
 // not set are ignored by the server.
-func (c *RustfsAdmin) UntagKmsKey(keyID string, tagKeys []string) (KmsKey, error) {
+func (c *RustfsAdmin) UntagKmsKey(ctx context.Context, keyID string, tagKeys []string) (KmsKey, error) {
 	body := struct {
 		KeyID   string   `json:"key_id"`
 		TagKeys []string `json:"tag_keys"`
 	}{KeyID: keyID, TagKeys: tagKeys}
-	return c.kmsKeyMetadataMutation("kms/keys/untag", body)
+	return c.kmsKeyMetadataMutation(ctx, "kms/keys/untag", body)
 }
 
-func (c *RustfsAdmin) kmsKeyMetadataMutation(relPath string, body any) (KmsKey, error) {
+func (c *RustfsAdmin) kmsKeyMetadataMutation(ctx context.Context, relPath string, body any) (KmsKey, error) {
 	//#nosec G117 — key ids, descriptions and tags are public metadata, not secrets
 	bytes, err := json.Marshal(body)
 	if err != nil {
@@ -480,8 +462,6 @@ func (c *RustfsAdmin) kmsKeyMetadataMutation(relPath string, body any) (KmsKey, 
 		RelPath: relPath,
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsKey{}, err
@@ -515,7 +495,7 @@ func kmsCapabilityError(err error, capability string) error {
 // Note that the Local development backend does not support rotation: the
 // server answers with a 501 (KmsError::UnsupportedCapability) for backends
 // whose capabilities report rotate=false.
-func (c *RustfsAdmin) RotateKmsKey(keyID string) (KmsKey, error) {
+func (c *RustfsAdmin) RotateKmsKey(ctx context.Context, keyID string) (KmsKey, error) {
 	body := struct {
 		KeyID string `json:"key_id"`
 	}{KeyID: keyID}
@@ -529,8 +509,6 @@ func (c *RustfsAdmin) RotateKmsKey(keyID string) (KmsKey, error) {
 		RelPath: "kms/keys/rotate",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return KmsKey{}, kmsCapabilityError(err, "key rotation")
@@ -553,14 +531,14 @@ func (c *RustfsAdmin) RotateKmsKey(keyID string) (KmsKey, error) {
 // schedules the deletion behind a pending window (default 30 days) unless
 // force_immediate/confirm_key_id are supplied; this client deliberately never
 // sends them, so callers always get the cancellable scheduled deletion.
-func (c *RustfsAdmin) DeleteKmsKey(keyID string) error {
-	return c.DeleteKmsKeyWithWindow(keyID, nil)
+func (c *RustfsAdmin) DeleteKmsKey(ctx context.Context, keyID string) error {
+	return c.DeleteKmsKeyWithWindow(ctx, keyID, nil)
 }
 
 // DeleteKmsKeyWithWindow schedules deletion and asks the server to wait
 // pendingWindowDays (7 to 30) before destroying the key material. A nil window
 // leaves the server default (30 days) in place.
-func (c *RustfsAdmin) DeleteKmsKeyWithWindow(keyID string, pendingWindowDays *int64) error {
+func (c *RustfsAdmin) DeleteKmsKeyWithWindow(ctx context.Context, keyID string, pendingWindowDays *int64) error {
 	body := struct {
 		KeyID               string `json:"key_id"`
 		PendingWindowInDays *int64 `json:"pending_window_in_days,omitempty"`
@@ -575,8 +553,6 @@ func (c *RustfsAdmin) DeleteKmsKeyWithWindow(keyID string, pendingWindowDays *in
 		RelPath: "kms/keys/delete",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

@@ -31,16 +31,16 @@ func (a LDAPPolicyAttachment) MarshalJSON() ([]byte, error) {
 }
 
 // AttachLDAPPolicy attaches a canned policy to an LDAP user or group.
-func (c *RustfsAdmin) AttachLDAPPolicy(req LDAPPolicyAttachment) error {
-	return c.ldapPolicyOperation("attach", req)
+func (c *RustfsAdmin) AttachLDAPPolicy(ctx context.Context, req LDAPPolicyAttachment) error {
+	return c.ldapPolicyOperation(ctx, "attach", req)
 }
 
 // DetachLDAPPolicy detaches a canned policy from an LDAP user or group.
-func (c *RustfsAdmin) DetachLDAPPolicy(req LDAPPolicyAttachment) error {
-	return c.ldapPolicyOperation("detach", req)
+func (c *RustfsAdmin) DetachLDAPPolicy(ctx context.Context, req LDAPPolicyAttachment) error {
+	return c.ldapPolicyOperation(ctx, "detach", req)
 }
 
-func (c *RustfsAdmin) ldapPolicyOperation(operation string, req LDAPPolicyAttachment) error {
+func (c *RustfsAdmin) ldapPolicyOperation(ctx context.Context, operation string, req LDAPPolicyAttachment) error {
 	bytes, err := json.Marshal(req)
 	if err != nil {
 		return err
@@ -50,8 +50,6 @@ func (c *RustfsAdmin) ldapPolicyOperation(operation string, req LDAPPolicyAttach
 		RelPath: "idp/ldap/policy/" + operation,
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

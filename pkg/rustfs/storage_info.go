@@ -68,13 +68,11 @@ type DiskInfo struct {
 }
 
 // StorageInfo returns storage layout and health from GET /v3/storageinfo.
-func (c *RustfsAdmin) StorageInfo() (*StorageInfo, error) {
+func (c *RustfsAdmin) StorageInfo(ctx context.Context) (*StorageInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "storageinfo",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

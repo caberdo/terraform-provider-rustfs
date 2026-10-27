@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -284,8 +285,8 @@ func IsUnsupportedFeature(err error) bool {
 // ServerVersion returns the version RustFS reports on GET /v3/healthinfo, both
 // parsed and exactly as reported. The raw string is returned even when it
 // cannot be parsed, so diagnostics can quote the server verbatim.
-func (c *RustfsAdmin) ServerVersion() (Version, string, error) {
-	info, err := c.GetHealthInfo()
+func (c *RustfsAdmin) ServerVersion(ctx context.Context) (Version, string, error) {
+	info, err := c.GetHealthInfo(ctx)
 	if err != nil {
 		return Version{}, "", err
 	}
@@ -323,7 +324,7 @@ func isUnsupportedRoute(err error) bool {
 // instead: the v4 namespace exists, but the path is not served. Every other
 // error is returned unchanged. The version lookup is best effort: the
 // capability gap is already established without it.
-func (c *RustfsAdmin) featureError(err error, feature Feature) error {
+func (c *RustfsAdmin) featureError(ctx context.Context, err error, feature Feature) error {
 	if err == nil {
 		return err
 	}
@@ -341,7 +342,7 @@ func (c *RustfsAdmin) featureError(err error, feature Feature) error {
 		MinVersion:      spec.minVersion,
 		Err:             err,
 	}
-	if _, raw, _ := c.ServerVersion(); raw != "" {
+	if _, raw, _ := c.ServerVersion(ctx); raw != "" {
 		unsupported.ServerVersion = raw
 		if version, parseErr := ParseServerVersion(raw); parseErr == nil {
 			unsupported.ServerVersion = version.String()

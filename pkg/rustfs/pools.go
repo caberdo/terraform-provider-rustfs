@@ -20,13 +20,11 @@ type PoolInfo struct {
 // GET /rustfs/admin/v3/pools/list. The older MinIO-style `list-pools` path is
 // not registered on RustFS 1.0.x: the S3 fallback answers it with
 // 501 NotImplemented.
-func (c *RustfsAdmin) ListPools() ([]PoolInfo, error) {
+func (c *RustfsAdmin) ListPools(ctx context.Context) ([]PoolInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "pools/list",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

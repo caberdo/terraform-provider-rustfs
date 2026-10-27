@@ -71,7 +71,7 @@ func (d *UsersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	users, err := d.client.RustClient.ListUsers(config.Bucket.ValueString())
+	users, err := d.client.RustClient.ListUsers(ctx, config.Bucket.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing users",

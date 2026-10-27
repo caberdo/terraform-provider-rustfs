@@ -47,13 +47,11 @@ type ModuleSwitchUpdate struct {
 }
 
 // GetModuleSwitches reads the current feature module switches from the server.
-func (c *RustfsAdmin) GetModuleSwitches() (*ModuleSwitchState, error) {
+func (c *RustfsAdmin) GetModuleSwitches(ctx context.Context) (*ModuleSwitchState, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "module-switches",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -66,7 +64,7 @@ func (c *RustfsAdmin) GetModuleSwitches() (*ModuleSwitchState, error) {
 
 // SetModuleSwitches applies the feature module switch toggles. The server
 // returns the resulting state after applying the update.
-func (c *RustfsAdmin) SetModuleSwitches(update ModuleSwitchUpdate) (*ModuleSwitchState, error) {
+func (c *RustfsAdmin) SetModuleSwitches(ctx context.Context, update ModuleSwitchUpdate) (*ModuleSwitchState, error) {
 	bytes, err := json.Marshal(update)
 	if err != nil {
 		return nil, err
@@ -76,8 +74,6 @@ func (c *RustfsAdmin) SetModuleSwitches(update ModuleSwitchUpdate) (*ModuleSwitc
 		RelPath: "module-switches",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

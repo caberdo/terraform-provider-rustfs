@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -36,7 +37,7 @@ func TestGetConfig(t *testing.T) {
 				`notify_webhook:primary endpoint="http://example.com/rustfs/events" enable="off"`,
 		))
 	})
-	kvs, err := client.GetConfig("notify_webhook:primary")
+	kvs, err := client.GetConfig(context.Background(), "notify_webhook:primary")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestGetConfigEscapedValue(t *testing.T) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = w.Write([]byte(`notify_webhook:primary endpoint="http://example.com/a\"b\\c"`))
 	})
-	kvs, err := client.GetConfig("notify_webhook:primary")
+	kvs, err := client.GetConfig(context.Background(), "notify_webhook:primary")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +74,7 @@ func TestGetConfigNotFound(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("config target 'missing' not found for subsystem 'notify_webhook'"))
 	})
-	_, err := client.GetConfig("notify_webhook:missing")
+	_, err := client.GetConfig(context.Background(), "notify_webhook:missing")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("expected not found error, got: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestSetConfig(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	kvs := []rustfs.ConfigKV{{Key: "endpoint", Value: "http://example.com/rustfs/events"}}
-	if err := client.SetConfig("notify_webhook:primary", kvs); err != nil {
+	if err := client.SetConfig(context.Background(), "notify_webhook:primary", kvs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/set-config-kv") {
@@ -107,7 +108,7 @@ func TestSetConfigEscapesValue(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 	kvs := []rustfs.ConfigKV{{Key: "auth_token", Value: `a"b\c`}}
-	if err := client.SetConfig("notify_webhook", kvs); err != nil {
+	if err := client.SetConfig(context.Background(), "notify_webhook", kvs); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	expected := `notify_webhook auth_token="a\"b\\c"`
@@ -124,7 +125,7 @@ func TestDeleteConfig(t *testing.T) {
 		gotBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
-	if err := client.DeleteConfig("notify_webhook:primary"); err != nil {
+	if err := client.DeleteConfig(context.Background(), "notify_webhook:primary"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/del-config-kv") {
@@ -151,7 +152,7 @@ func TestHelpConfig(t *testing.T) {
 			},
 		})
 	})
-	kvs, err := client.HelpConfig("notify_webhook")
+	kvs, err := client.HelpConfig(context.Background(), "notify_webhook")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestListConfigHistory(t *testing.T) {
 		]`))
 	})
 
-	entries, err := client.ListConfigHistory(7)
+	entries, err := client.ListConfigHistory(context.Background(), 7)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +202,7 @@ func TestListConfigHistoryEmpty(t *testing.T) {
 		_, _ = w.Write([]byte(`[]`))
 	})
 
-	entries, err := client.ListConfigHistory(1)
+	entries, err := client.ListConfigHistory(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -216,7 +217,7 @@ func TestListConfigHistoryRejectsInvalidCount(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	if _, err := client.ListConfigHistory(0); err == nil || !strings.Contains(err.Error(), "at least 1") {
+	if _, err := client.ListConfigHistory(context.Background(), 0); err == nil || !strings.Contains(err.Error(), "at least 1") {
 		t.Errorf("expected a count validation error, got %v", err)
 	}
 }
@@ -227,7 +228,7 @@ func TestListConfigHistoryServerError(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code><Message>not authorized</Message></Error>`))
 	})
 
-	_, err := client.ListConfigHistory(10)
+	_, err := client.ListConfigHistory(context.Background(), 10)
 	if err == nil || !strings.Contains(err.Error(), "not authorized") {
 		t.Fatalf("expected the server error, got %v", err)
 	}
@@ -239,7 +240,7 @@ func TestListConfigHistoryMalformedResponse(t *testing.T) {
 		_, _ = w.Write([]byte(`{"RestoreID":`))
 	})
 
-	_, err := client.ListConfigHistory(10)
+	_, err := client.ListConfigHistory(context.Background(), 10)
 	if err == nil || !strings.Contains(err.Error(), "decode config history") {
 		t.Fatalf("expected a decode error, got %v", err)
 	}
@@ -252,7 +253,7 @@ func TestRestoreConfigHistory(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.RestoreConfigHistory("4a1c"); err != nil {
+	if err := client.RestoreConfigHistory(context.Background(), "4a1c"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotMethod != http.MethodPut {
@@ -272,7 +273,7 @@ func TestRestoreConfigHistoryRejectsEmptyID(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	if err := client.RestoreConfigHistory(""); err == nil || !strings.Contains(err.Error(), "restore id is required") {
+	if err := client.RestoreConfigHistory(context.Background(), ""); err == nil || !strings.Contains(err.Error(), "restore id is required") {
 		t.Errorf("expected a restore id validation error, got %v", err)
 	}
 }
@@ -283,7 +284,7 @@ func TestRestoreConfigHistoryServerError(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>InvalidRequest</Code><Message>config history entry not found</Message></Error>`))
 	})
 
-	err := client.RestoreConfigHistory("missing")
+	err := client.RestoreConfigHistory(context.Background(), "missing")
 	if err == nil || !strings.Contains(err.Error(), "config history entry not found") {
 		t.Fatalf("expected the server error, got %v", err)
 	}
@@ -299,7 +300,7 @@ func TestListConfigHistoryUnsupportedFeature(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`))
 	})
 
-	_, err := client.ListConfigHistory(10)
+	_, err := client.ListConfigHistory(context.Background(), 10)
 	if err == nil || !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported feature error, got %v", err)
 	}
@@ -318,7 +319,7 @@ func TestRestoreConfigHistoryUnsupportedFeature(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`))
 	})
 
-	err := client.RestoreConfigHistory("4a1c")
+	err := client.RestoreConfigHistory(context.Background(), "4a1c")
 	if err == nil || !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported feature error, got %v", err)
 	}
@@ -336,7 +337,7 @@ func TestClearConfigHistory(t *testing.T) {
 
 	// An empty history clears to the same empty 200, so the method must not
 	// invent a failure when there is nothing to delete.
-	if err := client.ClearConfigHistory(); err != nil {
+	if err := client.ClearConfigHistory(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotMethod != http.MethodDelete {
@@ -356,7 +357,7 @@ func TestClearConfigHistoryServerError(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code><Message>denied by admin gate</Message></Error>`))
 	})
 
-	err := client.ClearConfigHistory()
+	err := client.ClearConfigHistory(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "denied by admin gate") {
 		t.Fatalf("expected the server error, got %v", err)
 	}
@@ -372,7 +373,7 @@ func TestClearConfigHistoryUnsupportedFeature(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`))
 	})
 
-	err := client.ClearConfigHistory()
+	err := client.ClearConfigHistory(context.Background())
 	if err == nil || !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported feature error, got %v", err)
 	}
@@ -390,7 +391,7 @@ func TestRestoreConfigHistoryMissingEntry(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>NoSuchKey</Code><Message>config history entry not found</Message></Error>`))
 	})
 
-	err := client.RestoreConfigHistory("cleared-entry")
+	err := client.RestoreConfigHistory(context.Background(), "cleared-entry")
 	if err == nil {
 		t.Fatal("expected an error")
 	}

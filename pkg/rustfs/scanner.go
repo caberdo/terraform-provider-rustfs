@@ -126,17 +126,15 @@ type scannerStatusEnvelope struct {
 // RustFS 1.0.1 and later; a server that registers it without implementing it
 // answers 501, which becomes an *UnsupportedFeatureError naming the route and
 // the server version.
-func (c *RustfsAdmin) GetScannerStatus() (ScannerStatus, error) {
+func (c *RustfsAdmin) GetScannerStatus(ctx context.Context) (ScannerStatus, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "scanner/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ScannerStatus{}, c.featureError(err, FeatureScannerStatus)
+		return ScannerStatus{}, c.featureError(ctx, err, FeatureScannerStatus)
 	}
 	defer drainClose(resp)
 
@@ -183,7 +181,7 @@ func (c *RustfsAdmin) GetScannerStatus() (ScannerStatus, error) {
 // mode the server accepts, full-rescan. It clears cycle recovery bookkeeping and
 // makes the next cycle scan the full namespace; it does not discard usage
 // state.
-func (c *RustfsAdmin) ResetScannerCycleState() (ScannerCycleStateResetResult, error) {
+func (c *RustfsAdmin) ResetScannerCycleState(ctx context.Context) (ScannerCycleStateResetResult, error) {
 	content, err := json.Marshal(map[string]string{"mode": "full-rescan"})
 	if err != nil {
 		return ScannerCycleStateResetResult{}, err
@@ -194,12 +192,10 @@ func (c *RustfsAdmin) ResetScannerCycleState() (ScannerCycleStateResetResult, er
 		RelPath: "scanner/cycle-state/reset",
 		Content: content,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ScannerCycleStateResetResult{}, c.featureError(err, FeatureScannerCycleStateReset)
+		return ScannerCycleStateResetResult{}, c.featureError(ctx, err, FeatureScannerCycleStateReset)
 	}
 	defer drainClose(resp)
 
@@ -225,7 +221,7 @@ func (c *RustfsAdmin) ResetScannerCycleState() (ScannerCycleStateResetResult, er
 // can reject the synchronous reset with a busy-lock error; callers detect that
 // with IsScannerLeaderLockBusy and retry, rather than using the server's async
 // recovery-intent form.
-func (c *RustfsAdmin) ResetScannerUsageState() (ScannerUsageStateResetResult, error) {
+func (c *RustfsAdmin) ResetScannerUsageState(ctx context.Context) (ScannerUsageStateResetResult, error) {
 	content, err := json.Marshal(map[string]string{"mode": "full-rebuild"})
 	if err != nil {
 		return ScannerUsageStateResetResult{}, err
@@ -236,12 +232,10 @@ func (c *RustfsAdmin) ResetScannerUsageState() (ScannerUsageStateResetResult, er
 		RelPath: "scanner/usage-state/reset",
 		Content: content,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ScannerUsageStateResetResult{}, c.featureError(err, FeatureScannerUsageStateReset)
+		return ScannerUsageStateResetResult{}, c.featureError(ctx, err, FeatureScannerUsageStateReset)
 	}
 	defer drainClose(resp)
 

@@ -331,7 +331,7 @@ func testAccBucketMetadataBackupArchive(t *testing.T) string {
 	t.Helper()
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	data, err := client.ExportBucketMetadata()
+	data, err := client.ExportBucketMetadata(context.Background())
 	if err != nil {
 		t.Fatalf("exporting the live bucket metadata: %v", err)
 	}

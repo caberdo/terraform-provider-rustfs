@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -114,7 +115,7 @@ func TestSetBucketOnDemandMigrationDryRunRequest(t *testing.T) {
 			`,"updated_at":null,"probe":{"reachable":true,"listable":true,"sample_key":"photos/a.jpg"}}`)
 	})
 
-	result, err := client.SetBucketOnDemandMigration("photos", odmTestConfig(), true)
+	result, err := client.SetBucketOnDemandMigration(context.Background(), "photos", odmTestConfig(), true)
 	if err != nil {
 		t.Fatalf("set: %v", err)
 	}
@@ -171,7 +172,7 @@ func TestSetBucketOnDemandMigrationSaveOmitsDryRun(t *testing.T) {
 			`,"updated_at":"2026-10-20T10:00:00Z","probe":{"reachable":true,"listable":true,"sample_key":null}}`)
 	})
 
-	result, err := client.SetBucketOnDemandMigration("photos", odmTestConfig(), false)
+	result, err := client.SetBucketOnDemandMigration(context.Background(), "photos", odmTestConfig(), false)
 	if err != nil {
 		t.Fatalf("set: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestGetBucketOnDemandMigrationReadsRedactedConfig(t *testing.T) {
 		_, _ = io.WriteString(w, `{"bucket":"photos","config":`+odmRedactedConfigJSON+`,"updated_at":"2026-10-20T10:00:00Z"}`)
 	})
 
-	result, err := client.GetBucketOnDemandMigration("photos")
+	result, err := client.GetBucketOnDemandMigration(context.Background(), "photos")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -212,7 +213,7 @@ func TestGetBucketOnDemandMigrationNoSuchConfiguration(t *testing.T) {
 		_, _ = io.WriteString(w, s3ErrorXML("NoSuchConfiguration", "on-demand migration is not configured for bucket photos"))
 	})
 
-	_, err := client.GetBucketOnDemandMigration("photos")
+	_, err := client.GetBucketOnDemandMigration(context.Background(), "photos")
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)
@@ -232,7 +233,7 @@ func TestDeleteBucketOnDemandMigrationIsIdempotent(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	if err := client.DeleteBucketOnDemandMigration("photos"); err != nil {
+	if err := client.DeleteBucketOnDemandMigration(context.Background(), "photos"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if method != http.MethodDelete || path != "/rustfs/admin/v3/on-demand-migration/photos" {
@@ -246,7 +247,7 @@ func TestDeleteBucketOnDemandMigrationMissingBucketStaysAnAPIError(t *testing.T)
 		_, _ = io.WriteString(w, s3ErrorXML("NoSuchBucket", "bucket does not exist"))
 	})
 
-	err := client.DeleteBucketOnDemandMigration("photos")
+	err := client.DeleteBucketOnDemandMigration(context.Background(), "photos")
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) || apiErr.Code != "NoSuchBucket" {
 		t.Fatalf("expected NoSuchBucket APIError, got %T: %v", err, err)
@@ -284,7 +285,7 @@ func TestGetBucketOnDemandMigrationStatus(t *testing.T) {
 }`)
 	})
 
-	status, err := client.GetBucketOnDemandMigrationStatus("photos")
+	status, err := client.GetBucketOnDemandMigrationStatus(context.Background(), "photos")
 	if err != nil {
 		t.Fatalf("status: %v", err)
 	}
@@ -332,7 +333,7 @@ func TestOnDemandMigrationRouteMissingNamesTheFeature(t *testing.T) {
 		}
 	})
 
-	_, err := client.GetBucketOnDemandMigration("photos")
+	_, err := client.GetBucketOnDemandMigration(context.Background(), "photos")
 
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
@@ -405,7 +406,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "set request fails",
 			handler: handler(http.StatusInternalServerError, `{"code":"InternalError"}`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.SetBucketOnDemandMigration("photos", odmTestConfig(), false)
+				_, err := c.SetBucketOnDemandMigration(context.Background(), "photos", odmTestConfig(), false)
 				return err
 			},
 		},
@@ -413,7 +414,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "set response is not json",
 			handler: handler(http.StatusOK, `{`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.SetBucketOnDemandMigration("photos", odmTestConfig(), false)
+				_, err := c.SetBucketOnDemandMigration(context.Background(), "photos", odmTestConfig(), false)
 				return err
 			},
 		},
@@ -421,7 +422,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "get request fails",
 			handler: handler(http.StatusInternalServerError, `{"code":"InternalError"}`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.GetBucketOnDemandMigration("photos")
+				_, err := c.GetBucketOnDemandMigration(context.Background(), "photos")
 				return err
 			},
 		},
@@ -429,7 +430,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "get response is not json",
 			handler: handler(http.StatusOK, `{`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.GetBucketOnDemandMigration("photos")
+				_, err := c.GetBucketOnDemandMigration(context.Background(), "photos")
 				return err
 			},
 		},
@@ -437,7 +438,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "status request fails",
 			handler: handler(http.StatusInternalServerError, `{"code":"InternalError"}`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.GetBucketOnDemandMigrationStatus("photos")
+				_, err := c.GetBucketOnDemandMigrationStatus(context.Background(), "photos")
 				return err
 			},
 		},
@@ -445,7 +446,7 @@ func TestOnDemandMigrationRequestFailures(t *testing.T) {
 			name:    "status response is not json",
 			handler: handler(http.StatusOK, `{`),
 			call: func(c rustfs.RustfsAdmin) error {
-				_, err := c.GetBucketOnDemandMigrationStatus("photos")
+				_, err := c.GetBucketOnDemandMigrationStatus(context.Background(), "photos")
 				return err
 			},
 		},

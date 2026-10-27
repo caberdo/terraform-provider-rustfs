@@ -294,7 +294,7 @@ func (d *ServerInfoDataSource) Configure(_ context.Context, req datasource.Confi
 }
 
 func (d *ServerInfoDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	info, err := d.client.RustClient.ServerInfo()
+	info, err := d.client.RustClient.ServerInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading server info",

@@ -201,7 +201,7 @@ func (r *ConfigRestoreResource) applyRestore(ctx context.Context, plan *ConfigRe
 	}
 
 	restoreID := plan.RestoreID.ValueString()
-	if err := r.client.RustClient.RestoreConfigHistory(restoreID); err != nil {
+	if err := r.client.RustClient.RestoreConfigHistory(ctx, restoreID); err != nil {
 		diagnostics.AddError(
 			"Error restoring config history",
 			"Could not restore config history entry "+restoreID+": "+err.Error(),

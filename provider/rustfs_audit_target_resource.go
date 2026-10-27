@@ -334,7 +334,7 @@ func (r *auditTargetResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	if err := r.client.RustClient.SetAuditTarget(
-		plan.TargetType.ValueString(),
+		ctx, plan.TargetType.ValueString(),
 		plan.TargetName.ValueString(),
 		kvs,
 	); err != nil {
@@ -345,7 +345,7 @@ func (r *auditTargetResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 	tflog.Trace(ctx, "created an audit target")
-	if err := r.refreshHealth(&plan); err != nil {
+	if err := r.refreshHealth(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading audit target",
 			"Could not read audit target after create, unexpected error: "+err.Error(),
@@ -357,8 +357,8 @@ func (r *auditTargetResource) Create(ctx context.Context, req resource.CreateReq
 
 // refreshHealth lists the audit targets and populates the computed health
 // metadata on the model when the target is present.
-func (r *auditTargetResource) refreshHealth(model *auditTargetResourceModel) error {
-	targets, err := r.client.RustClient.ListAuditTargets()
+func (r *auditTargetResource) refreshHealth(ctx context.Context, model *auditTargetResourceModel) error {
+	targets, err := r.client.RustClient.ListAuditTargets(ctx)
 	if err != nil {
 		return err
 	}
@@ -388,7 +388,7 @@ func (r *auditTargetResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	targets, err := r.client.RustClient.ListAuditTargets()
+	targets, err := r.client.RustClient.ListAuditTargets(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing audit targets",
@@ -438,7 +438,7 @@ func (r *auditTargetResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	if err := r.client.RustClient.SetAuditTarget(
-		plan.TargetType.ValueString(),
+		ctx, plan.TargetType.ValueString(),
 		plan.TargetName.ValueString(),
 		kvs,
 	); err != nil {
@@ -448,7 +448,7 @@ func (r *auditTargetResource) Update(ctx context.Context, req resource.UpdateReq
 		)
 		return
 	}
-	if err := r.refreshHealth(&plan); err != nil {
+	if err := r.refreshHealth(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading audit target",
 			"Could not read audit target after update, unexpected error: "+err.Error(),
@@ -469,7 +469,7 @@ func (r *auditTargetResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	if err := r.client.RustClient.ResetAuditTarget(
-		state.TargetType.ValueString(),
+		ctx, state.TargetType.ValueString(),
 		state.TargetName.ValueString(),
 	); err != nil {
 		resp.Diagnostics.AddError(

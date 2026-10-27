@@ -113,7 +113,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	// The admin API creates a group implicitly via update-group-members, so it
 	// must always be called (even with zero members) to make the group exist.
-	err := r.client.RustClient.UpdateGroupMembers(rustfs.GroupAddRemove{
+	err := r.client.RustClient.UpdateGroupMembers(ctx, rustfs.GroupAddRemove{
 		Group:    plan.Name.ValueString(),
 		Members:  members,
 		IsRemove: false,
@@ -128,7 +128,7 @@ func (r *GroupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	if status != "enabled" {
-		if err := r.client.RustClient.SetGroupStatus(plan.Name.ValueString(), status); err != nil {
+		if err := r.client.RustClient.SetGroupStatus(ctx, plan.Name.ValueString(), status); err != nil {
 			resp.Diagnostics.AddError(
 				"Error setting group status",
 				"Could not set group status: "+err.Error(),
@@ -155,7 +155,7 @@ func (r *GroupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		return
 	}
 
-	info, err := r.client.RustClient.GetGroup(state.Name.ValueString())
+	info, err := r.client.RustClient.GetGroup(ctx, state.Name.ValueString())
 	if err != nil {
 		if rustfs.IsAPIErrorCode(err, "NoSuchResource", "NoSuchGroup") {
 			// The group was removed outside Terraform, so the next plan has to
@@ -224,7 +224,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	if len(remove) > 0 {
-		if err := r.client.RustClient.UpdateGroupMembers(rustfs.GroupAddRemove{
+		if err := r.client.RustClient.UpdateGroupMembers(ctx, rustfs.GroupAddRemove{
 			Group:    name,
 			Members:  remove,
 			IsRemove: true,
@@ -242,7 +242,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		if status == "" {
 			status = "enabled"
 		}
-		if err := r.client.RustClient.UpdateGroupMembers(rustfs.GroupAddRemove{
+		if err := r.client.RustClient.UpdateGroupMembers(ctx, rustfs.GroupAddRemove{
 			Group:    name,
 			Members:  add,
 			IsRemove: false,
@@ -260,7 +260,7 @@ func (r *GroupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	// actually differs from the state, otherwise a members-only update issues a
 	// pointless call that would also undo an out-of-band status change.
 	if plan.Status.ValueString() != state.Status.ValueString() {
-		if err := r.client.RustClient.SetGroupStatus(name, plan.Status.ValueString()); err != nil {
+		if err := r.client.RustClient.SetGroupStatus(ctx, name, plan.Status.ValueString()); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating group status",
 				"Could not set group status: "+err.Error(),
@@ -281,7 +281,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 	name := data.Name.ValueString()
 
-	if err := r.client.RustClient.DeleteGroup(name); err != nil {
+	if err := r.client.RustClient.DeleteGroup(ctx, name); err != nil {
 		switch {
 		case rustfs.IsAPIErrorCode(err, "NoSuchResource", "NoSuchGroup"):
 			// Already gone, so there is nothing left to destroy.
@@ -290,7 +290,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 			// The admin API refuses to delete a group that still has members,
 			// and Terraform destroys the group before the users it references,
 			// so every member is detached and the delete is retried once.
-			info, readErr := r.client.RustClient.GetGroup(name)
+			info, readErr := r.client.RustClient.GetGroup(ctx, name)
 			if readErr != nil {
 				resp.Diagnostics.AddError(
 					"Error deleting group",
@@ -299,7 +299,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 				return
 			}
 			if len(info.Members) > 0 {
-				if err := r.client.RustClient.UpdateGroupMembers(rustfs.GroupAddRemove{
+				if err := r.client.RustClient.UpdateGroupMembers(ctx, rustfs.GroupAddRemove{
 					Group:    name,
 					Members:  info.Members,
 					IsRemove: true,
@@ -311,7 +311,7 @@ func (r *GroupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 					return
 				}
 			}
-			if err := r.client.RustClient.DeleteGroup(name); err != nil &&
+			if err := r.client.RustClient.DeleteGroup(ctx, name); err != nil &&
 				!rustfs.IsAPIErrorCode(err, "NoSuchResource", "NoSuchGroup") {
 				resp.Diagnostics.AddError(
 					"Error deleting group",

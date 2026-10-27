@@ -160,7 +160,7 @@ func (d *KmsStatusDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	status, err := d.client.RustClient.GetKmsStatus()
+	status, err := d.client.RustClient.GetKmsStatus(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading KMS status",

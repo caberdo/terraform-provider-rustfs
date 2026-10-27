@@ -169,14 +169,7 @@ type temporaryAccountInfoPayload struct {
 // whose claims match that provider, so anything the generic route reports and
 // neither scoped route does is builtin. All three routes enumerate the same
 // IAM users, so the subtraction is exact wherever the server can see the key.
-func (c *RustfsAdmin) ListTemporaryAccounts(options TemporaryAccountListOptions) ([]TemporaryAccount, error) {
-	return c.ListTemporaryAccountsContext(context.Background(), options)
-}
-
-// ListTemporaryAccountsContext is ListTemporaryAccounts with a caller context,
-// so a cancelled Terraform refresh stops the listing and the requests in
-// flight.
-func (c *RustfsAdmin) ListTemporaryAccountsContext(ctx context.Context, options TemporaryAccountListOptions) ([]TemporaryAccount, error) {
+func (c *RustfsAdmin) ListTemporaryAccounts(ctx context.Context, options TemporaryAccountListOptions) ([]TemporaryAccount, error) {
 	switch options.UserProvider {
 	case "", UserProviderBuiltin, UserProviderLDAP, UserProviderOpenID:
 	default:
@@ -311,7 +304,7 @@ func (c *RustfsAdmin) listAccessKeysBulk(ctx context.Context, relPath string, fe
 	}
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, feature)
+		return nil, c.featureError(ctx, err, feature)
 	}
 	defer drainClose(resp)
 
@@ -354,13 +347,7 @@ func temporaryAccountFromBulk(parentUser string, key bulkAccessKey, kind string)
 // RustFS answers this route for an STS credential; a service account has its
 // own info-service-account route. The answer never carries the secret key or
 // session token of the credential.
-func (c *RustfsAdmin) GetTemporaryAccountInfo(accessKey string) (TemporaryAccount, error) {
-	return c.GetTemporaryAccountInfoContext(context.Background(), accessKey)
-}
-
-// GetTemporaryAccountInfoContext is GetTemporaryAccountInfo with a caller
-// context, so a cancelled refresh stops the request.
-func (c *RustfsAdmin) GetTemporaryAccountInfoContext(ctx context.Context, accessKey string) (TemporaryAccount, error) {
+func (c *RustfsAdmin) GetTemporaryAccountInfo(ctx context.Context, accessKey string) (TemporaryAccount, error) {
 	if accessKey == "" {
 		return TemporaryAccount{}, errors.New("access key is required")
 	}
@@ -374,7 +361,7 @@ func (c *RustfsAdmin) GetTemporaryAccountInfoContext(ctx context.Context, access
 	}
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return TemporaryAccount{}, c.featureError(err, FeatureTemporaryAccountInfo)
+		return TemporaryAccount{}, c.featureError(ctx, err, FeatureTemporaryAccountInfo)
 	}
 	defer drainClose(resp)
 
@@ -402,7 +389,7 @@ func (c *RustfsAdmin) GetTemporaryAccountInfoContext(ctx context.Context, access
 // openid; a provider it does not support is refused before any request is sent.
 // The user has to be named too: the server would otherwise default to the
 // caller's own identity, which turns a mistake into an operator lockout.
-func (c *RustfsAdmin) RevokeTokens(userProvider, user string) (TokenRevocation, error) {
+func (c *RustfsAdmin) RevokeTokens(ctx context.Context, userProvider, user string) (TokenRevocation, error) {
 	switch userProvider {
 	case UserProviderBuiltin, UserProviderLDAP, UserProviderOpenID:
 	default:
@@ -423,11 +410,9 @@ func (c *RustfsAdmin) RevokeTokens(userProvider, user string) (TokenRevocation, 
 		RelPath:     "revoke-tokens/" + url.PathEscape(userProvider),
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return TokenRevocation{}, c.featureError(err, FeatureTokenRevocation)
+		return TokenRevocation{}, c.featureError(ctx, err, FeatureTokenRevocation)
 	}
 	defer drainClose(resp)
 

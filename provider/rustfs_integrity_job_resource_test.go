@@ -795,7 +795,7 @@ func TestIntegrityJobResourceLifecyclePaths(t *testing.T) {
 func testAccIntegritySkipUnlessSupported(t *testing.T) {
 	t.Helper()
 	client := testAccRustClient()
-	if _, err := client.IntegrityReadiness(); err != nil {
+	if _, err := client.IntegrityReadiness(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("data-integrity routes are not implemented on this server: %v", err)
 		}

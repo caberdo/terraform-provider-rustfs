@@ -241,7 +241,7 @@ func (d *ILMRecoveryRecordsDataSource) Read(ctx context.Context, req datasource.
 		// attribute known after every read.
 		limit = 100
 	}
-	page, err := d.client.RustClient.ListILMRecoveryRecords(rustfs.ILMRecoveryRecordQuery{
+	page, err := d.client.RustClient.ListILMRecoveryRecords(ctx, rustfs.ILMRecoveryRecordQuery{
 		Protocol:       protocol,
 		Classification: config.Classification.ValueString(),
 		Limit:          limit,

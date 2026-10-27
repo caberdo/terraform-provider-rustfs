@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -37,7 +38,7 @@ func TestReplicationDiff(t *testing.T) {
 		_, _ = w.Write([]byte(replicationDiffAggregateBody))
 	})
 
-	diff, err := client.ReplicationDiff("photos", "photos/")
+	diff, err := client.ReplicationDiff(context.Background(), "photos", "photos/")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestReplicationDiffWithoutReplicationConfiguration(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("ReplicationConfigurationNotFoundError", "replication configuration not found")))
 	})
 
-	diff, err := client.ReplicationDiff("photos", "")
+	diff, err := client.ReplicationDiff(context.Background(), "photos", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestReplicationDiffUnsupportedRouteBecomesFeatureError(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("NotImplemented", "not implemented")))
 	})
 
-	_, err := client.ReplicationDiff("photos", "")
+	_, err := client.ReplicationDiff(context.Background(), "photos", "")
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -120,7 +121,7 @@ func TestReplicationDiffUnsupportedRouteBecomesFeatureError(t *testing.T) {
 
 func TestReplicationDiffRequiresBucket(t *testing.T) {
 	client := New(&RustfsAdminConfig{})
-	if _, err := client.ReplicationDiff("", ""); err == nil {
+	if _, err := client.ReplicationDiff(context.Background(), "", ""); err == nil {
 		t.Fatal("expected an error for an empty bucket")
 	}
 }
@@ -135,7 +136,7 @@ func TestReplicationMRF(t *testing.T) {
 		_, _ = w.Write([]byte(replicationMrfAggregateBody))
 	})
 
-	mrf, err := client.ReplicationMRF("photos")
+	mrf, err := client.ReplicationMRF(context.Background(), "photos")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestReplicationMRFWithoutReplicationConfiguration(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("ReplicationConfigurationNotFoundError", "replication configuration not found")))
 	})
 
-	mrf, err := client.ReplicationMRF("photos")
+	mrf, err := client.ReplicationMRF(context.Background(), "photos")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -214,7 +215,7 @@ func TestReplicationMRFUnsupportedRouteBecomesFeatureError(t *testing.T) {
 		_, _ = w.Write([]byte(diagTestErrorXML("NotImplemented", "not implemented")))
 	})
 
-	_, err := client.ReplicationMRF("photos")
+	_, err := client.ReplicationMRF(context.Background(), "photos")
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -225,7 +226,7 @@ func TestReplicationMRFUnsupportedRouteBecomesFeatureError(t *testing.T) {
 
 func TestReplicationMRFRequiresBucket(t *testing.T) {
 	client := New(&RustfsAdminConfig{})
-	if _, err := client.ReplicationMRF(""); err == nil {
+	if _, err := client.ReplicationMRF(context.Background(), ""); err == nil {
 		t.Fatal("expected an error for an empty bucket")
 	}
 }
@@ -235,10 +236,10 @@ func TestReplicationDiagnosticsRejectMalformedJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`not json`))
 	})
 
-	if _, err := client.ReplicationDiff("photos", ""); err == nil {
+	if _, err := client.ReplicationDiff(context.Background(), "photos", ""); err == nil {
 		t.Fatal("expected a decode error for the diff")
 	}
-	if _, err := client.ReplicationMRF("photos"); err == nil {
+	if _, err := client.ReplicationMRF(context.Background(), "photos"); err == nil {
 		t.Fatal("expected a decode error for the MRF backlog")
 	}
 }
@@ -250,7 +251,7 @@ func TestReplicationMRFSortsTargetsByARN(t *testing.T) {
 			`"TotalFailedCount":3}`))
 	})
 
-	mrf, err := client.ReplicationMRF("photos")
+	mrf, err := client.ReplicationMRF(context.Background(), "photos")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,11 +271,11 @@ func TestReplicationDiagnosticsPreserveSemanticErrors(t *testing.T) {
 
 	for name, call := range map[string]func() error{
 		"diff": func() error {
-			_, err := client.ReplicationDiff("typo", "")
+			_, err := client.ReplicationDiff(context.Background(), "typo", "")
 			return err
 		},
 		"mrf": func() error {
-			_, err := client.ReplicationMRF("typo")
+			_, err := client.ReplicationMRF(context.Background(), "typo")
 			return err
 		},
 	} {

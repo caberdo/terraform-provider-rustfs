@@ -247,9 +247,9 @@ func (r *PoolDecommissionResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 
-	statuses, err := r.client.RustClient.DecommissionStatuses()
+	statuses, err := r.client.RustClient.DecommissionStatuses(ctx)
 	if err != nil {
-		r.addDecommissionError(&resp.Diagnostics, "Error starting pool decommission", "start a decommission of", pool, err)
+		r.addDecommissionError(ctx, &resp.Diagnostics, "Error starting pool decommission", "start a decommission of", pool, err)
 		return
 	}
 
@@ -265,15 +265,15 @@ func (r *PoolDecommissionResource) Create(ctx context.Context, req resource.Crea
 
 	switch current.Status {
 	case "none":
-		if err := r.client.RustClient.StartPoolDecommission(pool); err != nil {
-			r.addDecommissionError(&resp.Diagnostics, "Error starting pool decommission", "start a decommission of", pool, err)
+		if err := r.client.RustClient.StartPoolDecommission(ctx, pool); err != nil {
+			r.addDecommissionError(ctx, &resp.Diagnostics, "Error starting pool decommission", "start a decommission of", pool, err)
 			return
 		}
 		// Re-read instead of assuming the accepted request is already visible
 		// as running: the drain may complete before the response is handled.
-		statuses, err = r.client.RustClient.DecommissionStatuses()
+		statuses, err = r.client.RustClient.DecommissionStatuses(ctx)
 		if err != nil {
-			r.addDecommissionError(&resp.Diagnostics, "Error reading pool decommission", "read the decommission of", pool, err)
+			r.addDecommissionError(ctx, &resp.Diagnostics, "Error reading pool decommission", "read the decommission of", pool, err)
 			return
 		}
 		current = findPoolDecommission(statuses, pool)
@@ -321,9 +321,9 @@ func (r *PoolDecommissionResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	pool := state.Pool.ValueString()
-	statuses, err := r.client.RustClient.DecommissionStatuses()
+	statuses, err := r.client.RustClient.DecommissionStatuses(ctx)
 	if err != nil {
-		r.addDecommissionError(&resp.Diagnostics, "Error reading pool decommission", "read the decommission of", pool, err)
+		r.addDecommissionError(ctx, &resp.Diagnostics, "Error reading pool decommission", "read the decommission of", pool, err)
 		return
 	}
 
@@ -364,9 +364,9 @@ func (r *PoolDecommissionResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	pool := state.Pool.ValueString()
-	statuses, err := r.client.RustClient.DecommissionStatuses()
+	statuses, err := r.client.RustClient.DecommissionStatuses(ctx)
 	if err != nil {
-		r.addDecommissionError(&resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, err)
+		r.addDecommissionError(ctx, &resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, err)
 		return
 	}
 
@@ -386,17 +386,17 @@ func (r *PoolDecommissionResource) Delete(ctx context.Context, req resource.Dele
 		r.clearPoolDecommission(ctx, pool, &resp.Diagnostics)
 		return
 	case "running", "queued":
-		if cancelErr := r.client.RustClient.CancelPoolDecommission(pool); cancelErr != nil {
+		if cancelErr := r.client.RustClient.CancelPoolDecommission(ctx, pool); cancelErr != nil {
 			// RustFS answers 400 InvalidRequest when the drain finished between
 			// the status read and the cancel. Re-read once before failing.
 			if !rustfs.IsAPIErrorCode(cancelErr, "InvalidRequest") {
-				r.addDecommissionError(&resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, cancelErr)
+				r.addDecommissionError(ctx, &resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, cancelErr)
 				return
 			}
 			var readErr error
-			statuses, readErr = r.client.RustClient.DecommissionStatuses()
+			statuses, readErr = r.client.RustClient.DecommissionStatuses(ctx)
 			if readErr != nil {
-				r.addDecommissionError(&resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, readErr)
+				r.addDecommissionError(ctx, &resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, readErr)
 				return
 			}
 			current = findPoolDecommission(statuses, pool)
@@ -407,16 +407,16 @@ func (r *PoolDecommissionResource) Delete(ctx context.Context, req resource.Dele
 				r.clearPoolDecommission(ctx, pool, &resp.Diagnostics)
 				return
 			}
-			r.addDecommissionError(&resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, cancelErr)
+			r.addDecommissionError(ctx, &resp.Diagnostics, "Error canceling pool decommission", "cancel the decommission of", pool, cancelErr)
 			return
 		}
 		tflog.Trace(ctx, "canceled a pool decommission", map[string]any{"pool": pool})
 
 		// Clear the canceled record so a later apply can decommission the pool
 		// again. A drain that completed in the meantime must not be cleared.
-		statuses, err = r.client.RustClient.DecommissionStatuses()
+		statuses, err = r.client.RustClient.DecommissionStatuses(ctx)
 		if err != nil {
-			r.addDecommissionError(&resp.Diagnostics, "Error clearing pool decommission", "clear the decommission of", pool, err)
+			r.addDecommissionError(ctx, &resp.Diagnostics, "Error clearing pool decommission", "clear the decommission of", pool, err)
 			return
 		}
 		current = findPoolDecommission(statuses, pool)
@@ -450,15 +450,15 @@ func (r *PoolDecommissionResource) ImportState(ctx context.Context, req resource
 // clear that races a completion is treated as success: there is then nothing
 // left for Terraform to cancel.
 func (r *PoolDecommissionResource) clearPoolDecommission(ctx context.Context, pool string, diags *diag.Diagnostics) {
-	if err := r.client.RustClient.ClearPoolDecommission(pool); err != nil {
-		statuses, readErr := r.client.RustClient.DecommissionStatuses()
+	if err := r.client.RustClient.ClearPoolDecommission(ctx, pool); err != nil {
+		statuses, readErr := r.client.RustClient.DecommissionStatuses(ctx)
 		if readErr == nil {
 			current := findPoolDecommission(statuses, pool)
 			if current == nil || current.Status == "none" || current.Status == "complete" {
 				return
 			}
 		}
-		r.addDecommissionError(diags, "Error clearing pool decommission", "clear the decommission of", pool, err)
+		r.addDecommissionError(ctx, diags, "Error clearing pool decommission", "clear the decommission of", pool, err)
 		return
 	}
 	tflog.Trace(ctx, "cleared a pool decommission", map[string]any{"pool": pool})
@@ -466,12 +466,12 @@ func (r *PoolDecommissionResource) clearPoolDecommission(ctx context.Context, po
 
 // addDecommissionError reports err, replacing the server text with a topology
 // explanation when the 501 comes from a single-pool deployment.
-func (r *PoolDecommissionResource) addDecommissionError(diags *diag.Diagnostics, summary, action, pool string, err error) {
+func (r *PoolDecommissionResource) addDecommissionError(ctx context.Context, diags *diag.Diagnostics, summary, action, pool string, err error) {
 	if err == nil {
 		err = errors.New("the server returned no error detail")
 	}
 	detail := "Could not " + action + " pool " + fmt.Sprintf("%q", pool) + ": " + err.Error()
-	if explanation, ok := r.singlePoolExplanation(err); ok {
+	if explanation, ok := r.singlePoolExplanation(ctx, err); ok {
 		detail = "Could not " + action + " pool " + fmt.Sprintf("%q", pool) + ": " + explanation
 	}
 	diags.AddError(summary, detail)
@@ -479,11 +479,11 @@ func (r *PoolDecommissionResource) addDecommissionError(diags *diag.Diagnostics,
 
 // singlePoolExplanation recognises the 501 RustFS answers for every
 // decommission route on a single-pool deployment and names the current pools.
-func (r *PoolDecommissionResource) singlePoolExplanation(err error) (string, bool) {
+func (r *PoolDecommissionResource) singlePoolExplanation(ctx context.Context, err error) (string, bool) {
 	if !poolDecommissionUnsupported(err) {
 		return "", false
 	}
-	pools, listErr := r.client.RustClient.ListPools()
+	pools, listErr := r.client.RustClient.ListPools(ctx)
 	// Only an exactly-one-pool answer proves the topology gap. An empty list
 	// means the pool inventory could not be determined, so the raw 501 is the
 	// truthful diagnosis.

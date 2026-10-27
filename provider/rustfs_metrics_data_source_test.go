@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -39,7 +40,7 @@ data "rustfs_metrics" "test" {}
 func testAccMetricsPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.GetMetrics(); err != nil {
+	if _, err := client.GetMetrics(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("the admin metrics stream is not implemented by the running RustFS, skipping: %v", err)
 		}

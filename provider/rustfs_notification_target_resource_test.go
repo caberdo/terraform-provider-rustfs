@@ -390,7 +390,7 @@ func testAccNotificationTargetPreCheck(t *testing.T) {
 	probeConfig := []rustfs.TargetKeyValue{
 		{Key: "endpoint", Value: endpoint},
 	}
-	err := client.SetNotificationTarget("notify_webhook", probe, probeConfig)
+	err := client.SetNotificationTarget(context.Background(), "notify_webhook", probe, probeConfig)
 	if err != nil {
 		if strings.Contains(err.Error(), "module is disabled") {
 			t.Skipf("notification module is disabled on the running RustFS; skipping: %v", err)
@@ -398,7 +398,7 @@ func testAccNotificationTargetPreCheck(t *testing.T) {
 		t.Fatalf("notification target management is not available on the running RustFS: %v", err)
 	}
 	// Clean up the probe target so it does not linger in the server config.
-	if err := client.ResetNotificationTarget("notify_webhook", probe); err != nil {
+	if err := client.ResetNotificationTarget(context.Background(), "notify_webhook", probe); err != nil {
 		t.Logf("could not clean up notification target probe %s: %v", probe, err)
 	}
 }
@@ -449,7 +449,7 @@ func testAccCheckNotificationTargetExists(name string) resource.TestCheckFunc {
 		}
 
 		client := testAccRustClient()
-		targets, err := client.ListNotificationTargets()
+		targets, err := client.ListNotificationTargets(context.Background())
 		if err != nil {
 			return err
 		}
@@ -469,7 +469,7 @@ func testAccCheckNotificationTargetExists(name string) resource.TestCheckFunc {
 func testAccCheckNotificationTargetConfigValue(name, key, want string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig("notify_webhook:" + name)
+		kvs, err := client.GetConfig(context.Background(), "notify_webhook:"+name)
 		if err != nil {
 			return fmt.Errorf("failed to read notification target %s config from the server: %w", name, err)
 		}
@@ -491,7 +491,7 @@ func testAccCheckNotificationTargetConfigValue(name, key, want string) resource.
 func testAccCheckNotificationTargetGone(name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		targets, err := client.ListNotificationTargets()
+		targets, err := client.ListNotificationTargets(context.Background())
 		if err != nil {
 			return err
 		}
@@ -509,7 +509,7 @@ func testAccCheckNotificationTargetGone(name string) resource.TestCheckFunc {
 func testAccNotificationTargetResetOutOfBand(name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.ResetNotificationTarget("notify_webhook", name); err != nil {
+		if err := client.ResetNotificationTarget(context.Background(), "notify_webhook", name); err != nil {
 			return fmt.Errorf("failed to reset notification target %s out of band: %w", name, err)
 		}
 		return nil
@@ -518,7 +518,7 @@ func testAccNotificationTargetResetOutOfBand(name string) resource.TestCheckFunc
 
 func testAccCheckNotificationTargetDestroy(s *terraform.State) error {
 	client := testAccRustClient()
-	targets, err := client.ListNotificationTargets()
+	targets, err := client.ListNotificationTargets(context.Background())
 	if err != nil {
 		return err
 	}

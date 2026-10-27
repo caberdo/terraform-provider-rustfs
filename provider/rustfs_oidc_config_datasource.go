@@ -201,7 +201,7 @@ func (d *OIDCConfigDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	effective, err := d.client.RustClient.ListOIDCConfig()
+	effective, err := d.client.RustClient.ListOIDCConfig(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading OIDC config",

@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,7 +36,7 @@ func TestGetBucketUsage(t *testing.T) {
 		_, _ = w.Write([]byte(bucketUsageTestResponse))
 	})
 
-	usage, err := client.GetBucketUsage("my-bucket", "logs/", 5)
+	usage, err := client.GetBucketUsage(context.Background(), "my-bucket", "logs/", 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -78,7 +79,7 @@ func TestGetBucketUsageEmpty(t *testing.T) {
 		_, _ = w.Write([]byte(`{"bucket":"empty","prefix":"","usage":{"size":0,"objects":0,"versions":0,"deleteMarkers":0},"setsReporting":0,"setsTotal":4}`))
 	})
 
-	usage, err := client.GetBucketUsage("empty", "", 0)
+	usage, err := client.GetBucketUsage(context.Background(), "empty", "", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,10 +100,10 @@ func TestGetBucketUsageRejectsInvalidInput(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	if _, err := client.GetBucketUsage("", "", 0); err == nil || !strings.Contains(err.Error(), "bucket is required") {
+	if _, err := client.GetBucketUsage(context.Background(), "", "", 0); err == nil || !strings.Contains(err.Error(), "bucket is required") {
 		t.Errorf("expected a missing bucket error, got %v", err)
 	}
-	if _, err := client.GetBucketUsage("bucket", "", -1); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+	if _, err := client.GetBucketUsage(context.Background(), "bucket", "", -1); err == nil || !strings.Contains(err.Error(), "must not be negative") {
 		t.Errorf("expected a negative max entries error, got %v", err)
 	}
 }
@@ -113,7 +114,7 @@ func TestGetBucketUsageServerError(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>InvalidArgument</Code><Message>invalid bucket name: .system</Message></Error>`))
 	})
 
-	_, err := client.GetBucketUsage(".system", "", 0)
+	_, err := client.GetBucketUsage(context.Background(), ".system", "", 0)
 	if err == nil || !strings.Contains(err.Error(), "invalid bucket name") {
 		t.Fatalf("expected the server error, got %v", err)
 	}
@@ -136,7 +137,7 @@ func TestGetBucketUsageUnsupportedFeature(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(srv.URL, "http://"),
 	})
 
-	_, err := client.GetBucketUsage("my-bucket", "", 0)
+	_, err := client.GetBucketUsage(context.Background(), "my-bucket", "", 0)
 	if err == nil || !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported feature error, got %v", err)
 	}
@@ -151,7 +152,7 @@ func TestGetBucketUsageMalformedResponse(t *testing.T) {
 		_, _ = w.Write([]byte(`{"usage":`))
 	})
 
-	_, err := client.GetBucketUsage("my-bucket", "", 0)
+	_, err := client.GetBucketUsage(context.Background(), "my-bucket", "", 0)
 	if err == nil || !strings.Contains(err.Error(), "decode bucket usage") {
 		t.Fatalf("expected a decode error, got %v", err)
 	}

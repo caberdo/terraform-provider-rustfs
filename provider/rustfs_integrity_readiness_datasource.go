@@ -107,7 +107,7 @@ func (d *IntegrityReadinessDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	readiness, err := d.client.RustClient.IntegrityReadiness()
+	readiness, err := d.client.RustClient.IntegrityReadiness(ctx)
 	if err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			resp.Diagnostics.AddError(

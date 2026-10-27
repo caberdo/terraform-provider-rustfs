@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -65,7 +66,7 @@ func TestAttachGroupPolicy(t *testing.T) {
 	server, requests, methodPath := newAssociationServer(t)
 	client := newAssociationClient(t, server.Listener.Addr().String())
 
-	if err := client.AttachGroupPolicy("developers", "readwrite"); err != nil {
+	if err := client.AttachGroupPolicy(context.Background(), "developers", "readwrite"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -94,7 +95,7 @@ func TestDetachGroupPolicy(t *testing.T) {
 	server, requests, methodPath := newAssociationServer(t)
 	client := newAssociationClient(t, server.Listener.Addr().String())
 
-	if err := client.DetachGroupPolicy("developers", "readwrite"); err != nil {
+	if err := client.DetachGroupPolicy(context.Background(), "developers", "readwrite"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -126,10 +127,10 @@ func TestGroupPolicyAssociationError(t *testing.T) {
 
 	client := newAssociationClient(t, server.Listener.Addr().String())
 
-	if err := client.AttachGroupPolicy("developers", "readwrite"); err == nil {
+	if err := client.AttachGroupPolicy(context.Background(), "developers", "readwrite"); err == nil {
 		t.Fatal("expected error for non-2xx response, got nil")
 	}
-	if err := client.DetachGroupPolicy("developers", "readwrite"); err == nil {
+	if err := client.DetachGroupPolicy(context.Background(), "developers", "readwrite"); err == nil {
 		t.Fatal("expected error for non-2xx response, got nil")
 	}
 }
@@ -148,10 +149,10 @@ func TestGroupPolicyAssociationMissingGroup(t *testing.T) {
 
 	client := newAssociationClient(t, server.Listener.Addr().String())
 
-	if err := client.DetachGroupPolicy("gone", "readwrite"); !IsAPIErrorCode(err, "NoSuchResource") {
+	if err := client.DetachGroupPolicy(context.Background(), "gone", "readwrite"); !IsAPIErrorCode(err, "NoSuchResource") {
 		t.Errorf("expected a NoSuchResource error from detach, got %v", err)
 	}
-	if _, err := client.GetGroup("gone"); !IsAPIErrorCode(err, "NoSuchResource") {
+	if _, err := client.GetGroup(context.Background(), "gone"); !IsAPIErrorCode(err, "NoSuchResource") {
 		t.Errorf("expected a NoSuchResource error from the group read, got %v", err)
 	}
 }
@@ -182,7 +183,7 @@ func TestGroupPolicyAssociationIsSerialized(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := client.AttachGroupPolicy("developers", policy); err != nil {
+			if err := client.AttachGroupPolicy(context.Background(), "developers", policy); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}()

@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +38,7 @@ func TestCreateServiceAccountWithExpirySendsExpirationAndPolicy(t *testing.T) {
 		Policy:      `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::*"]}]}`,
 		TargetUser:  "alice",
 	}
-	if err := client.CreateServiceAccount(account); err != nil {
+	if err := client.CreateServiceAccount(context.Background(), account); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "add-service-accounts") {
@@ -71,7 +72,7 @@ func TestCreateServiceAccountWithExpiryDefaultsImpliedPolicy(t *testing.T) {
 		SecretKey: "s3cret",
 		Name:      "tokens",
 	}
-	if err := client.CreateServiceAccount(account); err != nil {
+	if err := client.CreateServiceAccount(context.Background(), account); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	for _, want := range []string{`"impliedPolicy":true`, `"expiration":"9999-01-01T00:00:00Z"`} {
@@ -101,7 +102,7 @@ func TestUpdateServiceAccountWithExpirySendsNewExpiration(t *testing.T) {
 		AccessKey:  "sa-test",
 		Expiration: "2031-06-01T00:00:00Z",
 	}
-	if err := client.UpdateServiceAccount(account); err != nil {
+	if err := client.UpdateServiceAccount(context.Background(), account); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotBody, `"newExpiration":"2031-06-01T00:00:00Z"`) {

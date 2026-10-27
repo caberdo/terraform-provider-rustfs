@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 )
 
 const (
@@ -162,7 +162,7 @@ func IsAPIErrorCode(err error, codes ...string) bool {
 }
 
 func New(config *RustfsAdminConfig) (client RustfsAdmin) {
-	client.rootURL = client.createRootURL(config.Endpoint, config.Ssl)
+	client.rootURL = RootURL(config.Endpoint, config.Ssl)
 	client.adminBaseURL = client.rootURL + adminBasePath
 	client.configuredEndpoint = config.Endpoint
 	client.httpClient = config.HTTPClient
@@ -242,14 +242,10 @@ func RootURL(endpoint string, secure bool) string {
 	return scheme + "://" + endpoint
 }
 
-func (c *RustfsAdmin) createRootURL(endpoint string, secure bool) string {
-	return RootURL(endpoint, secure)
-}
-
 // adminURL returns the versioned admin API base a request is sent to. The
 // empty version keeps the historical v3 URL. Only v3 and v4 are accepted: the
 // provider deliberately models no other namespace.
-func (c *RustfsAdmin) adminURL(version string) (string, error) {
+func (c *RustfsAdmin) adminURL(ctx context.Context, version string) (string, error) {
 	switch version {
 	case "":
 		version = defaultAdminAPIVersion
@@ -265,7 +261,7 @@ func (c *RustfsAdmin) adminURL(version string) (string, error) {
 
 func (c *RustfsAdmin) createRequest(ctx context.Context, request RequestData) (*http.Request, error) {
 	// Initialize a new HTTP request for the method.
-	adminURL, err := c.adminURL(request.Version)
+	adminURL, err := c.adminURL(ctx, request.Version)
 	if err != nil {
 		return nil, err
 	}

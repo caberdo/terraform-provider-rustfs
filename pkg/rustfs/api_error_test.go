@@ -19,7 +19,7 @@ func TestAPIErrorParsingXML(t *testing.T) {
 		_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message></Error>`))
 	})
 
-	_, err := srv.ReadQuota("missing")
+	_, err := srv.ReadQuota(context.Background(), "missing")
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)
@@ -57,7 +57,7 @@ func TestAPIErrorParsingJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`{"code":"internal_error","message":"boom"}`))
 	})
 
-	_, err := srv.ReadQuota("x")
+	_, err := srv.ReadQuota(context.Background(), "x")
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)
@@ -76,7 +76,7 @@ func TestAPIErrorParsingPlainText(t *testing.T) {
 		_, _ = w.Write([]byte("access denied"))
 	})
 
-	_, err := srv.ReadQuota("x")
+	_, err := srv.ReadQuota(context.Background(), "x")
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)

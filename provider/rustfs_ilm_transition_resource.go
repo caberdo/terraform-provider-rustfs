@@ -455,7 +455,7 @@ func (r *ILMTransitionResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
-	run, err := r.client.RustClient.RunILMTransition(rustfs.ILMTransitionRunOptions{
+	run, err := r.client.RustClient.RunILMTransition(ctx, rustfs.ILMTransitionRunOptions{
 		Bucket:             plan.Bucket.ValueString(),
 		Prefix:             plan.Prefix.ValueString(),
 		Tier:               plan.Tier.ValueString(),
@@ -511,7 +511,7 @@ func (r *ILMTransitionResource) Read(ctx context.Context, req resource.ReadReque
 		return
 	}
 
-	job, err := r.client.RustClient.ILMTransitionJob(jobID)
+	job, err := r.client.RustClient.ILMTransitionJob(ctx, jobID)
 	if err != nil {
 		// The server reports a job it does not hold as NoSuchKey. A missing
 		// route is a different failure and must not silently drop the record.

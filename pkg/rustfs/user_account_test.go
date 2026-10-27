@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
@@ -16,11 +17,11 @@ func TestCreateUserAccount(t *testing.T) {
 		SecretKey: randomString(8),
 	}
 	dut := getClient(t)
-	err := dut.CreateUserAccount(account)
+	err := dut.CreateUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
-	read, err := dut.ReadUserAccount(account.AccessKey)
+	read, err := dut.ReadUserAccount(context.Background(), account.AccessKey)
 	if err != nil {
 		t.Error(err)
 	}
@@ -28,7 +29,7 @@ func TestCreateUserAccount(t *testing.T) {
 		t.Error("wtf")
 	}
 
-	err = dut.DeleteUserAccount(account)
+	err = dut.DeleteUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -42,11 +43,11 @@ func TestCreateUserAccountWithGrp(t *testing.T) {
 		Policy:    "readwrite",
 	}
 	dut := getClient(t)
-	err := dut.CreateUserAccount(account)
+	err := dut.CreateUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dut.DeleteUserAccount(account)
+	err = dut.DeleteUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +59,7 @@ func TestAddUserWithAccesKey(t *testing.T) {
 		SecretKey: randomString(8),
 	}
 	dut := getClient(t)
-	err := dut.CreateUserAccount(account)
+	err := dut.CreateUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -69,16 +70,16 @@ func TestAddUserWithAccesKey(t *testing.T) {
 		Name:       randomServiceAccountName(),
 		TargetUser: account.AccessKey,
 	}
-	err = dut.CreateServiceAccount(service)
+	err = dut.CreateServiceAccount(context.Background(), service)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = dut.DeleteServiceAccount(service)
+	err = dut.DeleteServiceAccount(context.Background(), service)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dut.DeleteUserAccount(account)
+	err = dut.DeleteUserAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}

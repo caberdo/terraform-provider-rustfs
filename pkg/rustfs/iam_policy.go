@@ -14,13 +14,11 @@ import (
 // ListCannedPolicies returns the names of all canned policies. The API may
 // return an array of {policy_name} objects, an array of plain names, or a
 // map keyed by policy name; all three shapes are normalized to a sorted list.
-func (c *RustfsAdmin) ListCannedPolicies() ([]string, error) {
+func (c *RustfsAdmin) ListCannedPolicies(ctx context.Context) ([]string, error) {
 	req_data := RequestData{
 		Method:  "GET",
 		RelPath: "list-canned-policies",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +30,7 @@ func TestTierStats(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	stats, err := client.TierStats()
+	stats, err := client.TierStats(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestTierStatsEmpty(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	stats, err := client.TierStats()
+	stats, err := client.TierStats(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestTierStatsFallsBackToActivity(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	stats, err := client.TierStats()
+	stats, err := client.TierStats(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

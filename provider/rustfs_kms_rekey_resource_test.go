@@ -245,7 +245,7 @@ func testAccKmsRekeySkipUnlessCapability(t *testing.T, want bool) {
 	t.Helper()
 
 	client := testAccRustClient()
-	status, err := client.GetKmsStatus()
+	status, err := client.GetKmsStatus(context.Background())
 	if err != nil {
 		t.Skipf("this deployment does not serve the KMS status route: %v", err)
 	}
@@ -351,7 +351,7 @@ func testAccCheckKmsRekeyDestroyed(_ *terraform.State) error {
 	client := testAccRustClient()
 	deadline := time.Now().Add(30 * time.Second)
 	for {
-		status, err := client.GetKmsRekeyStatus()
+		status, err := client.GetKmsRekeyStatus(context.Background())
 		if errors.Is(err, rustfs.ErrKmsRekeyNotRun) {
 			return nil
 		}

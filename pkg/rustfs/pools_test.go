@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -35,7 +36,7 @@ func TestListPools(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	pools, err := client.ListPools()
+	pools, err := client.ListPools(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

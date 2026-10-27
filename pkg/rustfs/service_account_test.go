@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"net/http"
@@ -65,7 +66,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		Name:      randomServiceAccountName(),
 	}
 	dut := getClient(t)
-	err := dut.CreateServiceAccount(account)
+	err := dut.CreateServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,11 +80,11 @@ func TestCreateAndDeleteServiceAccount(t *testing.T) {
 		Name:      randomServiceAccountName(),
 	}
 	dut := getClient(t)
-	err := dut.CreateServiceAccount(account)
+	err := dut.CreateServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dut.DeleteServiceAccount(account)
+	err = dut.DeleteServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -96,16 +97,16 @@ func TestCreateUpdateAndDeleteServiceAccount(t *testing.T) {
 		Name:      randomServiceAccountName(),
 	}
 	dut := getClient(t)
-	err := dut.CreateServiceAccount(account)
+	err := dut.CreateServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
 	account.SecretKey = "insecureOne"
-	err = dut.UpdateServiceAccount(account)
+	err = dut.UpdateServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
-	err = dut.DeleteServiceAccount(account)
+	err = dut.DeleteServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -118,18 +119,18 @@ func TestCreateReadAndDeleteServiceAccount(t *testing.T) {
 		Name:      randomServiceAccountName(),
 	}
 	dut := getClient(t)
-	err := dut.CreateServiceAccount(account)
+	err := dut.CreateServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
-	reply, err := dut.ReadServiceAccount(account.AccessKey)
+	reply, err := dut.ReadServiceAccount(context.Background(), account.AccessKey)
 	if err != nil {
 		t.Error(err)
 	}
 	if reply.Name != account.Name {
 		t.Error("Read value not matching")
 	}
-	err = dut.DeleteServiceAccount(account)
+	err = dut.DeleteServiceAccount(context.Background(), account)
 	if err != nil {
 		t.Error(err)
 	}
@@ -155,7 +156,7 @@ func TestListServiceAccounts(t *testing.T) {
 	defer server.Close()
 
 	client := rustfs.New(&rustfs.RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
-	accounts, err := client.ListServiceAccounts()
+	accounts, err := client.ListServiceAccounts(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +184,7 @@ func TestListServiceAccountsBlanksInjectedSecret(t *testing.T) {
 	defer server.Close()
 
 	client := rustfs.New(&rustfs.RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
-	accounts, err := client.ListServiceAccounts()
+	accounts, err := client.ListServiceAccounts(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -208,7 +209,7 @@ func TestListServiceAccountsUnsupportedRoute(t *testing.T) {
 	defer server.Close()
 
 	client := rustfs.New(&rustfs.RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
-	_, err := client.ListServiceAccounts()
+	_, err := client.ListServiceAccounts(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -231,7 +232,7 @@ func TestListServiceAccountsFor(t *testing.T) {
 	defer server.Close()
 
 	client := rustfs.New(&rustfs.RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
-	if _, err := client.ListServiceAccountsFor("parent-user"); err != nil {
+	if _, err := client.ListServiceAccountsFor(context.Background(), "parent-user"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotUser != "parent-user" {

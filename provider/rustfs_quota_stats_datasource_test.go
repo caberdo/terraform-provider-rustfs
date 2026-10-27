@@ -217,7 +217,7 @@ func TestQuotaStatsDataSourceRead(t *testing.T) {
 func testAccQuotaStatsPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.GetQuotaStats("tf-route-probe"); err != nil && rustfs.IsUnsupportedFeature(err) {
+	if _, err := client.GetQuotaStats(context.Background(), "tf-route-probe"); err != nil && rustfs.IsUnsupportedFeature(err) {
 		t.Skipf("the quota-stats route is not implemented by the running RustFS, skipping: %v", err)
 	}
 }
@@ -225,7 +225,7 @@ func testAccQuotaStatsPreCheck(t *testing.T) {
 func testAccQuotaCheckPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.CheckQuota("tf-route-probe", "PUT", 1); err != nil && rustfs.IsUnsupportedFeature(err) {
+	if _, err := client.CheckQuota(context.Background(), "tf-route-probe", "PUT", 1); err != nil && rustfs.IsUnsupportedFeature(err) {
 		t.Skipf("the quota-check route is not implemented by the running RustFS, skipping: %v", err)
 	}
 }
@@ -239,7 +239,7 @@ func waitForQuotaUsage(t *testing.T, bucket string) resource.TestCheckFunc {
 		client := testAccRustClient()
 		deadline := time.Now().Add(30 * time.Second)
 		for {
-			stats, err := client.GetQuotaStats(bucket)
+			stats, err := client.GetQuotaStats(context.Background(), bucket)
 			if err == nil && stats.CurrentUsage != nil && *stats.CurrentUsage > 0 {
 				return nil
 			}

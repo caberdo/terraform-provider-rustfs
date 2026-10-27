@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -184,7 +185,7 @@ func testAccCheckBucketDurabilityExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no bucket set")
 		}
 		client := testAccDurabilityClient()
-		d, err := client.GetBucketDurability(bucketName)
+		d, err := client.GetBucketDurability(context.Background(), bucketName)
 		if err != nil {
 			return fmt.Errorf("error reading bucket durability: %s", err)
 		}
@@ -202,7 +203,7 @@ func testAccMutateBucketDurabilityOutOfBand(t *testing.T, bucket, mode string) r
 
 	return func(s *terraform.State) error {
 		client := testAccDurabilityClient()
-		if _, err := client.SetBucketDurability(bucket, rustfs.BucketDurability{Bucket: bucket, Mode: mode}); err != nil {
+		if _, err := client.SetBucketDurability(context.Background(), bucket, rustfs.BucketDurability{Bucket: bucket, Mode: mode}); err != nil {
 			return fmt.Errorf("out-of-band durability mutation failed: %s", err)
 		}
 		return nil
@@ -222,7 +223,7 @@ func testAccCheckBucketDurabilityDestroy(s *terraform.State) error {
 		// The override is cleared on destroy; an empty mode means the bucket
 		// inherits the process-wide durability mode again. A read error means
 		// the bucket itself is already gone, which also counts as destroyed.
-		d, err := client.GetBucketDurability(bucketName)
+		d, err := client.GetBucketDurability(context.Background(), bucketName)
 		if err != nil {
 			continue
 		}

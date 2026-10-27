@@ -287,7 +287,7 @@ func (r *SiteReplicationResyncResource) applyResync(
 	}
 
 	operation := plan.Operation.ValueString()
-	result, err := r.client.RustClient.SiteReplicationResyncOp(operation, rustfs.SiteReplicationPeer{
+	result, err := r.client.RustClient.SiteReplicationResyncOp(ctx, operation, rustfs.SiteReplicationPeer{
 		Name:         peer.Name.ValueString(),
 		Endpoint:     peer.Endpoint.ValueString(),
 		DeploymentID: peer.DeploymentID.ValueString(),

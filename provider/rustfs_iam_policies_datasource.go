@@ -78,7 +78,7 @@ func (d *IAMPoliciesDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 
-	names, err := d.client.RustClient.ListCannedPolicies()
+	names, err := d.client.RustClient.ListCannedPolicies(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing canned policies",

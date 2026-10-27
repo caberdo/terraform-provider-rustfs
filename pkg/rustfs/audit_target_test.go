@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -35,7 +36,7 @@ func TestListAuditTargets(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"audit_endpoints":[{"account_id":"audit","service":"webhook","status":"offline","health_state":"offline","health_reason":"not_loaded_in_runtime","source":"config"}]}`))
 	})
-	targets, err := client.ListAuditTargets()
+	targets, err := client.ListAuditTargets(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,7 +77,7 @@ func TestSetAuditTarget(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	err := client.SetAuditTarget("audit_webhook", "audit", []TargetKeyValue{
+	err := client.SetAuditTarget(context.Background(), "audit_webhook", "audit", []TargetKeyValue{
 		{Key: "endpoint", Value: "https://hooks.example/webhook"},
 		{Key: "auth_token", Value: "s3cr3t"},
 		{Key: "comment", Value: "audit logs"},
@@ -96,7 +97,7 @@ func TestResetAuditTarget(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	if err := client.ResetAuditTarget("audit_webhook", "audit"); err != nil {
+	if err := client.ResetAuditTarget(context.Background(), "audit_webhook", "audit"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -106,7 +107,7 @@ func TestSetAuditTargetError(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(`{"Code":"InvalidArgument","Message":"endpoint is required"}`))
 	})
-	err := client.SetAuditTarget("audit_webhook", "audit", []TargetKeyValue{{Key: "comment", Value: "x"}})
+	err := client.SetAuditTarget(context.Background(), "audit_webhook", "audit", []TargetKeyValue{{Key: "comment", Value: "x"}})
 	if err == nil {
 		t.Fatal("expected an error for a rejected request")
 	}

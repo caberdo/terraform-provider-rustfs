@@ -173,7 +173,7 @@ func testAccCheckPolicyDocument(n, effect, action, resourceARN string) resource.
 			return fmt.Errorf("no policy name set")
 		}
 		client := testAccPolicyClient()
-		policy, err := client.ReadPolicy(policyName)
+		policy, err := client.ReadPolicy(context.Background(), policyName)
 		if err != nil {
 			return fmt.Errorf("policy not found: %s", err)
 		}
@@ -207,7 +207,7 @@ func testAccCheckPolicyCondition(n, operator, key, value string) resource.TestCh
 			return fmt.Errorf("no policy name set")
 		}
 		client := testAccPolicyClient()
-		policy, err := client.ReadPolicy(policyName)
+		policy, err := client.ReadPolicy(context.Background(), policyName)
 		if err != nil {
 			return fmt.Errorf("policy not found: %s", err)
 		}
@@ -229,7 +229,7 @@ func testAccDeletePolicyOutOfBand(t *testing.T, name string) resource.TestCheckF
 	return func(s *terraform.State) error {
 		t.Helper()
 		client := testAccPolicyClient()
-		if err := client.DeletePolicy(name); err != nil {
+		if err := client.DeletePolicy(context.Background(), name); err != nil {
 			return fmt.Errorf("could not delete policy %s out of band: %s", name, err)
 		}
 		t.Logf("deleted policy %s out of band", name)
@@ -248,7 +248,7 @@ func testAccCheckPolicyExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no policy name set")
 		}
 		client := testAccPolicyClient()
-		_, err := client.ReadPolicy(policyName)
+		_, err := client.ReadPolicy(context.Background(), policyName)
 		if err != nil {
 			return fmt.Errorf("policy not found: %s", err)
 		}
@@ -266,7 +266,7 @@ func testAccCheckPolicyDestroy(s *terraform.State) error {
 		if policyName == "" {
 			continue
 		}
-		_, err := client.ReadPolicy(policyName)
+		_, err := client.ReadPolicy(context.Background(), policyName)
 		if err == nil {
 			return fmt.Errorf("policy %s still exists", policyName)
 		}

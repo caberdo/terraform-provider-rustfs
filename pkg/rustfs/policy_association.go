@@ -22,7 +22,7 @@ type policyAssociationRequest struct {
 // remove from, the target's existing policy list instead of replacing it, so
 // unlike PUT set-user-or-group-policy (which carries the single primary policy
 // on rustfs_user) they never touch a policy the caller did not name.
-func (c *RustfsAdmin) policyAssociation(relPath string, req policyAssociationRequest) error {
+func (c *RustfsAdmin) policyAssociation(ctx context.Context, relPath string, req policyAssociationRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return err
@@ -33,8 +33,6 @@ func (c *RustfsAdmin) policyAssociation(relPath string, req policyAssociationReq
 		RelPath: relPath,
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

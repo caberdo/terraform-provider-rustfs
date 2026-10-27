@@ -279,7 +279,7 @@ func (r *SiteReplicationRepairResource) Create(ctx context.Context, req resource
 		requestedOperationID = uuid.NewString()
 	}
 
-	preflight, err := r.client.RustClient.SiteReplicationRepairPreflight()
+	preflight, err := r.client.RustClient.SiteReplicationRepairPreflight(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error planning site replication repair",
@@ -295,7 +295,7 @@ func (r *SiteReplicationRepairResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	operation, err := r.client.RustClient.SiteReplicationRepairExecute(preflight.PreflightToken, requestedOperationID)
+	operation, err := r.client.RustClient.SiteReplicationRepairExecute(ctx, preflight.PreflightToken, requestedOperationID)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error repairing site replication",
@@ -357,7 +357,7 @@ func (r *SiteReplicationRepairResource) Read(ctx context.Context, req resource.R
 		return
 	}
 
-	operation, err := r.client.RustClient.SiteReplicationRepairStatus(operationID)
+	operation, err := r.client.RustClient.SiteReplicationRepairStatus(ctx, operationID)
 	if err != nil {
 		if rustfs.IsAPIErrorCode(err, "InvalidRequest") && strings.Contains(err.Error(), "repair operation was not found") {
 			// RustFS keeps a bounded history and prunes the oldest successful

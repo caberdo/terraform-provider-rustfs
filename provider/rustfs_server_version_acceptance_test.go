@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -34,13 +35,13 @@ func testAccCheckServerCapabilities(t *testing.T) resource.TestCheckFunc {
 	return func(_ *terraform.State) error {
 		client := testAccRustClient()
 
-		version, raw, err := client.ServerVersion()
+		version, raw, err := client.ServerVersion(context.Background())
 		if err != nil {
 			return fmt.Errorf("could not determine the RustFS server version: %w", err)
 		}
 		t.Logf("RustFS server version: %s (parsed %s)", raw, version)
 
-		if _, err := client.GetMetrics(); err != nil {
+		if _, err := client.GetMetrics(context.Background()); err != nil {
 			if !rustfs.IsUnsupportedFeature(err) {
 				return fmt.Errorf("GET /rustfs/admin/v3/metrics failed unexpectedly: %w", err)
 			}

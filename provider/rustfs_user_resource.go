@@ -114,7 +114,7 @@ func (r *RustfsUserResource) Create(ctx context.Context, req resource.CreateRequ
 		Policy:    plan.Policy.ValueString(),
 	}
 
-	err := r.client.RustClient.CreateUserAccount(account)
+	err := r.client.RustClient.CreateUserAccount(ctx, account)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating user",
@@ -142,7 +142,7 @@ func (r *RustfsUserResource) Read(ctx context.Context, req resource.ReadRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	read, err := r.client.RustClient.ReadUserAccount(state.AccessKey.ValueString())
+	read, err := r.client.RustClient.ReadUserAccount(ctx, state.AccessKey.ValueString())
 	if err != nil {
 		// RustFS answers 404 NoSuchResource for a user it does not have.
 		if rustfs.IsAPIErrorCode(err, "NoSuchResource") {
@@ -179,7 +179,7 @@ func (r *RustfsUserResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	if !plan.SecretKey.Equal(state.SecretKey) {
 		if err := r.client.RustClient.SetUserSecretKey(
-			plan.AccessKey.ValueString(),
+			ctx, plan.AccessKey.ValueString(),
 			plan.SecretKey.ValueString(),
 		); err != nil {
 			resp.Diagnostics.AddError("Error updating user secret", err.Error())
@@ -189,7 +189,7 @@ func (r *RustfsUserResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	if plan.Status.ValueString() != state.Status.ValueString() {
 		if err := r.client.RustClient.SetUserStatus(
-			plan.AccessKey.ValueString(),
+			ctx, plan.AccessKey.ValueString(),
 			plan.Status.ValueString(),
 		); err != nil {
 			resp.Diagnostics.AddError("Error updating user status", err.Error())
@@ -216,7 +216,7 @@ func (r *RustfsUserResource) Delete(ctx context.Context, req resource.DeleteRequ
 	account := rustfs.UserAccount{
 		AccessKey: data.AccessKey.ValueString(),
 	}
-	err := r.client.RustClient.DeleteUserAccount(account)
+	err := r.client.RustClient.DeleteUserAccount(ctx, account)
 	if err != nil {
 		// RustFS answers 404 NoSuchResource when the user is already gone.
 		if rustfs.IsAPIErrorCode(err, "NoSuchResource") {

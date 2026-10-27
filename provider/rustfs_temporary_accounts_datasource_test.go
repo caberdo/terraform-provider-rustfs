@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -542,7 +542,7 @@ func TestAccTemporaryAccountsListAndRevoke(t *testing.T) {
 			AccessKey:    os.Getenv("RUSTFS_USER"),
 			AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		})
-		_, _ = client.RevokeTokens(rustfs.UserProviderBuiltin, parent)
+		_, _ = client.RevokeTokens(context.Background(), rustfs.UserProviderBuiltin, parent)
 	})
 
 	resource.Test(t, resource.TestCase{

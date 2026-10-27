@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,7 +32,7 @@ func TestServerInfo(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	info, err := client.ServerInfo()
+	info, err := client.ServerInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -208,7 +208,7 @@ func (d *ReplicationMrfDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 
-	mrf, err := d.client.RustClient.ReplicationMRF(bucket)
+	mrf, err := d.client.RustClient.ReplicationMRF(ctx, bucket)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

@@ -35,13 +35,11 @@ type notificationTargetSetBody struct {
 }
 
 // ListNotificationTargets lists all configured event-notification targets.
-func (c *RustfsAdmin) ListNotificationTargets() ([]NotificationTarget, error) {
+func (c *RustfsAdmin) ListNotificationTargets(ctx context.Context) ([]NotificationTarget, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "target/list",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -58,7 +56,7 @@ func (c *RustfsAdmin) ListNotificationTargets() ([]NotificationTarget, error) {
 // SetNotificationTarget adds or edits an event-notification target, sending
 // keyValues as the target configuration. The server validates the keys against
 // the target type and automatically enables the target.
-func (c *RustfsAdmin) SetNotificationTarget(targetType, targetName string, keyValues []TargetKeyValue) error {
+func (c *RustfsAdmin) SetNotificationTarget(ctx context.Context, targetType, targetName string, keyValues []TargetKeyValue) error {
 	body := notificationTargetSetBody{KeyValues: keyValues}
 	//#nosec G117 — the marshaled body is the target's own configuration and
 	// may contain credentials (for example an amqp URL with an embedded
@@ -73,8 +71,6 @@ func (c *RustfsAdmin) SetNotificationTarget(targetType, targetName string, keyVa
 		RelPath: fmt.Sprintf("target/%s/%s", targetType, targetName),
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -85,13 +81,11 @@ func (c *RustfsAdmin) SetNotificationTarget(targetType, targetName string, keyVa
 
 // ResetNotificationTarget removes an event-notification target, reverting it to
 // the server default (the admin API exposes no plain delete for targets).
-func (c *RustfsAdmin) ResetNotificationTarget(targetType, targetName string) error {
+func (c *RustfsAdmin) ResetNotificationTarget(ctx context.Context, targetType, targetName string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: fmt.Sprintf("target/%s/%s/reset", targetType, targetName),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

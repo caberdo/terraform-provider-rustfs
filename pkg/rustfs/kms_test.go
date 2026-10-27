@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -54,7 +55,7 @@ func TestGetKmsStatus(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	status, err := client.GetKmsStatus()
+	status, err := client.GetKmsStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestGetKmsStatusOptionalFieldsAbsent(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	status, err := client.GetKmsStatus()
+	status, err := client.GetKmsStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -171,7 +172,7 @@ func TestGetKmsConfig(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	config, err := client.GetKmsConfig()
+	config, err := client.GetKmsConfig(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -212,7 +213,7 @@ func TestGetKmsConfigNullDefaultKey(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	config, err := client.GetKmsConfig()
+	config, err := client.GetKmsConfig(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -234,7 +235,7 @@ func TestGetKmsStatusError(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	if _, err := client.GetKmsStatus(); err == nil {
+	if _, err := client.GetKmsStatus(context.Background()); err == nil {
 		t.Fatal("expected error, got nil")
 	} else if !strings.Contains(err.Error(), "KMS status not available") {
 		t.Errorf("expected error containing 'KMS status not available', got %v", err)
@@ -254,7 +255,7 @@ func TestGetKmsConfigError(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	if _, err := client.GetKmsConfig(); err == nil {
+	if _, err := client.GetKmsConfig(context.Background()); err == nil {
 		t.Fatal("expected error, got nil")
 	} else if !strings.Contains(err.Error(), "KMS config not available") {
 		t.Errorf("expected error containing 'KMS config not available', got %v", err)
@@ -309,7 +310,7 @@ func TestCreateKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key created successfully","key_id":"mykey","key_metadata":{"key_id":"mykey","key_state":"Enabled","key_usage":"EncryptDecrypt","creation_date":"2026-09-07T00:00:00Z","origin":"KMS","key_manager":"CUSTOMER","tags":{"name":"mykey"}}}`))
 	})
 
-	key, err := client.CreateKmsKey("mykey")
+	key, err := client.CreateKmsKey(context.Background(), "mykey")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -336,7 +337,7 @@ func TestDescribeKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"Key described successfully","key_metadata":{"key_id":"k1","key_state":"Disabled","key_usage":"EncryptDecrypt","creation_date":"2026-09-07T00:00:00Z","origin":"KMS","key_manager":"CUSTOMER","tags":{"name":"k1"}},"impact":null}`))
 	})
 
-	key, err := client.DescribeKmsKey("k1")
+	key, err := client.DescribeKmsKey(context.Background(), "k1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,7 +361,7 @@ func TestListKmsKeys(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"keys listed successfully","keys":[{"key_id":"k1","status":"Active","created_at":"2026-09-07T00:00:00Z","created_by":"local-kms"},{"key_id":"k2","status":"Active","created_at":"2026-09-07T00:00:00Z"}],"truncated":false,"next_marker":null}`))
 	})
 
-	keys, err := client.ListKmsKeys()
+	keys, err := client.ListKmsKeys(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -397,7 +398,7 @@ func TestEnableKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key enabled successfully","key_id":"mykey","key_metadata":null}`))
 	})
 
-	if err := client.EnableKmsKey("mykey"); err != nil {
+	if err := client.EnableKmsKey(context.Background(), "mykey"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -423,7 +424,7 @@ func TestDisableKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key disabled successfully","key_id":"mykey","key_metadata":null}`))
 	})
 
-	if err := client.DisableKmsKey("mykey"); err != nil {
+	if err := client.DisableKmsKey(context.Background(), "mykey"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -449,7 +450,7 @@ func TestRotateKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key rotated successfully","key_id":"mykey","key_metadata":{"key_id":"mykey","key_state":"Enabled","creation_date":"2026-09-07T01:00:00Z","origin":"KMS","key_manager":"CUSTOMER"}}`))
 	})
 
-	key, err := client.RotateKmsKey("mykey")
+	key, err := client.RotateKmsKey(context.Background(), "mykey")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -479,7 +480,7 @@ func TestDeleteKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key deleted successfully","key_id":"mykey","deletion_date":"2026-10-07T00:00:00Z","impact":null}`))
 	})
 
-	if err := client.DeleteKmsKey("mykey"); err != nil {
+	if err := client.DeleteKmsKey(context.Background(), "mykey"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -506,7 +507,7 @@ func TestUpdateKmsKeyDescription(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key description updated","key_id":"k1","key_metadata":{"key_id":"k1","key_state":"Enabled","description":"app key","tags":{"name":"k1"}}}`))
 	})
 
-	key, err := client.UpdateKmsKeyDescription("k1", "app key")
+	key, err := client.UpdateKmsKeyDescription(context.Background(), "k1", "app key")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -537,7 +538,7 @@ func TestTagKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key tags updated","key_id":"k1","key_metadata":{"key_id":"k1","key_state":"Enabled","tags":{"name":"k1","environment":"test"}}}`))
 	})
 
-	key, err := client.TagKmsKey("k1", map[string]string{"environment": "test"})
+	key, err := client.TagKmsKey(context.Background(), "k1", map[string]string{"environment": "test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -568,7 +569,7 @@ func TestUntagKmsKey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"message":"key tags removed","key_id":"k1","key_metadata":{"key_id":"k1","key_state":"Enabled","tags":{"name":"k1"}}}`))
 	})
 
-	key, err := client.UntagKmsKey("k1", []string{"environment"})
+	key, err := client.UntagKmsKey(context.Background(), "k1", []string{"environment"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -608,7 +609,7 @@ func TestDeleteKmsKeyWithWindow(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"key_id":"k1","deletion_date":"2026-10-27T00:00:00Z"}`))
 	})
 
-	if err := client.DeleteKmsKeyWithWindow("k1", &window); err != nil {
+	if err := client.DeleteKmsKeyWithWindow(context.Background(), "k1", &window); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -619,7 +620,7 @@ func TestKmsCapabilityError(t *testing.T) {
 			w.WriteHeader(http.StatusNotImplemented)
 			_, _ = w.Write([]byte(`{"error":"the configured KMS backend does not support rotation"}`))
 		})
-		_, err := client.RotateKmsKey("k1")
+		_, err := client.RotateKmsKey(context.Background(), "k1")
 		if err == nil || !strings.Contains(err.Error(), "does not support key rotation") {
 			t.Fatalf("expected a capability error, got %v", err)
 		}
@@ -630,7 +631,7 @@ func TestKmsCapabilityError(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`boom`))
 		})
-		_, err := client.RotateKmsKey("k1")
+		_, err := client.RotateKmsKey(context.Background(), "k1")
 		if err == nil || strings.Contains(err.Error(), "does not support") {
 			t.Fatalf("expected the raw error, got %v", err)
 		}
@@ -659,7 +660,7 @@ func TestStartKmsRekey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"job_id":"job-1","state":"running","buckets":["b1"],"current_bucket":"b1","scanned":10,"rewrapped":7,"already_current":1,"not_applicable":1,"failed":1}`))
 	})
 
-	status, err := client.StartKmsRekey([]string{"b1"}, "photos/")
+	status, err := client.StartKmsRekey(context.Background(), []string{"b1"}, "photos/")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -687,7 +688,7 @@ func TestStartKmsRekeyAllBucketsOmitsScope(t *testing.T) {
 		_, _ = w.Write([]byte(`{"job_id":"job-1","state":"running","buckets":["b1"],"scanned":0,"rewrapped":0,"already_current":0,"not_applicable":0,"failed":0}`))
 	})
 
-	if _, err := client.StartKmsRekey(nil, ""); err != nil {
+	if _, err := client.StartKmsRekey(context.Background(), nil, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -704,7 +705,7 @@ func TestGetKmsRekeyStatus(t *testing.T) {
 		_, _ = w.Write([]byte(`{"job_id":"job-2","state":"completed","buckets":["b1","b2"],"current_bucket":null,"scanned":20,"rewrapped":18,"already_current":2,"not_applicable":0,"failed":0}`))
 	})
 
-	status, err := client.GetKmsRekeyStatus()
+	status, err := client.GetKmsRekeyStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -722,7 +723,7 @@ func TestGetKmsRekeyStatusNoSweep(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":"no rekey sweep has run"}`))
 	})
 
-	_, err := client.GetKmsRekeyStatus()
+	_, err := client.GetKmsRekeyStatus(context.Background())
 	if !errors.Is(err, ErrKmsRekeyNotRun) {
 		t.Fatalf("expected ErrKmsRekeyNotRun, got %v", err)
 	}
@@ -740,7 +741,7 @@ func TestCancelKmsRekey(t *testing.T) {
 		_, _ = w.Write([]byte(`{"job_id":"job-1","state":"cancelled","buckets":["b1"],"scanned":3,"rewrapped":1,"already_current":0,"not_applicable":2,"failed":0}`))
 	})
 
-	status, err := client.CancelKmsRekey()
+	status, err := client.CancelKmsRekey(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -755,7 +756,7 @@ func TestStartKmsRekeyUnsupportedBackend(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":"the configured KMS backend does not support rewrapping data-key envelopes"}`))
 	})
 
-	_, err := client.StartKmsRekey(nil, "")
+	_, err := client.StartKmsRekey(context.Background(), nil, "")
 	if err == nil || !strings.Contains(err.Error(), "does not support rewrapping data-key envelopes") {
 		t.Fatalf("expected a capability error, got %v", err)
 	}
@@ -767,7 +768,7 @@ func TestStartKmsRekeyAlreadyRunning(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":"a rekey sweep is already running","job_id":"job-1"}`))
 	})
 
-	_, err := client.StartKmsRekey(nil, "")
+	_, err := client.StartKmsRekey(context.Background(), nil, "")
 	if err == nil || !strings.Contains(err.Error(), "already running") || !strings.Contains(err.Error(), "job-1") {
 		t.Fatalf("expected an already-running error naming the job, got %v", err)
 	}
@@ -785,7 +786,7 @@ func TestGetKmsBackupStatus(t *testing.T) {
 		_, _ = w.Write([]byte(`{"service_status":"healthy","backend":"local","responsibility":"full-material","export_supported":true,"deployment_identity":"deploy-1","backup_root":"/var/lib/rustfs/kms-backups","backup_kek_configured":true,"backup_kek_id":"kek-1","backup_kek_version":3,"target_key_dir":"/var/lib/rustfs/kms","unavailable_reason":null}`))
 	})
 
-	status, err := client.GetKmsBackupStatus()
+	status, err := client.GetKmsBackupStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -812,7 +813,7 @@ func TestGetKmsBackupStatusOptionalAbsent(t *testing.T) {
 		_, _ = w.Write([]byte(`{"service_status":"unavailable","backend":null,"responsibility":null,"export_supported":false,"deployment_identity":null,"backup_root":null,"backup_kek_configured":false,"backup_kek_id":null,"backup_kek_version":null,"target_key_dir":null,"unavailable_reason":"RUSTFS_KMS_BACKUP_DIR is not set"}`))
 	})
 
-	status, err := client.GetKmsBackupStatus()
+	status, err := client.GetKmsBackupStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -845,7 +846,7 @@ func TestCreateKmsBackup(t *testing.T) {
 		_, _ = w.Write([]byte(`{"backup_id":"nightly-1","snapshot_generation":42,"deployment_identity":"deploy-1","artifact_count":3,"manifest_digest":"abc123","backup_kek_id":"kek-1","backup_kek_version":3,"sanitized_config_included":true}`))
 	})
 
-	bundle, err := client.CreateKmsBackup("nightly-1")
+	bundle, err := client.CreateKmsBackup(context.Background(), "nightly-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -866,7 +867,7 @@ func TestCreateKmsBackupUnsupportedBackend(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"backend aws cannot export a RustFS bundle"}`))
 	})
 
-	_, err := client.CreateKmsBackup("nightly-1")
+	_, err := client.CreateKmsBackup(context.Background(), "nightly-1")
 	if err == nil || !strings.Contains(err.Error(), "does not support KMS backup") {
 		t.Fatalf("expected a capability error, got %v", err)
 	}
@@ -878,7 +879,7 @@ func TestGetKmsRekeyStatusInvalidJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`not-json`))
 	})
 
-	if _, err := client.GetKmsRekeyStatus(); err == nil {
+	if _, err := client.GetKmsRekeyStatus(context.Background()); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -889,7 +890,7 @@ func TestGetKmsBackupStatusError(t *testing.T) {
 		_, _ = w.Write([]byte(`boom`))
 	})
 
-	if _, err := client.GetKmsBackupStatus(); err == nil || !strings.Contains(err.Error(), "boom") {
+	if _, err := client.GetKmsBackupStatus(context.Background()); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("expected the server error, got %v", err)
 	}
 }
@@ -900,7 +901,7 @@ func TestGetKmsBackupStatusInvalidJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`{"service_status":`))
 	})
 
-	if _, err := client.GetKmsBackupStatus(); err == nil {
+	if _, err := client.GetKmsBackupStatus(context.Background()); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -911,7 +912,7 @@ func TestCreateKmsBackupInvalidJSON(t *testing.T) {
 		_, _ = w.Write([]byte(`not-json`))
 	})
 
-	if _, err := client.CreateKmsBackup("nightly-1"); err == nil {
+	if _, err := client.CreateKmsBackup(context.Background(), "nightly-1"); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -922,7 +923,7 @@ func TestKmsKeyMetadataMutationErrors(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(`boom`))
 		})
-		if _, err := client.TagKmsKey("k1", map[string]string{"env": "test"}); err == nil || !strings.Contains(err.Error(), "boom") {
+		if _, err := client.TagKmsKey(context.Background(), "k1", map[string]string{"env": "test"}); err == nil || !strings.Contains(err.Error(), "boom") {
 			t.Fatalf("expected the server error, got %v", err)
 		}
 	})
@@ -932,7 +933,7 @@ func TestKmsKeyMetadataMutationErrors(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`not-json`))
 		})
-		if _, err := client.TagKmsKey("k1", nil); err == nil {
+		if _, err := client.TagKmsKey(context.Background(), "k1", nil); err == nil {
 			t.Fatal("expected a decode error")
 		}
 	})
@@ -942,7 +943,7 @@ func TestKmsKeyMetadataMutationErrors(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"success":false,"message":"key not found"}`))
 		})
-		_, err := client.TagKmsKey("k1", nil)
+		_, err := client.TagKmsKey(context.Background(), "k1", nil)
 		if err == nil || err.Error() != "key not found" {
 			t.Fatalf("expected the server message, got %v", err)
 		}
@@ -954,7 +955,7 @@ func TestKmsRekeyCallMarshalError(t *testing.T) {
 		t.Error("no request should be sent when the body cannot be encoded")
 	})
 
-	if _, err := client.kmsRekeyCall(http.MethodPost, "kms/keys/rekey", make(chan int)); err == nil {
+	if _, err := client.kmsRekeyCall(context.Background(), http.MethodPost, "kms/keys/rekey", make(chan int)); err == nil {
 		t.Fatal("expected a marshal error")
 	}
 }
@@ -964,7 +965,7 @@ func TestKmsKeyMetadataMutationMarshalError(t *testing.T) {
 		t.Error("no request should be sent when the body cannot be encoded")
 	})
 
-	if _, err := client.kmsKeyMetadataMutation("kms/keys/tag", make(chan int)); err == nil {
+	if _, err := client.kmsKeyMetadataMutation(context.Background(), "kms/keys/tag", make(chan int)); err == nil {
 		t.Fatal("expected a marshal error")
 	}
 }
@@ -975,7 +976,7 @@ func TestListKmsKeysCapabilityError(t *testing.T) {
 		_, _ = w.Write([]byte(`{"error":"not implemented"}`))
 	})
 
-	if _, err := client.ListKmsKeys(); !IsUnsupportedFeature(err) {
+	if _, err := client.ListKmsKeys(context.Background()); !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported-feature error, got %v", err)
 	}
 }

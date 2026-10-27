@@ -79,12 +79,12 @@ func (d *PluginsDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *PluginsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	catalog, err := d.client.RustClient.GetPluginCatalog()
+	catalog, err := d.client.RustClient.GetPluginCatalog(ctx)
 	if err != nil {
 		d.reportError(resp, err)
 		return
 	}
-	instances, err := d.client.RustClient.ListPluginInstances()
+	instances, err := d.client.RustClient.ListPluginInstances(ctx)
 	if err != nil {
 		d.reportError(resp, err)
 		return

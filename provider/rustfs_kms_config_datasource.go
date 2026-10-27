@@ -87,7 +87,7 @@ func (d *KmsConfigDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	kmsConfig, err := d.client.RustClient.GetKmsConfig()
+	kmsConfig, err := d.client.RustClient.GetKmsConfig(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading KMS config",

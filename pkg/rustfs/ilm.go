@@ -156,7 +156,7 @@ type ILMTransitionJob struct {
 // accepts a durable job and answers "accepted" together with its job id;
 // otherwise it scans and enqueues synchronously and answers "completed" or
 // "partial".
-func (c *RustfsAdmin) RunILMTransition(options ILMTransitionRunOptions) (*ILMTransitionRunResponse, error) {
+func (c *RustfsAdmin) RunILMTransition(ctx context.Context, options ILMTransitionRunOptions) (*ILMTransitionRunResponse, error) {
 	query := url.Values{}
 	query.Set("bucket", options.Bucket)
 	if options.Prefix != "" {
@@ -183,11 +183,9 @@ func (c *RustfsAdmin) RunILMTransition(options ILMTransitionRunOptions) (*ILMTra
 		RelPath:     "ilm/transition/run",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeatureILMTransition)
+		return nil, c.featureError(ctx, err, FeatureILMTransition)
 	}
 	defer drainClose(resp)
 
@@ -201,13 +199,11 @@ func (c *RustfsAdmin) RunILMTransition(options ILMTransitionRunOptions) (*ILMTra
 // ILMTransitionJob returns one durable transition job. A job the server no
 // longer holds is reported as an error carrying NoSuchKey so the caller can
 // treat it as absent.
-func (c *RustfsAdmin) ILMTransitionJob(jobID string) (*ILMTransitionJob, error) {
+func (c *RustfsAdmin) ILMTransitionJob(ctx context.Context, jobID string) (*ILMTransitionJob, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "ilm/transition/jobs/" + url.PathEscape(jobID),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -224,13 +220,11 @@ func (c *RustfsAdmin) ILMTransitionJob(jobID string) (*ILMTransitionJob, error) 
 // CancelILMTransitionJob asks the server to cancel a durable transition job.
 // Cancelling is not a rollback: objects already enqueued or moved stay where
 // they are. The provider never calls this on destroy.
-func (c *RustfsAdmin) CancelILMTransitionJob(jobID string) error {
+func (c *RustfsAdmin) CancelILMTransitionJob(ctx context.Context, jobID string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: "ilm/transition/jobs/" + url.PathEscape(jobID),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -322,16 +316,14 @@ type ILMExpiryStatus struct {
 
 // ExpiryStatus returns the lifecycle expiry worker status
 // (GET /rustfs/admin/v3/ilm/expiry/status).
-func (c *RustfsAdmin) ILMExpiryStatus() (*ILMExpiryStatus, error) {
+func (c *RustfsAdmin) ILMExpiryStatus(ctx context.Context) (*ILMExpiryStatus, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "ilm/expiry/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeatureILMExpiryStatus)
+		return nil, c.featureError(ctx, err, FeatureILMExpiryStatus)
 	}
 	defer drainClose(resp)
 
@@ -392,7 +384,7 @@ type ILMRecoveryRecordPage struct {
 
 // ListILMRecoveryRecords returns one page of durable ILM recovery controls
 // (GET /rustfs/admin/v3/ilm/recovery/records).
-func (c *RustfsAdmin) ListILMRecoveryRecords(query ILMRecoveryRecordQuery) (*ILMRecoveryRecordPage, error) {
+func (c *RustfsAdmin) ListILMRecoveryRecords(ctx context.Context, query ILMRecoveryRecordQuery) (*ILMRecoveryRecordPage, error) {
 	values := url.Values{}
 	values.Set("protocol", query.Protocol)
 	if query.Classification != "" {
@@ -410,11 +402,9 @@ func (c *RustfsAdmin) ListILMRecoveryRecords(query ILMRecoveryRecordQuery) (*ILM
 		RelPath:     "ilm/recovery/records",
 		QueryValues: values,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeatureILMRecoveryRecords)
+		return nil, c.featureError(ctx, err, FeatureILMRecoveryRecords)
 	}
 	defer drainClose(resp)
 
@@ -434,15 +424,15 @@ func (c *RustfsAdmin) ListILMRecoveryRecords(query ILMRecoveryRecordQuery) (*ILM
 // observation receipts the server only issues through this route. The payload
 // is returned as raw JSON because it carries short-lived, action-specific
 // receipts rather than a stable read model.
-func (c *RustfsAdmin) InspectILMRecoveryRecord(controlID string) (json.RawMessage, error) {
-	return c.ilmRawRequest("GET", "ilm/recovery/records/"+url.PathEscape(controlID), nil, nil)
+func (c *RustfsAdmin) InspectILMRecoveryRecord(ctx context.Context, controlID string) (json.RawMessage, error) {
+	return c.ilmRawRequest(ctx, "GET", "ilm/recovery/records/"+url.PathEscape(controlID), nil, nil)
 }
 
 // InspectILMTransitionReconcile reads one transition transaction for operator
 // reconciliation (GET /rustfs/admin/v3/ilm/transition/reconcile/{id}). It never
 // mutates object state.
-func (c *RustfsAdmin) InspectILMTransitionReconcile(transactionID string) (json.RawMessage, error) {
-	return c.ilmRawRequest("GET", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, nil)
+func (c *RustfsAdmin) InspectILMTransitionReconcile(ctx context.Context, transactionID string) (json.RawMessage, error) {
+	return c.ilmRawRequest(ctx, "GET", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, nil)
 }
 
 // ApplyILMTransitionReconcile runs one operator reconciliation
@@ -450,7 +440,7 @@ func (c *RustfsAdmin) InspectILMTransitionReconcile(transactionID string) (json.
 // state on the remote backend, so it is deliberately not part of any Terraform
 // read path. action is "delete_candidate" (with a non-empty remoteVersionID)
 // or "finalize_missing".
-func (c *RustfsAdmin) ApplyILMTransitionReconcile(transactionID, action, remoteVersionID string) (json.RawMessage, error) {
+func (c *RustfsAdmin) ApplyILMTransitionReconcile(ctx context.Context, transactionID, action, remoteVersionID string) (json.RawMessage, error) {
 	body, err := json.Marshal(struct {
 		Action          string `json:"action"`
 		Confirm         bool   `json:"confirm"`
@@ -463,32 +453,30 @@ func (c *RustfsAdmin) ApplyILMTransitionReconcile(transactionID, action, remoteV
 	if err != nil {
 		return nil, err
 	}
-	return c.ilmRawRequest("POST", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, body)
+	return c.ilmRawRequest(ctx, "POST", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, body)
 }
 
 // InspectILMLegacyTransitionState reads the legacy transition-state record of
 // one object version (GET /rustfs/admin/v3/ilm/transition/state/reconcile).
 // versionID must be the local version id, or the literal "null" for an
 // unversioned object.
-func (c *RustfsAdmin) InspectILMLegacyTransitionState(bucket, object, versionID string) (json.RawMessage, error) {
+func (c *RustfsAdmin) InspectILMLegacyTransitionState(ctx context.Context, bucket, object, versionID string) (json.RawMessage, error) {
 	values := url.Values{}
 	values.Set("bucket", bucket)
 	values.Set("object", object)
 	values.Set("versionId", versionID)
-	return c.ilmRawRequest("GET", "ilm/transition/state/reconcile", values, nil)
+	return c.ilmRawRequest(ctx, "GET", "ilm/transition/state/reconcile", values, nil)
 }
 
 // ilmRawRequest issues an ILM admin request and returns the response body
 // unchanged, for routes whose payload is owned by the server.
-func (c *RustfsAdmin) ilmRawRequest(method, relPath string, query url.Values, body []byte) (json.RawMessage, error) {
+func (c *RustfsAdmin) ilmRawRequest(ctx context.Context, method, relPath string, query url.Values, body []byte) (json.RawMessage, error) {
 	reqData := RequestData{
 		Method:      method,
 		RelPath:     relPath,
 		QueryValues: query,
 		Content:     body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

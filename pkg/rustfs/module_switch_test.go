@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +35,7 @@ func TestGetModuleSwitches(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"notify_enabled":true,"audit_enabled":false,"persisted_notify_enabled":true,"persisted_audit_enabled":false,"notify_source":"console","audit_source":"console","admin_discovery":{"runtimeCapabilities":"/x","clusterSnapshot":"/y","extensionsCatalog":"/z"}}`))
 	})
-	state, err := client.GetModuleSwitches()
+	state, err := client.GetModuleSwitches(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestSetModuleSwitches(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"notify_enabled":true,"audit_enabled":false,"persisted_notify_enabled":true,"persisted_audit_enabled":false,"notify_source":"console","audit_source":"console"}`))
 	})
-	state, err := client.SetModuleSwitches(ModuleSwitchUpdate{NotifyEnabled: true, AuditEnabled: false})
+	state, err := client.SetModuleSwitches(context.Background(), ModuleSwitchUpdate{NotifyEnabled: true, AuditEnabled: false})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

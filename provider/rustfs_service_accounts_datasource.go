@@ -146,7 +146,7 @@ func (d *ServiceAccountsDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	accounts, err := d.client.RustClient.ListServiceAccountsFor(config.User.ValueString())
+	accounts, err := d.client.RustClient.ListServiceAccountsFor(ctx, config.User.ValueString())
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

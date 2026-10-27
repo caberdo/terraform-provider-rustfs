@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -58,7 +59,7 @@ func TestGetObjectDataCacheStats(t *testing.T) {
 		_, _ = io.WriteString(w, objectDataCacheStatsPayload)
 	})
 
-	stats, err := client.GetObjectDataCacheStats()
+	stats, err := client.GetObjectDataCacheStats(context.Background())
 	if err != nil {
 		t.Fatalf("read object data cache stats: %v", err)
 	}
@@ -95,7 +96,7 @@ func TestGetObjectDataCacheStatsDisabled(t *testing.T) {
 		_, _ = io.WriteString(w, body)
 	})
 
-	stats, err := client.GetObjectDataCacheStats()
+	stats, err := client.GetObjectDataCacheStats(context.Background())
 	if err != nil {
 		t.Fatalf("read object data cache stats: %v", err)
 	}
@@ -112,14 +113,14 @@ func TestObjectDataCacheMalformedBody(t *testing.T) {
 		{
 			name: "stats",
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.GetObjectDataCacheStats()
+				_, err := client.GetObjectDataCacheStats(context.Background())
 				return err
 			},
 		},
 		{
 			name: "flush",
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.FlushObjectDataCache("", "")
+				_, err := client.FlushObjectDataCache(context.Background(), "", "")
 				return err
 			},
 		},
@@ -163,7 +164,7 @@ func TestFlushObjectDataCache(t *testing.T) {
 					`"outcome":"removed","removed_keys":`+strconv.Itoa(tc.wantRemoved)+`}`)
 			})
 
-			result, err := client.FlushObjectDataCache(tc.bucket, tc.object)
+			result, err := client.FlushObjectDataCache(context.Background(), tc.bucket, tc.object)
 			if err != nil {
 				t.Fatalf("flush object data cache: %v", err)
 			}
@@ -192,7 +193,7 @@ func TestFlushObjectDataCacheRejectsObjectWithoutBucket(t *testing.T) {
 		t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 	})
 
-	if _, err := client.FlushObjectDataCache("", "a.log"); err == nil {
+	if _, err := client.FlushObjectDataCache(context.Background(), "", "a.log"); err == nil {
 		t.Fatal("expected an error for an object flush without a bucket")
 	}
 }
@@ -209,7 +210,7 @@ func TestObjectDataCacheNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 			route:   "/rustfs/admin/v3/object-data-cache/stats",
 			feature: rustfs.FeatureObjectDataCacheStats,
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.GetObjectDataCacheStats()
+				_, err := client.GetObjectDataCacheStats(context.Background())
 				return err
 			},
 		},
@@ -218,7 +219,7 @@ func TestObjectDataCacheNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 			route:   "/rustfs/admin/v3/object-data-cache/flush",
 			feature: rustfs.FeatureObjectDataCacheFlush,
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.FlushObjectDataCache("", "")
+				_, err := client.FlushObjectDataCache(context.Background(), "", "")
 				return err
 			},
 		},

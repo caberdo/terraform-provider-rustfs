@@ -193,7 +193,7 @@ func (r *BucketRecoveryResource) Create(ctx context.Context, req resource.Create
 	}
 
 	bucket := plan.Bucket.ValueString()
-	result, err := r.client.RustClient.RecoverOrphanedBucket(bucket, incarnationID)
+	result, err := r.client.RustClient.RecoverOrphanedBucket(ctx, bucket, incarnationID)
 	if err != nil {
 		addBucketRecoveryFailure(&resp.Diagnostics, bucket, incarnationID, err)
 		return

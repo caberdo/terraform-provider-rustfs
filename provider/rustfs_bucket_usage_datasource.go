@@ -217,7 +217,7 @@ func (d *BucketUsageDataSource) Read(ctx context.Context, req datasource.ReadReq
 		maxEntries = int(config.MaxEntries.ValueInt64())
 	}
 
-	usage, err := d.client.RustClient.GetBucketUsage(bucket, prefix, maxEntries)
+	usage, err := d.client.RustClient.GetBucketUsage(ctx, bucket, prefix, maxEntries)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket usage",

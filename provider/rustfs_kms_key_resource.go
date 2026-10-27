@@ -211,7 +211,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	key, err := r.client.RustClient.CreateKmsKey(plan.Name.ValueString())
+	key, err := r.client.RustClient.CreateKmsKey(ctx, plan.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating KMS key",
@@ -232,7 +232,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	description := plan.Description.ValueString()
 	if !plan.Description.IsNull() && description != "" {
-		if _, err := r.client.RustClient.UpdateKmsKeyDescription(key.KeyID, description); err != nil {
+		if _, err := r.client.RustClient.UpdateKmsKeyDescription(ctx, key.KeyID, description); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating KMS key description",
 				"Could not update KMS key description, unexpected error: "+err.Error(),
@@ -247,7 +247,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	if len(tags) > 0 {
-		if _, err := r.client.RustClient.TagKmsKey(key.KeyID, tags); err != nil {
+		if _, err := r.client.RustClient.TagKmsKey(ctx, key.KeyID, tags); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating KMS key tags",
 				"Could not update KMS key tags, unexpected error: "+err.Error(),
@@ -257,7 +257,7 @@ func (r *kmsKeyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	if !plan.Enabled.ValueBool() {
-		if err := r.client.RustClient.DisableKmsKey(key.KeyID); err != nil {
+		if err := r.client.RustClient.DisableKmsKey(ctx, key.KeyID); err != nil {
 			resp.Diagnostics.AddError(
 				"Error disabling KMS key",
 				"Could not disable KMS key, unexpected error: "+err.Error(),
@@ -290,7 +290,7 @@ func (r *kmsKeyResource) Read(ctx context.Context, req resource.ReadRequest, res
 		state.KeyID = types.StringValue(keyID)
 	}
 
-	key, err := r.client.RustClient.DescribeKmsKey(keyID)
+	key, err := r.client.RustClient.DescribeKmsKey(ctx, keyID)
 	if err != nil {
 		if isKmsKeyNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -332,7 +332,7 @@ func isKmsKeyNotFound(err error) bool {
 // backend the key id equals the name; on production backends the key created
 // through this provider carries a `name` tag that the listing exposes.
 func (r *kmsKeyResource) resolveKeyID(ctx context.Context, name string, resp *resource.ReadResponse) string {
-	keys, err := r.client.RustClient.ListKmsKeys()
+	keys, err := r.client.RustClient.ListKmsKeys(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing KMS keys",
@@ -364,7 +364,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	if !plan.Description.Equal(state.Description) {
-		if _, err := r.client.RustClient.UpdateKmsKeyDescription(keyID, plan.Description.ValueString()); err != nil {
+		if _, err := r.client.RustClient.UpdateKmsKeyDescription(ctx, keyID, plan.Description.ValueString()); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating KMS key description",
 				"Could not update KMS key description, unexpected error: "+err.Error(),
@@ -396,7 +396,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 	if len(additions) > 0 {
-		if _, err := r.client.RustClient.TagKmsKey(keyID, additions); err != nil {
+		if _, err := r.client.RustClient.TagKmsKey(ctx, keyID, additions); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating KMS key tags",
 				"Could not update KMS key tags, unexpected error: "+err.Error(),
@@ -405,7 +405,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 	if len(removals) > 0 {
-		if _, err := r.client.RustClient.UntagKmsKey(keyID, removals); err != nil {
+		if _, err := r.client.RustClient.UntagKmsKey(ctx, keyID, removals); err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating KMS key tags",
 				"Could not remove KMS key tags, unexpected error: "+err.Error(),
@@ -418,9 +418,9 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if !plan.Enabled.Equal(state.Enabled) {
 		var err error
 		if plan.Enabled.ValueBool() {
-			err = r.client.RustClient.EnableKmsKey(keyID)
+			err = r.client.RustClient.EnableKmsKey(ctx, keyID)
 		} else {
-			err = r.client.RustClient.DisableKmsKey(keyID)
+			err = r.client.RustClient.DisableKmsKey(ctx, keyID)
 		}
 		if err != nil {
 			resp.Diagnostics.AddError(
@@ -434,7 +434,7 @@ func (r *kmsKeyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	// Rotation goes last: metadata failures before it leave the trigger unsaved,
 	// so a retry does not rotate twice.
 	if !plan.RotateTrigger.IsNull() && !plan.RotateTrigger.Equal(state.RotateTrigger) {
-		if _, err := r.client.RustClient.RotateKmsKey(keyID); err != nil {
+		if _, err := r.client.RustClient.RotateKmsKey(ctx, keyID); err != nil {
 			resp.Diagnostics.AddError(
 				"Error rotating KMS key",
 				"Could not rotate KMS key, unexpected error: "+err.Error(),
@@ -471,7 +471,7 @@ func (r *kmsKeyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if !state.DeletionWindowDays.IsNull() && !state.DeletionWindowDays.IsUnknown() && state.DeletionWindowDays.ValueInt64() > 0 {
 		window = state.DeletionWindowDays.ValueInt64()
 	}
-	if err := r.client.RustClient.DeleteKmsKeyWithWindow(keyID, &window); err != nil {
+	if err := r.client.RustClient.DeleteKmsKeyWithWindow(ctx, keyID, &window); err != nil {
 		// A key that is already gone (deleted or scheduled for deletion) has
 		// nothing left to destroy, so the destroy is a no-op rather than a
 		// failure.

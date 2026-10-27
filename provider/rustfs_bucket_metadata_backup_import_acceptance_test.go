@@ -55,7 +55,7 @@ func TestAccBucketMetadataBackupImportResource_replaceAndErrors(t *testing.T) {
 	// remove it here.
 	t.Cleanup(func() {
 		client := testAccRustClient()
-		_ = client.DeletQuota(bucket)
+		_ = client.DeletQuota(context.Background(), bucket)
 	})
 
 	resource.ParallelTest(t, resource.TestCase{
@@ -266,7 +266,7 @@ func testAccBucketMetadataBackupImportOutOfBand(t *testing.T, archive, bucket st
 			return fmt.Errorf("decode out-of-band archive: %w", err)
 		}
 		client := testAccRustClient()
-		if err := client.ImportBucketMetadata(data); err != nil {
+		if err := client.ImportBucketMetadata(context.Background(), data); err != nil {
 			return fmt.Errorf("out-of-band bucket metadata import: %w", err)
 		}
 
@@ -287,7 +287,7 @@ func testAccBucketMetadataBackupImportOutOfBand(t *testing.T, archive, bucket st
 // import endpoint writes.
 func testAccBucketMetadataBackupImportServerQuota(bucket string) (int, error) {
 	client := testAccRustClient()
-	exported, err := client.ExportBucketMetadata()
+	exported, err := client.ExportBucketMetadata(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("export bucket metadata: %w", err)
 	}

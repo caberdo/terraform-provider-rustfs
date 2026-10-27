@@ -91,7 +91,7 @@ func (r *GroupPolicyAttachmentResource) Create(ctx context.Context, req resource
 		return
 	}
 
-	err := r.client.RustClient.AttachGroupPolicy(plan.Group.ValueString(), plan.Policy.ValueString())
+	err := r.client.RustClient.AttachGroupPolicy(ctx, plan.Group.ValueString(), plan.Policy.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching policy to group",
@@ -115,7 +115,7 @@ func (r *GroupPolicyAttachmentResource) Read(ctx context.Context, req resource.R
 	group := state.Group.ValueString()
 	policy := state.Policy.ValueString()
 
-	info, err := r.client.RustClient.GetGroup(group)
+	info, err := r.client.RustClient.GetGroup(ctx, group)
 	if err != nil {
 		if rustfs.IsAPIErrorCode(err, "NoSuchResource", "NoSuchGroup") {
 			// The group is gone, so the attachment is gone with it.
@@ -153,7 +153,7 @@ func (r *GroupPolicyAttachmentResource) Update(ctx context.Context, req resource
 	}
 	// All attributes are RequiresReplace, so Terraform normally plans a
 	// replacement; re-attaching keeps this method correct if it is invoked.
-	err := r.client.RustClient.AttachGroupPolicy(plan.Group.ValueString(), plan.Policy.ValueString())
+	err := r.client.RustClient.AttachGroupPolicy(ctx, plan.Group.ValueString(), plan.Policy.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching policy to group",
@@ -172,7 +172,7 @@ func (r *GroupPolicyAttachmentResource) Delete(ctx context.Context, req resource
 		return
 	}
 
-	err := r.client.RustClient.DetachGroupPolicy(data.Group.ValueString(), data.Policy.ValueString())
+	err := r.client.RustClient.DetachGroupPolicy(ctx, data.Group.ValueString(), data.Policy.ValueString())
 	if err != nil {
 		// A group that no longer exists cannot still carry the policy, so the
 		// attachment is already gone.

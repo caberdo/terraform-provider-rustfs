@@ -44,13 +44,11 @@ type GroupAddRemove struct {
 // JSON array of group name strings; a {"groups": [...]} wrapper is also
 // accepted for forward compatibility. Names are sorted for deterministic
 // output.
-func (c *RustfsAdmin) ListGroups() ([]string, error) {
+func (c *RustfsAdmin) ListGroups(ctx context.Context) ([]string, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "groups",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -78,7 +76,7 @@ func (c *RustfsAdmin) ListGroups() ([]string, error) {
 	return nil, errors.New("unrecognized groups response")
 }
 
-func (c *RustfsAdmin) GetGroup(name string) (GroupInfo, error) {
+func (c *RustfsAdmin) GetGroup(ctx context.Context, name string) (GroupInfo, error) {
 	query := url.Values{}
 	query.Set("group", name)
 	reqData := RequestData{
@@ -86,8 +84,6 @@ func (c *RustfsAdmin) GetGroup(name string) (GroupInfo, error) {
 		RelPath:     "group",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return GroupInfo{}, err
@@ -98,7 +94,7 @@ func (c *RustfsAdmin) GetGroup(name string) (GroupInfo, error) {
 	return info, err
 }
 
-func (c *RustfsAdmin) UpdateGroupMembers(req GroupAddRemove) error {
+func (c *RustfsAdmin) UpdateGroupMembers(ctx context.Context, req GroupAddRemove) error {
 	if req.Members == nil {
 		req.Members = []string{}
 	}
@@ -111,8 +107,6 @@ func (c *RustfsAdmin) UpdateGroupMembers(req GroupAddRemove) error {
 		RelPath: "update-group-members",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -121,13 +115,11 @@ func (c *RustfsAdmin) UpdateGroupMembers(req GroupAddRemove) error {
 	return nil
 }
 
-func (c *RustfsAdmin) DeleteGroup(name string) error {
+func (c *RustfsAdmin) DeleteGroup(ctx context.Context, name string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: "group/" + name,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -136,7 +128,7 @@ func (c *RustfsAdmin) DeleteGroup(name string) error {
 	return nil
 }
 
-func (c *RustfsAdmin) SetGroupStatus(name, status string) error {
+func (c *RustfsAdmin) SetGroupStatus(ctx context.Context, name, status string) error {
 	query := url.Values{}
 	query.Set("group", name)
 	query.Set("status", status)
@@ -145,8 +137,6 @@ func (c *RustfsAdmin) SetGroupStatus(name, status string) error {
 		RelPath:     "set-group-status",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

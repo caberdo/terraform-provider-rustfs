@@ -139,7 +139,7 @@ func (r *ConfigHistoryClearResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	r.applyClear(&plan, &resp.Diagnostics)
+	r.applyClear(ctx, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -166,7 +166,7 @@ func (r *ConfigHistoryClearResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	r.applyClear(&plan, &resp.Diagnostics)
+	r.applyClear(ctx, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -180,7 +180,7 @@ func (r *ConfigHistoryClearResource) Delete(_ context.Context, _ resource.Delete
 	// Destroy only forgets the record.
 }
 
-func (r *ConfigHistoryClearResource) applyClear(plan *ConfigHistoryClearResourceModel, diagnostics *diag.Diagnostics) {
+func (r *ConfigHistoryClearResource) applyClear(ctx context.Context, plan *ConfigHistoryClearResourceModel, diagnostics *diag.Diagnostics) {
 	if plan.Confirm.IsUnknown() {
 		diagnostics.AddError(
 			"Incomplete config history clear",
@@ -194,7 +194,7 @@ func (r *ConfigHistoryClearResource) applyClear(plan *ConfigHistoryClearResource
 		return
 	}
 
-	if err := r.client.RustClient.ClearConfigHistory(); err != nil {
+	if err := r.client.RustClient.ClearConfigHistory(ctx); err != nil {
 		diagnostics.AddError(
 			"Error clearing config history",
 			"Could not clear the server's config history: "+err.Error(),

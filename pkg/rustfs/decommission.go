@@ -63,17 +63,15 @@ type decommissionStatusResponse struct {
 // RustFS answers 501 NotImplemented for this route on a single-pool
 // deployment: decommission needs at least two pools, and the route is only
 // served when the persisted layout is not the single-path legacy layout.
-func (c *RustfsAdmin) DecommissionStatuses() ([]PoolDecommissionStatus, error) {
+func (c *RustfsAdmin) DecommissionStatuses(ctx context.Context) ([]PoolDecommissionStatus, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "decommission/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeaturePoolDecommission)
+		return nil, c.featureError(ctx, err, FeaturePoolDecommission)
 	}
 	defer drainClose(resp)
 
@@ -89,40 +87,38 @@ func (c *RustfsAdmin) DecommissionStatuses() ([]PoolDecommissionStatus, error) {
 //
 // The request answers 200 with an empty body. Once accepted the drain runs in
 // the background; callers read its progress from DecommissionStatuses.
-func (c *RustfsAdmin) StartPoolDecommission(pool string) error {
-	return c.poolDecommissionMutation("pools/decommission", pool)
+func (c *RustfsAdmin) StartPoolDecommission(ctx context.Context, pool string) error {
+	return c.poolDecommissionMutation(ctx, "pools/decommission", pool)
 }
 
 // CancelPoolDecommission cancels an in-flight or queued drain through
 // POST /rustfs/admin/v3/pools/cancel. It is not valid for a terminal
 // (complete, failed or canceled) drain: RustFS answers 400 InvalidRequest.
-func (c *RustfsAdmin) CancelPoolDecommission(pool string) error {
-	return c.poolDecommissionMutation("pools/cancel", pool)
+func (c *RustfsAdmin) CancelPoolDecommission(ctx context.Context, pool string) error {
+	return c.poolDecommissionMutation(ctx, "pools/cancel", pool)
 }
 
 // ClearPoolDecommission wipes the decommission metadata of a failed or
 // canceled drain through POST /rustfs/admin/v3/pools/clear, returning the pool
 // to status "none". Already moved data is not rolled back, and RustFS rejects
 // the call for a completed drain.
-func (c *RustfsAdmin) ClearPoolDecommission(pool string) error {
-	return c.poolDecommissionMutation("pools/clear", pool)
+func (c *RustfsAdmin) ClearPoolDecommission(ctx context.Context, pool string) error {
+	return c.poolDecommissionMutation(ctx, "pools/clear", pool)
 }
 
 // poolDecommissionMutation issues one of the three pool decommission
 // mutations. All of them identify the pool by its cmdline and accept the same
 // query shape.
-func (c *RustfsAdmin) poolDecommissionMutation(relPath, pool string) error {
+func (c *RustfsAdmin) poolDecommissionMutation(ctx context.Context, relPath, pool string) error {
 	reqData := RequestData{
 		Method:      "POST",
 		RelPath:     relPath,
 		QueryValues: url.Values{"pool": []string{pool}},
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.featureError(err, FeaturePoolDecommission)
+		return c.featureError(ctx, err, FeaturePoolDecommission)
 	}
 	defer drainClose(resp)
 	return nil

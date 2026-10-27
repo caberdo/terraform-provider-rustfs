@@ -174,7 +174,7 @@ func (d *TemporaryAccountsDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 
-	accounts, err := d.client.RustClient.ListTemporaryAccountsContext(ctx, rustfs.TemporaryAccountListOptions{
+	accounts, err := d.client.RustClient.ListTemporaryAccounts(ctx, rustfs.TemporaryAccountListOptions{
 		UserProvider:           config.UserProvider.ValueString(),
 		ParentUser:             config.ParentUser.ValueString(),
 		IncludeServiceAccounts: config.IncludeServiceAccounts.ValueBool(),
@@ -294,7 +294,7 @@ func (d *TemporaryAccountsDataSource) addCancelledError(resp *datasource.ReadRes
 
 func (d *TemporaryAccountsDataSource) accountInfo(ctx context.Context, account rustfs.TemporaryAccount) (accessKeyEnrichment, error) {
 	if account.Kind == rustfs.AccessKeyKindServiceAccount {
-		info, err := d.client.RustClient.ReadServiceAccountContext(ctx, account.AccessKey)
+		info, err := d.client.RustClient.ReadServiceAccount(ctx, account.AccessKey)
 		if err != nil {
 			return accessKeyEnrichment{}, err
 		}
@@ -305,7 +305,7 @@ func (d *TemporaryAccountsDataSource) accountInfo(ctx context.Context, account r
 		}, nil
 	}
 
-	info, err := d.client.RustClient.GetTemporaryAccountInfoContext(ctx, account.AccessKey)
+	info, err := d.client.RustClient.GetTemporaryAccountInfo(ctx, account.AccessKey)
 	if err != nil {
 		return accessKeyEnrichment{}, err
 	}

@@ -190,7 +190,7 @@ func (d *ScannerStatusDataSource) Configure(_ context.Context, req datasource.Co
 }
 
 func (d *ScannerStatusDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	status, err := d.client.RustClient.GetScannerStatus()
+	status, err := d.client.RustClient.GetScannerStatus(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

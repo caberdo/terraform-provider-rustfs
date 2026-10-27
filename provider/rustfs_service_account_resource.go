@@ -139,7 +139,7 @@ func (r *ServiceAccountResource) Create(ctx context.Context, req resource.Create
 		Expiration:  plan.Expiration.ValueString(),
 		Policy:      plan.Policy.ValueString(),
 	}
-	err := r.client.RustClient.CreateServiceAccount(account)
+	err := r.client.RustClient.CreateServiceAccount(ctx, account)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating service account",
@@ -169,7 +169,7 @@ func (r *ServiceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	}
 
 	// Make the read request
-	actual, err := r.client.RustClient.ReadServiceAccount(state.AccessKey.ValueString())
+	actual, err := r.client.RustClient.ReadServiceAccount(ctx, state.AccessKey.ValueString())
 	if err != nil {
 		if isMissingServiceAccount(err) {
 			// Dropping it from state makes Terraform plan a recreation instead
@@ -220,7 +220,7 @@ func (r *ServiceAccountResource) Update(ctx context.Context, req resource.Update
 		Expiration:  plan.Expiration.ValueString(),
 		Policy:      plan.Policy.ValueString(),
 	}
-	err := r.client.RustClient.UpdateServiceAccount(account)
+	err := r.client.RustClient.UpdateServiceAccount(ctx, account)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating service account",
@@ -259,7 +259,7 @@ func (r *ServiceAccountResource) Delete(ctx context.Context, req resource.Delete
 		SecretKey:   data.SecretKey.ValueString(),
 		Description: data.Description.ValueString(),
 	}
-	err := r.client.RustClient.DeleteServiceAccount(account)
+	err := r.client.RustClient.DeleteServiceAccount(ctx, account)
 	if err != nil {
 		if isMissingServiceAccount(err) {
 			// Already gone: destroying twice must not fail.

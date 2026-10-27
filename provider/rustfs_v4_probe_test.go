@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -25,12 +26,12 @@ func TestAccV4AdminRouteProbe(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"GET /rustfs/admin/v4/runtime/capabilities", func() error { _, err := client.GetRuntimeCapabilities(); return err }},
-		{"GET /rustfs/admin/v4/plugins/catalog", func() error { _, err := client.GetPluginCatalog(); return err }},
-		{"GET /rustfs/admin/v4/plugins/instances", func() error { _, err := client.ListPluginInstances(); return err }},
-		{"GET /rustfs/admin/v4/extensions/catalog", func() error { _, err := client.GetExtensionCatalog(); return err }},
-		{"GET /rustfs/admin/v4/extensions/instances", func() error { _, err := client.ListExtensionInstances(); return err }},
-		{"GET /rustfs/admin/v4/cluster/snapshot", func() error { _, err := client.GetClusterSnapshot(); return err }},
+		{"GET /rustfs/admin/v4/runtime/capabilities", func() error { _, err := client.GetRuntimeCapabilities(context.Background()); return err }},
+		{"GET /rustfs/admin/v4/plugins/catalog", func() error { _, err := client.GetPluginCatalog(context.Background()); return err }},
+		{"GET /rustfs/admin/v4/plugins/instances", func() error { _, err := client.ListPluginInstances(context.Background()); return err }},
+		{"GET /rustfs/admin/v4/extensions/catalog", func() error { _, err := client.GetExtensionCatalog(context.Background()); return err }},
+		{"GET /rustfs/admin/v4/extensions/instances", func() error { _, err := client.ListExtensionInstances(context.Background()); return err }},
+		{"GET /rustfs/admin/v4/cluster/snapshot", func() error { _, err := client.GetClusterSnapshot(context.Background()); return err }},
 	}
 
 	for _, route := range routes {

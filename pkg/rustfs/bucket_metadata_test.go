@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,7 +27,7 @@ func TestExportBucketMetadata(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	data, err := client.ExportBucketMetadata()
+	data, err := client.ExportBucketMetadata(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestImportBucketMetadata(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.ImportBucketMetadata([]byte("fake-metadata-zip"))
+	err := client.ImportBucketMetadata(context.Background(), []byte("fake-metadata-zip"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

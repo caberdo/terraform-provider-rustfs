@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -104,7 +105,7 @@ func testAccCheckOIDCProviderExists(n string) resource.TestCheckFunc {
 		}
 		client := testAccRustClient()
 		providerID := rs.Primary.Attributes["id"]
-		_, found, err := client.GetOIDCProvider(providerID)
+		_, found, err := client.GetOIDCProvider(context.Background(), providerID)
 		if err != nil {
 			return fmt.Errorf("reading OIDC provider %s: %w", providerID, err)
 		}
@@ -122,7 +123,7 @@ func testAccCheckOIDCProviderDestroy(s *terraform.State) error {
 			continue
 		}
 		providerID := rs.Primary.Attributes["id"]
-		_, found, err := client.GetOIDCProvider(providerID)
+		_, found, err := client.GetOIDCProvider(context.Background(), providerID)
 		if err != nil {
 			return fmt.Errorf("reading OIDC provider %s: %w", providerID, err)
 		}

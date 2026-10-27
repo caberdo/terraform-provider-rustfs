@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +38,7 @@ func TestCreateLDAPServiceAccount(t *testing.T) {
 		TargetUser: "uid=alice,ou=people,dc=example,dc=com",
 		Policy:     "readwrite",
 	}
-	if err := client.CreateLDAPServiceAccount(account); err != nil {
+	if err := client.CreateLDAPServiceAccount(context.Background(), account); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/rustfs/admin/v3/idp/ldap/add-service-account") {
@@ -72,7 +73,7 @@ func TestCreateLDAPServiceAccountError(t *testing.T) {
 		SecretKey:  "s3cret",
 		TargetUser: "uid=ghost,ou=people,dc=example,dc=com",
 	}
-	err := client.CreateLDAPServiceAccount(account)
+	err := client.CreateLDAPServiceAccount(context.Background(), account)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

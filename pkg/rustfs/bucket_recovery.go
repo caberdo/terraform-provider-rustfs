@@ -42,7 +42,7 @@ type bucketRecoveryRequest struct {
 // match. An interrupted cleanup can be retried safely with the same identity.
 // The call never deletes a bucket or its objects; it retires the orphaned
 // generation and drops its metadata.
-func (c *RustfsAdmin) RecoverOrphanedBucket(bucket, expectedIncarnationID string) (BucketRecoveryResult, error) {
+func (c *RustfsAdmin) RecoverOrphanedBucket(ctx context.Context, bucket, expectedIncarnationID string) (BucketRecoveryResult, error) {
 	content, err := json.Marshal(bucketRecoveryRequest{ExpectedIncarnationID: expectedIncarnationID})
 	if err != nil {
 		return BucketRecoveryResult{}, err
@@ -53,14 +53,12 @@ func (c *RustfsAdmin) RecoverOrphanedBucket(bucket, expectedIncarnationID string
 		RelPath: "recover-orphaned-bucket/" + url.PathEscape(bucket),
 		Content: content,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		// RustFS 1.0.1 never registered the route, so it answers 404. Name the
 		// feature, route and version instead of surfacing a bare 404.
-		return BucketRecoveryResult{}, c.featureError(err, FeatureBucketRecovery)
+		return BucketRecoveryResult{}, c.featureError(ctx, err, FeatureBucketRecovery)
 	}
 	defer drainClose(resp)
 

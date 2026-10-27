@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,7 +31,7 @@ func TestListUsers(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	users, err := client.ListUsers("")
+	users, err := client.ListUsers(context.Background(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +65,7 @@ func TestListUsersWithBucket(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	users, err := client.ListUsers("my-bucket")
+	users, err := client.ListUsers(context.Background(), "my-bucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestListUsersError(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	if _, err := client.ListUsers(""); err == nil {
+	if _, err := client.ListUsers(context.Background(), ""); err == nil {
 		t.Fatal("expected an error for a failing list-users")
 	}
 }

@@ -146,7 +146,7 @@ func (d *QuotaCheckDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		operationSize = config.OperationSize.ValueInt64()
 	}
 
-	check, err := d.client.RustClient.CheckQuota(bucket, operationType, operationSize)
+	check, err := d.client.RustClient.CheckQuota(ctx, bucket, operationType, operationSize)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error checking bucket quota",

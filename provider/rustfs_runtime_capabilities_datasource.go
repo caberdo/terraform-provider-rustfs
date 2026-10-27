@@ -112,7 +112,7 @@ func (d *RuntimeCapabilitiesDataSource) Configure(_ context.Context, req datasou
 }
 
 func (d *RuntimeCapabilitiesDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	capabilities, err := d.client.RustClient.GetRuntimeCapabilities()
+	capabilities, err := d.client.RustClient.GetRuntimeCapabilities(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

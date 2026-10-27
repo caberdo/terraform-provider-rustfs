@@ -130,7 +130,7 @@ func (d *HealthInfoDataSource) Configure(_ context.Context, req datasource.Confi
 }
 
 func (d *HealthInfoDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	health, err := d.client.RustClient.GetHealthInfo()
+	health, err := d.client.RustClient.GetHealthInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading health info",
@@ -139,7 +139,7 @@ func (d *HealthInfoDataSource) Read(ctx context.Context, _ datasource.ReadReques
 		return
 	}
 
-	obd, err := d.client.RustClient.GetObdInfo()
+	obd, err := d.client.RustClient.GetObdInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading OBD info",

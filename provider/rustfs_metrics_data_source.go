@@ -66,7 +66,7 @@ func (d *MetricsDataSource) Configure(_ context.Context, req datasource.Configur
 }
 
 func (d *MetricsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	raw, err := d.client.RustClient.GetMetrics()
+	raw, err := d.client.RustClient.GetMetrics(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

@@ -65,7 +65,7 @@ type configHelpResponse struct {
 // subSystem is a config scope: either a bare sub-system (e.g. "scanner") or a
 // targeted sub-system (e.g. "notify_webhook:primary"). The server renders the
 // scope as text lines in the form `scope key="value" key2="value2"`.
-func (c *RustfsAdmin) GetConfig(subSystem string) ([]ConfigKV, error) {
+func (c *RustfsAdmin) GetConfig(ctx context.Context, subSystem string) ([]ConfigKV, error) {
 	query := make(url.Values)
 	query.Set("key", subSystem)
 	reqData := RequestData{
@@ -73,8 +73,6 @@ func (c *RustfsAdmin) GetConfig(subSystem string) ([]ConfigKV, error) {
 		RelPath:     "get-config-kv",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -91,14 +89,12 @@ func (c *RustfsAdmin) GetConfig(subSystem string) ([]ConfigKV, error) {
 //
 // The request body is a plain text config directive in the same format the
 // server renders: `scope key="value" key2="value2"`.
-func (c *RustfsAdmin) SetConfig(subSystem string, kvs []ConfigKV) error {
+func (c *RustfsAdmin) SetConfig(ctx context.Context, subSystem string, kvs []ConfigKV) error {
 	reqData := RequestData{
 		Method:  "PUT",
 		RelPath: "set-config-kv",
 		Content: []byte(buildConfigDirective(subSystem, kvs)),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -110,14 +106,12 @@ func (c *RustfsAdmin) SetConfig(subSystem string, kvs []ConfigKV) error {
 // DeleteConfig removes a config scope via DELETE del-config-kv. The whole
 // sub-system or the named target is removed; keys that are not explicitly
 // listed are also removed, so this resets the scope to the server defaults.
-func (c *RustfsAdmin) DeleteConfig(subSystem string) error {
+func (c *RustfsAdmin) DeleteConfig(ctx context.Context, subSystem string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: "del-config-kv",
 		Content: []byte(subSystem),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -147,7 +141,7 @@ type ConfigHistoryEntry struct {
 // The server requires a count and keeps at most that many newest entries. It
 // returns whole-server snapshots, not per-subsystem diffs, so every entry
 // describes the same config scopes.
-func (c *RustfsAdmin) ListConfigHistory(count int) ([]ConfigHistoryEntry, error) {
+func (c *RustfsAdmin) ListConfigHistory(ctx context.Context, count int) ([]ConfigHistoryEntry, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("config history count must be at least 1: %d", count)
 	}
@@ -159,11 +153,9 @@ func (c *RustfsAdmin) ListConfigHistory(count int) ([]ConfigHistoryEntry, error)
 		RelPath:     "list-config-history-kv",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeatureConfigHistory)
+		return nil, c.featureError(ctx, err, FeatureConfigHistory)
 	}
 	defer drainClose(resp)
 
@@ -182,7 +174,7 @@ func (c *RustfsAdmin) ListConfigHistory(count int) ([]ConfigHistoryEntry, error)
 // history entry for the current configuration before applying the snapshot,
 // which is what makes a restore itself revertible. A missing or legacy entry
 // is reported by the server; the provider does not fall back to another entry.
-func (c *RustfsAdmin) RestoreConfigHistory(restoreID string) error {
+func (c *RustfsAdmin) RestoreConfigHistory(ctx context.Context, restoreID string) error {
 	if restoreID == "" {
 		return errors.New("restore id is required")
 	}
@@ -194,13 +186,11 @@ func (c *RustfsAdmin) RestoreConfigHistory(restoreID string) error {
 		RelPath:     "restore-config-history-kv",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		// A missing entry is a semantic 404 (NoSuchKey); only a bare 404/501
 		// means the route is not implemented.
-		return c.featureErrorPreservingCode(err, FeatureConfigRestore)
+		return c.featureErrorPreservingCode(ctx, err, FeatureConfigRestore)
 	}
 	drainClose(resp)
 	return nil
@@ -214,7 +204,7 @@ func (c *RustfsAdmin) RestoreConfigHistory(restoreID string) error {
 // many entries it removed. The operation is idempotent; clearing an already
 // empty history succeeds. Clearing removes the rollback points the restore
 // resource reaches, so a later restore can no longer roll back to them.
-func (c *RustfsAdmin) ClearConfigHistory() error {
+func (c *RustfsAdmin) ClearConfigHistory(ctx context.Context) error {
 	query := make(url.Values)
 	query.Set("restoreId", "all")
 	reqData := RequestData{
@@ -222,11 +212,9 @@ func (c *RustfsAdmin) ClearConfigHistory() error {
 		RelPath:     "clear-config-history-kv",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.featureError(err, FeatureConfigHistoryClear)
+		return c.featureError(ctx, err, FeatureConfigHistoryClear)
 	}
 	drainClose(resp)
 	return nil
@@ -234,7 +222,7 @@ func (c *RustfsAdmin) ClearConfigHistory() error {
 
 // HelpConfig returns the documented keys of a sub-system via GET help-config-kv.
 // The returned ConfigKV pairs map each key to its value type hint.
-func (c *RustfsAdmin) HelpConfig(subSystem string) ([]ConfigKV, error) {
+func (c *RustfsAdmin) HelpConfig(ctx context.Context, subSystem string) ([]ConfigKV, error) {
 	query := make(url.Values)
 	query.Set("subSys", subSystem)
 	reqData := RequestData{
@@ -242,8 +230,6 @@ func (c *RustfsAdmin) HelpConfig(subSystem string) ([]ConfigKV, error) {
 		RelPath:     "help-config-kv",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

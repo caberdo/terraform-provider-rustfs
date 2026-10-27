@@ -121,7 +121,7 @@ func (d *KmsBackupStatusDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	status, err := d.client.RustClient.GetKmsBackupStatus()
+	status, err := d.client.RustClient.GetKmsBackupStatus(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading KMS backup status",

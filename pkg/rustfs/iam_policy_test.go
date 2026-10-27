@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +37,7 @@ func TestListPoliciesObjectSlice(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"policy_name":"readwrite"},{"policy_name":"readonly"}]`))
 	})
 
-	names, err := client.ListCannedPolicies()
+	names, err := client.ListCannedPolicies(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -54,7 +55,7 @@ func TestListPoliciesStringSlice(t *testing.T) {
 		_, _ = w.Write([]byte(`["readwrite","readonly"]`))
 	})
 
-	names, err := client.ListCannedPolicies()
+	names, err := client.ListCannedPolicies(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestListPoliciesMap(t *testing.T) {
 		_, _ = w.Write([]byte(`{"readwrite":{},"readonly":{}}`))
 	})
 
-	names, err := client.ListCannedPolicies()
+	names, err := client.ListCannedPolicies(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,7 +109,7 @@ func TestGetPolicy(t *testing.T) {
 		}`))
 	})
 
-	policy, err := client.ReadPolicy("readwrite")
+	policy, err := client.ReadPolicy(context.Background(), "readwrite")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -165,7 +166,7 @@ func TestGetPolicyStatementFields(t *testing.T) {
 		}`))
 	})
 
-	policy, err := client.ReadPolicy("tenant")
+	policy, err := client.ReadPolicy(context.Background(), "tenant")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,7 +236,7 @@ func TestGetPolicyStringForm(t *testing.T) {
 		_, _ = w.Write([]byte(`{"policy_name": "tenant", "policy": ` + string(encoded) + `}`))
 	})
 
-	policy, err := client.ReadPolicy("tenant")
+	policy, err := client.ReadPolicy(context.Background(), "tenant")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -280,7 +281,7 @@ func TestCreatePolicyStatementFields(t *testing.T) {
 		}
 	})
 
-	err := client.CreatePolicy(Policy{
+	err := client.CreatePolicy(context.Background(), Policy{
 		Name: "tenant",
 		Statement: []PolicyStatement{
 			{

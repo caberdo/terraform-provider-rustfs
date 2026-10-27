@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ func TestNewUsesTheConfiguredHTTPClient(t *testing.T) {
 	}}
 
 	client := New(&RustfsAdminConfig{Endpoint: endpoint, Ssl: true, HTTPClient: insecure})
-	pools, err := client.ListPools()
+	pools, err := client.ListPools(context.Background())
 	if err != nil {
 		t.Fatalf("admin request through the configured client failed: %v", err)
 	}
@@ -40,7 +41,7 @@ func TestNewUsesTheConfiguredHTTPClient(t *testing.T) {
 	// Same call, default client: certificate verification must reject the
 	// self-signed server instead of silently succeeding.
 	strictClient := New(&RustfsAdminConfig{Endpoint: endpoint, Ssl: true})
-	if _, err := strictClient.ListPools(); err == nil {
+	if _, err := strictClient.ListPools(context.Background()); err == nil {
 		t.Fatal("expected the default client to reject the self-signed test server")
 	}
 }

@@ -162,12 +162,12 @@ func testAccKmsKeyPreCheck(t *testing.T) {
 	client := newKmsKeyAccClient()
 	//#nosec G117 — the probe key name is a public identifier, not a secret
 	probeName := fmt.Sprintf("tf-kms-precheck-%d", acctest.RandInt())
-	probeKey, err := client.CreateKmsKey(probeName)
+	probeKey, err := client.CreateKmsKey(context.Background(), probeName)
 	if err != nil {
 		t.Skipf("KMS key creation is not supported on the running backend, skipping: %v", err)
 	}
 	// Clean up the probe key (scheduled deletion; cancellable server-side).
-	if delErr := client.DeleteKmsKey(probeKey.KeyID); delErr != nil {
+	if delErr := client.DeleteKmsKey(context.Background(), probeKey.KeyID); delErr != nil {
 		t.Logf("warning: failed to clean up probe key %s: %v", probeKey.KeyID, delErr)
 	}
 }
@@ -208,7 +208,7 @@ func testAccCheckKmsKeyMetadata(description, environment string) resource.TestCh
 		if keyID == "" {
 			return fmt.Errorf("no key_id set in state")
 		}
-		key, err := newKmsKeyAccClient().DescribeKmsKey(keyID)
+		key, err := newKmsKeyAccClient().DescribeKmsKey(context.Background(), keyID)
 		if err != nil {
 			return fmt.Errorf("error describing KMS key %s: %s", keyID, err)
 		}
@@ -238,7 +238,7 @@ func testAccCheckKmsKeyExists(name string) resource.TestCheckFunc {
 			return fmt.Errorf("no key_id set in state")
 		}
 
-		key, err := newKmsKeyAccClient().DescribeKmsKey(keyID)
+		key, err := newKmsKeyAccClient().DescribeKmsKey(context.Background(), keyID)
 		if err != nil {
 			return fmt.Errorf("error describing KMS key %s: %s", keyID, err)
 		}
@@ -266,7 +266,7 @@ func testAccCheckKmsKeyServerEnabled(enabled bool) resource.TestCheckFunc {
 		if keyID == "" {
 			return fmt.Errorf("no key_id set in state")
 		}
-		key, err := newKmsKeyAccClient().DescribeKmsKey(keyID)
+		key, err := newKmsKeyAccClient().DescribeKmsKey(context.Background(), keyID)
 		if err != nil {
 			return fmt.Errorf("error describing KMS key %s: %s", keyID, err)
 		}
@@ -297,15 +297,15 @@ func testAccMutateKmsKeyOutOfBand(t *testing.T) resource.TestCheckFunc {
 		client := newKmsKeyAccClient()
 		var err error
 		if wantEnabled {
-			err = client.DisableKmsKey(keyID)
+			err = client.DisableKmsKey(context.Background(), keyID)
 		} else {
-			err = client.EnableKmsKey(keyID)
+			err = client.EnableKmsKey(context.Background(), keyID)
 		}
 		if err != nil {
 			return fmt.Errorf("out-of-band state change of KMS key %s failed: %s", keyID, err)
 		}
 
-		key, err := client.DescribeKmsKey(keyID)
+		key, err := client.DescribeKmsKey(context.Background(), keyID)
 		if err != nil {
 			return fmt.Errorf("error describing KMS key %s after out-of-band change: %s", keyID, err)
 		}
@@ -327,7 +327,7 @@ func testAccCheckKmsKeyDestroy(s *terraform.State) error {
 		if keyID == "" {
 			continue
 		}
-		key, err := client.DescribeKmsKey(keyID)
+		key, err := client.DescribeKmsKey(context.Background(), keyID)
 		if err != nil {
 			// Key gone (or describe refused): that satisfies destruction.
 			continue

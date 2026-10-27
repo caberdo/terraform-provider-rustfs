@@ -1278,7 +1278,7 @@ func TestPoolDecommissionErrorHelpers(t *testing.T) {
 	}
 
 	var diags diag.Diagnostics
-	r.addDecommissionError(&diags, "Error", "read", decommissionPoolB, nil)
+	r.addDecommissionError(context.Background(), &diags, "Error", "read", decommissionPoolB, nil)
 	assertErrorDiagnostic(t, diags, "Error", "the server returned no error detail")
 }
 
@@ -1307,7 +1307,7 @@ func TestAccPoolDecommission_lifecycle(t *testing.T) {
 	}
 
 	client := testAccPoolDecommissionClient(t)
-	statuses, err := client.DecommissionStatuses()
+	statuses, err := client.DecommissionStatuses(context.Background())
 	if err != nil {
 		if poolDecommissionUnsupported(err) {
 			t.Skipf("decommission is not served on this deployment: %v", err)
@@ -1397,7 +1397,7 @@ func testAccCheckPoolDecommissionStarted(t *testing.T, n string) tfresource.Test
 		}
 		pool := rs.Primary.Attributes["pool"]
 		client := testAccPoolDecommissionClient(t)
-		statuses, err := client.DecommissionStatuses()
+		statuses, err := client.DecommissionStatuses(context.Background())
 		if err != nil {
 			return fmt.Errorf("reading decommission status: %w", err)
 		}
@@ -1417,7 +1417,7 @@ func testAccCheckPoolDecommissionStarted(t *testing.T, n string) tfresource.Test
 // completed record, which RustFS refuses to cancel or clear.
 func testAccCheckPoolDecommissionDestroy(t *testing.T, s *terraform.State) error {
 	client := testAccPoolDecommissionClient(t)
-	statuses, err := client.DecommissionStatuses()
+	statuses, err := client.DecommissionStatuses(context.Background())
 	if err != nil {
 		return fmt.Errorf("reading decommission status: %w", err)
 	}

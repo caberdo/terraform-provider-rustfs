@@ -22,7 +22,7 @@ type UserInfo struct {
 // key — {"alice":{"status":"enabled","policyName":"readwrite"}} — and an empty
 // object when no user matches, so the access key comes from the key. The
 // result is sorted by access key so a data source's list is stable.
-func (c *RustfsAdmin) ListUsers(bucket string) ([]UserInfo, error) {
+func (c *RustfsAdmin) ListUsers(ctx context.Context, bucket string) ([]UserInfo, error) {
 	query := url.Values{}
 	if bucket != "" {
 		query.Set("bucket", bucket)
@@ -32,8 +32,6 @@ func (c *RustfsAdmin) ListUsers(bucket string) ([]UserInfo, error) {
 		RelPath:     "list-users",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

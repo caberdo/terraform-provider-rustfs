@@ -104,17 +104,15 @@ type OIDCValidation struct {
 
 // ListOIDCConfig reads every effective OIDC provider
 // (GET /rustfs/admin/v3/oidc/config).
-func (c *RustfsAdmin) ListOIDCConfig() (OIDCConfig, error) {
+func (c *RustfsAdmin) ListOIDCConfig(ctx context.Context) (OIDCConfig, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "oidc/config",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return OIDCConfig{}, c.featureError(err, FeatureOIDCConfig)
+		return OIDCConfig{}, c.featureError(ctx, err, FeatureOIDCConfig)
 	}
 	defer drainClose(resp)
 
@@ -127,8 +125,8 @@ func (c *RustfsAdmin) ListOIDCConfig() (OIDCConfig, error) {
 
 // GetOIDCProvider returns one provider by id and whether it exists. The server
 // has no GET-by-id route (it answers 501), so this reads the list.
-func (c *RustfsAdmin) GetOIDCProvider(providerID string) (OIDCProvider, bool, error) {
-	config, err := c.ListOIDCConfig()
+func (c *RustfsAdmin) GetOIDCProvider(ctx context.Context, providerID string) (OIDCProvider, bool, error) {
+	config, err := c.ListOIDCConfig(ctx)
 	if err != nil {
 		return OIDCProvider{}, false, err
 	}
@@ -142,7 +140,7 @@ func (c *RustfsAdmin) GetOIDCProvider(providerID string) (OIDCProvider, bool, er
 
 // UpsertOIDCProvider creates or replaces one provider
 // (PUT /rustfs/admin/v3/oidc/config/{provider_id}).
-func (c *RustfsAdmin) UpsertOIDCProvider(providerID string, input OIDCProviderInput) error {
+func (c *RustfsAdmin) UpsertOIDCProvider(ctx context.Context, providerID string, input OIDCProviderInput) error {
 	body, err := json.Marshal(input)
 	if err != nil {
 		return err
@@ -153,12 +151,10 @@ func (c *RustfsAdmin) UpsertOIDCProvider(providerID string, input OIDCProviderIn
 		RelPath: "oidc/config/" + url.PathEscape(providerID),
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.featureError(err, FeatureOIDCProviderConfig)
+		return c.featureError(ctx, err, FeatureOIDCProviderConfig)
 	}
 	drainClose(resp)
 	return nil
@@ -167,17 +163,15 @@ func (c *RustfsAdmin) UpsertOIDCProvider(providerID string, input OIDCProviderIn
 // DeleteOIDCProvider deletes one provider
 // (DELETE /rustfs/admin/v3/oidc/config/{provider_id}). The server answers 400
 // InvalidRequest "provider not found" when the provider is already gone.
-func (c *RustfsAdmin) DeleteOIDCProvider(providerID string) error {
+func (c *RustfsAdmin) DeleteOIDCProvider(ctx context.Context, providerID string) error {
 	reqData := RequestData{
 		Method:  http.MethodDelete,
 		RelPath: "oidc/config/" + url.PathEscape(providerID),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.featureError(err, FeatureOIDCProviderConfig)
+		return c.featureError(ctx, err, FeatureOIDCProviderConfig)
 	}
 	drainClose(resp)
 	return nil
@@ -185,7 +179,7 @@ func (c *RustfsAdmin) DeleteOIDCProvider(providerID string) error {
 
 // ValidateOIDCProvider runs discovery for a provider configuration without
 // persisting it (POST /rustfs/admin/v3/oidc/validate).
-func (c *RustfsAdmin) ValidateOIDCProvider(input OIDCProviderValidationInput) (OIDCValidation, error) {
+func (c *RustfsAdmin) ValidateOIDCProvider(ctx context.Context, input OIDCProviderValidationInput) (OIDCValidation, error) {
 	body, err := json.Marshal(input)
 	if err != nil {
 		return OIDCValidation{}, err
@@ -196,12 +190,10 @@ func (c *RustfsAdmin) ValidateOIDCProvider(input OIDCProviderValidationInput) (O
 		RelPath: "oidc/validate",
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return OIDCValidation{}, c.featureError(err, FeatureOIDCValidation)
+		return OIDCValidation{}, c.featureError(ctx, err, FeatureOIDCValidation)
 	}
 	defer drainClose(resp)
 

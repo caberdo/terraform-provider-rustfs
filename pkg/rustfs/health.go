@@ -71,13 +71,11 @@ type HealthDrive struct {
 	WriteLatency    float64 `json:"write_latency"`
 }
 
-func (c *RustfsAdmin) getHealthInfo(relPath string) (*HealthInfo, error) {
+func (c *RustfsAdmin) getHealthInfo(ctx context.Context, relPath string) (*HealthInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: relPath,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -92,11 +90,11 @@ func (c *RustfsAdmin) getHealthInfo(relPath string) (*HealthInfo, error) {
 }
 
 // GetHealthInfo returns cluster health from GET /v3/healthinfo.
-func (c *RustfsAdmin) GetHealthInfo() (*HealthInfo, error) {
-	return c.getHealthInfo("healthinfo")
+func (c *RustfsAdmin) GetHealthInfo(ctx context.Context) (*HealthInfo, error) {
+	return c.getHealthInfo(ctx, "healthinfo")
 }
 
 // GetObdInfo returns OBD diagnostics from GET /v3/obdinfo.
-func (c *RustfsAdmin) GetObdInfo() (*HealthInfo, error) {
-	return c.getHealthInfo("obdinfo")
+func (c *RustfsAdmin) GetObdInfo(ctx context.Context) (*HealthInfo, error) {
+	return c.getHealthInfo(ctx, "obdinfo")
 }

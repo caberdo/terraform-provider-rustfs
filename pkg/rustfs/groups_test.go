@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -29,7 +30,7 @@ func TestListGroups(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	names, err := client.ListGroups()
+	names, err := client.ListGroups(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestListGroupsWrapped(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	names, err := client.ListGroups()
+	names, err := client.ListGroups(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

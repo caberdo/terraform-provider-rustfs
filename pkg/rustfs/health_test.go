@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -66,7 +67,7 @@ func TestGetHealthInfo(t *testing.T) {
 		_, _ = w.Write([]byte(sampleHealthInfoJSON()))
 	})
 
-	info, err := client.GetHealthInfo()
+	info, err := client.GetHealthInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestGetHealthInfoDecodesDegradedDrive(t *testing.T) {
 		_, _ = w.Write([]byte(sampleObdInfoJSON()))
 	})
 
-	info, err := client.GetHealthInfo()
+	info, err := client.GetHealthInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +123,7 @@ func TestGetObdInfo(t *testing.T) {
 		_, _ = w.Write([]byte(sampleObdInfoJSON()))
 	})
 
-	info, err := client.GetObdInfo()
+	info, err := client.GetObdInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestGetHealthInfoUnmarshalRoundTrip(t *testing.T) {
 		_, _ = w.Write([]byte(sampleHealthInfoJSON()))
 	})
 
-	info, err := client.GetHealthInfo()
+	info, err := client.GetHealthInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

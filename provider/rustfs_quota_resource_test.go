@@ -205,12 +205,12 @@ func testAccMutateQuotaOutOfBand(t *testing.T, bucket string, managed int) resou
 
 	return func(*terraform.State) error {
 		client := testAccQuotaClient()
-		if err := client.DeletQuota(bucket); err != nil {
+		if err := client.DeletQuota(context.Background(), bucket); err != nil {
 			return fmt.Errorf("could not delete quota of bucket %s out of band: %s", bucket, err)
 		}
 
 		for range quotaReadMaxAttempts {
-			quota, err := client.ReadQuota(bucket)
+			quota, err := client.ReadQuota(context.Background(), bucket)
 			if err != nil {
 				if isTransientQuotaError(err) {
 					// Usage is not authoritative yet; look again.
@@ -239,7 +239,7 @@ func testAccCheckQuotaAndBucketDestroy(s *terraform.State) error {
 		if bucketName == "" {
 			continue
 		}
-		_, err := client.ReadQuota(bucketName)
+		_, err := client.ReadQuota(context.Background(), bucketName)
 		if err == nil {
 			return fmt.Errorf("quota for bucket %s still exists", bucketName)
 		}

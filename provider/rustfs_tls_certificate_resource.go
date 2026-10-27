@@ -157,7 +157,7 @@ func (r *TLSCertificateResource) Create(ctx context.Context, req resource.Create
 	}
 
 	receipt, err := r.client.RustClient.PublishTLSCertificate(
-		plan.CertificatePEM.ValueString(),
+		ctx, plan.CertificatePEM.ValueString(),
 		plan.KeyPEM.ValueString(),
 	)
 	if err != nil {
@@ -180,7 +180,7 @@ func (r *TLSCertificateResource) Read(ctx context.Context, req resource.ReadRequ
 		return
 	}
 
-	certificateState, err := r.client.RustClient.GetTLSCertificateState()
+	certificateState, err := r.client.RustClient.GetTLSCertificateState(ctx)
 	if err != nil {
 		addTLSCertificateDiagnostic(&resp.Diagnostics, "Error reading TLS certificate state",
 			"Could not read the TLS certificate state: ", err)

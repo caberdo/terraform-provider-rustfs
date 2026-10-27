@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -70,7 +71,7 @@ func TestReplicationMetrics(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
 
-	metrics, err := c.ReplicationMetrics("mybucket")
+	metrics, err := c.ReplicationMetrics(context.Background(), "mybucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestReplicationMetricsNoReplicationConfigured(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
 
-	metrics, err := c.ReplicationMetrics("mybucket")
+	metrics, err := c.ReplicationMetrics(context.Background(), "mybucket")
 	if err != nil {
 		t.Fatalf("expected no error when replication is not configured, got: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestReplicationMetricsNoReplicationConfigured(t *testing.T) {
 
 func TestReplicationMetricsMissingBucket(t *testing.T) {
 	c := New(&RustfsAdminConfig{AccessKey: "admin", AccessSecret: "secret"})
-	if _, err := c.ReplicationMetrics(""); err == nil {
+	if _, err := c.ReplicationMetrics(context.Background(), ""); err == nil {
 		t.Fatal("expected error for empty bucket, got nil")
 	}
 }
@@ -169,7 +170,7 @@ func TestReplicationMetricsBucketNotFound(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
 
-	if _, err := c.ReplicationMetrics("nope"); err == nil {
+	if _, err := c.ReplicationMetrics(context.Background(), "nope"); err == nil {
 		t.Fatal("expected error for nonexistent bucket, got nil")
 	}
 }
@@ -189,7 +190,7 @@ func TestReplicationMetricsServerError(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
 
-	if _, err := c.ReplicationMetrics("mybucket"); err == nil {
+	if _, err := c.ReplicationMetrics(context.Background(), "mybucket"); err == nil {
 		t.Fatal("expected error for 500, got nil")
 	}
 }
@@ -211,7 +212,7 @@ func TestReplicationMetricsSendsBucketQuery(t *testing.T) {
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
 
-	if _, err := c.ReplicationMetrics("quoted bucket!?&"); err != nil {
+	if _, err := c.ReplicationMetrics(context.Background(), "quoted bucket!?&"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got.Get("bucket") != "quoted bucket!?&" {

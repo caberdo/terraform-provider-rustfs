@@ -127,19 +127,17 @@ type IntegrityInventoryPage struct {
 }
 
 // IntegrityReadiness reads GET /rustfs/admin/v3/integrity/readiness.
-func (c *RustfsAdmin) IntegrityReadiness() (IntegrityReadiness, error) {
+func (c *RustfsAdmin) IntegrityReadiness(ctx context.Context) (IntegrityReadiness, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "integrity/readiness",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		// Readiness is not bucket-scoped, so a 404 means the route was never
 		// registered and the generic capability conversion is safe here.
-		return IntegrityReadiness{}, c.featureError(err, FeatureIntegrityReadiness)
+		return IntegrityReadiness{}, c.featureError(ctx, err, FeatureIntegrityReadiness)
 	}
 	defer drainClose(resp)
 
@@ -153,7 +151,7 @@ func (c *RustfsAdmin) IntegrityReadiness() (IntegrityReadiness, error) {
 // IntegrityInventory reads one inventory page for a bucket. Empty strings omit
 // the corresponding query parameter; a limit of zero leaves the server default
 // (100) in place.
-func (c *RustfsAdmin) IntegrityInventory(bucket, prefix, keyMarker, versionMarker string, limit int) (IntegrityInventoryPage, error) {
+func (c *RustfsAdmin) IntegrityInventory(ctx context.Context, bucket, prefix, keyMarker, versionMarker string, limit int) (IntegrityInventoryPage, error) {
 	query := url.Values{}
 	if prefix != "" {
 		query.Set("prefix", prefix)
@@ -173,12 +171,10 @@ func (c *RustfsAdmin) IntegrityInventory(bucket, prefix, keyMarker, versionMarke
 		RelPath:     "integrity/" + url.PathEscape(bucket) + "/inventory",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return IntegrityInventoryPage{}, c.integrityFeatureError(err, FeatureIntegrityInventory)
+		return IntegrityInventoryPage{}, c.integrityFeatureError(ctx, err, FeatureIntegrityInventory)
 	}
 	defer drainClose(resp)
 
@@ -191,7 +187,7 @@ func (c *RustfsAdmin) IntegrityInventory(bucket, prefix, keyMarker, versionMarke
 
 // CreateIntegrityJob creates a durable job. The server answers 201 with the
 // job in state "paused": nothing runs until ControlIntegrityJob resumes it.
-func (c *RustfsAdmin) CreateIntegrityJob(bucket string, request IntegrityJobRequest) (IntegrityJob, error) {
+func (c *RustfsAdmin) CreateIntegrityJob(ctx context.Context, bucket string, request IntegrityJobRequest) (IntegrityJob, error) {
 	body, err := json.Marshal(request)
 	if err != nil {
 		return IntegrityJob{}, err
@@ -202,12 +198,10 @@ func (c *RustfsAdmin) CreateIntegrityJob(bucket string, request IntegrityJobRequ
 		RelPath: "integrity/" + url.PathEscape(bucket) + "/jobs",
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return IntegrityJob{}, c.integrityFeatureError(err, FeatureIntegrityJobs)
+		return IntegrityJob{}, c.integrityFeatureError(ctx, err, FeatureIntegrityJobs)
 	}
 	defer drainClose(resp)
 
@@ -220,13 +214,11 @@ func (c *RustfsAdmin) CreateIntegrityJob(bucket string, request IntegrityJobRequ
 
 // IntegrityJob reads one durable job. The server reports a job it no longer
 // holds as NoSuchKey, which callers detect with IsAPIErrorCode.
-func (c *RustfsAdmin) IntegrityJob(bucket, jobID string) (IntegrityJob, error) {
+func (c *RustfsAdmin) IntegrityJob(ctx context.Context, bucket, jobID string) (IntegrityJob, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "integrity/" + url.PathEscape(bucket) + "/jobs/" + url.PathEscape(jobID),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
@@ -247,7 +239,7 @@ func (c *RustfsAdmin) IntegrityJob(bucket, jobID string) (IntegrityJob, error) {
 // cancel acknowledge intent; an in-flight conditional publication is allowed to
 // drain. Cancelling does not roll back bytes already verified or migrated, and
 // a terminal job is returned unchanged.
-func (c *RustfsAdmin) ControlIntegrityJob(bucket, jobID, operation string) (IntegrityJob, error) {
+func (c *RustfsAdmin) ControlIntegrityJob(ctx context.Context, bucket, jobID, operation string) (IntegrityJob, error) {
 	body, err := json.Marshal(map[string]string{"operation": operation})
 	if err != nil {
 		return IntegrityJob{}, err
@@ -258,8 +250,6 @@ func (c *RustfsAdmin) ControlIntegrityJob(bucket, jobID, operation string) (Inte
 		RelPath: "integrity/" + url.PathEscape(bucket) + "/jobs/" + url.PathEscape(jobID) + "/control",
 		Content: body,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
@@ -279,7 +269,7 @@ func (c *RustfsAdmin) ControlIntegrityJob(bucket, jobID, operation string) (Inte
 // The bucket-scoped integrity routes answer 404 NoSuchBucket for a missing
 // bucket, so that code stays a plain API error instead of a capability gap;
 // every other 404 means the route was never registered.
-func (c *RustfsAdmin) integrityFeatureError(err error, feature Feature) error {
+func (c *RustfsAdmin) integrityFeatureError(ctx context.Context, err error, feature Feature) error {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
 		return err
@@ -288,7 +278,7 @@ func (c *RustfsAdmin) integrityFeatureError(err error, feature Feature) error {
 		apiErr.StatusCode == http.StatusMethodNotAllowed ||
 		strings.EqualFold(apiErr.Code, "NotImplemented") ||
 		(apiErr.StatusCode == http.StatusNotFound && !IsAPIErrorCode(err, "NoSuchBucket")) {
-		return c.featureError(err, feature)
+		return c.featureError(ctx, err, feature)
 	}
 	return err
 }

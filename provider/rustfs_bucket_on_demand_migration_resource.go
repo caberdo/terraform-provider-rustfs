@@ -695,7 +695,7 @@ func (r *bucketOnDemandMigrationResource) Read(ctx context.Context, req resource
 	}
 
 	bucket := state.Bucket.ValueString()
-	result, err := r.client.RustClient.GetBucketOnDemandMigration(bucket)
+	result, err := r.client.RustClient.GetBucketOnDemandMigration(ctx, bucket)
 	if err != nil {
 		if odmConfigurationGone(err) {
 			tflog.Trace(ctx, "bucket on-demand migration is no longer configured", map[string]any{"bucket": bucket})
@@ -737,7 +737,7 @@ func (r *bucketOnDemandMigrationResource) upsert(ctx context.Context, plan *buck
 		summary = "Error updating bucket on-demand migration"
 	}
 
-	if _, err := r.client.RustClient.SetBucketOnDemandMigration(bucket, config, true); err != nil {
+	if _, err := r.client.RustClient.SetBucketOnDemandMigration(ctx, bucket, config, true); err != nil {
 		diags.AddError(
 			summary,
 			"Could not "+action+" on-demand migration for bucket "+bucket+": "+odmErrorText(err)+
@@ -746,7 +746,7 @@ func (r *bucketOnDemandMigrationResource) upsert(ctx context.Context, plan *buck
 		return
 	}
 
-	if _, err := r.client.RustClient.SetBucketOnDemandMigration(bucket, config, false); err != nil {
+	if _, err := r.client.RustClient.SetBucketOnDemandMigration(ctx, bucket, config, false); err != nil {
 		diags.AddError(
 			summary,
 			"Could not "+action+" on-demand migration for bucket "+bucket+": "+odmErrorText(err),
@@ -754,7 +754,7 @@ func (r *bucketOnDemandMigrationResource) upsert(ctx context.Context, plan *buck
 		return
 	}
 
-	result, err := r.client.RustClient.GetBucketOnDemandMigration(bucket)
+	result, err := r.client.RustClient.GetBucketOnDemandMigration(ctx, bucket)
 	if err != nil {
 		diags.AddError(
 			summary,
@@ -773,7 +773,7 @@ func (r *bucketOnDemandMigrationResource) Delete(ctx context.Context, req resour
 	}
 
 	bucket := state.Bucket.ValueString()
-	if err := r.client.RustClient.DeleteBucketOnDemandMigration(bucket); err != nil {
+	if err := r.client.RustClient.DeleteBucketOnDemandMigration(ctx, bucket); err != nil {
 		if odmConfigurationGone(err) {
 			tflog.Trace(ctx, "bucket on-demand migration was already cleared", map[string]any{"bucket": bucket})
 			return

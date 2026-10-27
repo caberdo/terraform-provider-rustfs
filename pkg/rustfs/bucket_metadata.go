@@ -8,13 +8,11 @@ import (
 	"io"
 )
 
-func (c *RustfsAdmin) ExportBucketMetadata() ([]byte, error) {
+func (c *RustfsAdmin) ExportBucketMetadata(ctx context.Context) ([]byte, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "export-bucket-metadata",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -23,14 +21,12 @@ func (c *RustfsAdmin) ExportBucketMetadata() ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (c *RustfsAdmin) ImportBucketMetadata(data []byte) error {
+func (c *RustfsAdmin) ImportBucketMetadata(ctx context.Context, data []byte) error {
 	reqData := RequestData{
 		Method:  "PUT",
 		RelPath: "import-bucket-metadata",
 		Content: data,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

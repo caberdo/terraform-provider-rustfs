@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -28,7 +29,7 @@ func TestGetBucketDurability(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	d, err := c.GetBucketDurability("mybucket")
+	d, err := c.GetBucketDurability(context.Background(), "mybucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,7 +49,7 @@ func TestGetBucketDurabilityInheritsNullMode(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	d, err := c.GetBucketDurability("mybucket")
+	d, err := c.GetBucketDurability(context.Background(), "mybucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestSetBucketDurability(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	d, err := c.SetBucketDurability("mybucket", BucketDurability{Bucket: "mybucket", Mode: "strict"})
+	d, err := c.SetBucketDurability(context.Background(), "mybucket", BucketDurability{Bucket: "mybucket", Mode: "strict"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -103,7 +104,7 @@ func TestDeleteBucketDurability(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	if err := c.DeleteBucketDurability("mybucket"); err != nil {
+	if err := c.DeleteBucketDurability(context.Background(), "mybucket"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

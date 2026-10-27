@@ -17,7 +17,7 @@ type UserAccount struct {
 	Groups    []string `json:"memberOf"`
 }
 
-func (c *RustfsAdmin) CreateUserAccount(user UserAccount) error {
+func (c *RustfsAdmin) CreateUserAccount(ctx context.Context, user UserAccount) error {
 
 	user.Status = "enabled"
 	urlValues := make(url.Values)
@@ -36,8 +36,6 @@ func (c *RustfsAdmin) CreateUserAccount(user UserAccount) error {
 		QueryValues: urlValues,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -45,12 +43,12 @@ func (c *RustfsAdmin) CreateUserAccount(user UserAccount) error {
 	drainClose(resp)
 
 	if user.Policy != "" {
-		return c.AttachPolicyToUser(user.AccessKey, user.Policy)
+		return c.AttachPolicyToUser(ctx, user.AccessKey, user.Policy)
 	}
 	return err
 }
 
-func (c *RustfsAdmin) ReadUserAccount(name string) (UserAccount, error) {
+func (c *RustfsAdmin) ReadUserAccount(ctx context.Context, name string) (UserAccount, error) {
 	var instance UserAccount
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", name)
@@ -59,8 +57,6 @@ func (c *RustfsAdmin) ReadUserAccount(name string) (UserAccount, error) {
 		RelPath:     "user-info",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return instance, err
@@ -72,7 +68,7 @@ func (c *RustfsAdmin) ReadUserAccount(name string) (UserAccount, error) {
 
 }
 
-func (c *RustfsAdmin) UpdateUserAccount(account UserAccount) error {
+func (c *RustfsAdmin) UpdateUserAccount(ctx context.Context, account UserAccount) error {
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", account.AccessKey)
 	urlValues.Set("status", account.Status)
@@ -81,20 +77,18 @@ func (c *RustfsAdmin) UpdateUserAccount(account UserAccount) error {
 		RelPath:     "user-info",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
 	}
 	drainClose(resp)
 	if account.Policy != "" {
-		return c.AttachPolicyToUser(account.AccessKey, account.Policy)
+		return c.AttachPolicyToUser(ctx, account.AccessKey, account.Policy)
 	}
 	return nil
 }
 
-func (c *RustfsAdmin) DeleteUserAccount(account UserAccount) error {
+func (c *RustfsAdmin) DeleteUserAccount(ctx context.Context, account UserAccount) error {
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", account.AccessKey)
 	req_data := RequestData{
@@ -102,8 +96,6 @@ func (c *RustfsAdmin) DeleteUserAccount(account UserAccount) error {
 		RelPath:     "remove-user",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -113,7 +105,7 @@ func (c *RustfsAdmin) DeleteUserAccount(account UserAccount) error {
 }
 
 // AttachPolicyToUser attaches a policy to an existing user.
-func (c *RustfsAdmin) AttachPolicyToUser(user string, policy string) error {
+func (c *RustfsAdmin) AttachPolicyToUser(ctx context.Context, user string, policy string) error {
 	urlValues := make(url.Values)
 	urlValues.Set("userOrGroup", user)
 	urlValues.Set("policyName", policy)
@@ -123,8 +115,6 @@ func (c *RustfsAdmin) AttachPolicyToUser(user string, policy string) error {
 		RelPath:     "set-user-or-group-policy",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -134,7 +124,7 @@ func (c *RustfsAdmin) AttachPolicyToUser(user string, policy string) error {
 }
 
 // SetUserSecretKey rotates the user's secret key in place.
-func (c *RustfsAdmin) SetUserSecretKey(accessKey, secretKey string) error {
+func (c *RustfsAdmin) SetUserSecretKey(ctx context.Context, accessKey, secretKey string) error {
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", accessKey)
 	body := struct {
@@ -150,8 +140,6 @@ func (c *RustfsAdmin) SetUserSecretKey(accessKey, secretKey string) error {
 		Content:     bytes,
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -161,7 +149,7 @@ func (c *RustfsAdmin) SetUserSecretKey(accessKey, secretKey string) error {
 }
 
 // SetUserStatus enables or disables an existing user.
-func (c *RustfsAdmin) SetUserStatus(accessKey, status string) error {
+func (c *RustfsAdmin) SetUserStatus(ctx context.Context, accessKey, status string) error {
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", accessKey)
 	urlValues.Set("status", status)
@@ -170,8 +158,6 @@ func (c *RustfsAdmin) SetUserStatus(accessKey, status string) error {
 		RelPath:     "set-user-status",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err

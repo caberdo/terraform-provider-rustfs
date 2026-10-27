@@ -52,17 +52,15 @@ type ObjectDataCacheFlushResult struct {
 }
 
 // GetObjectDataCacheStats reads GET /v3/object-data-cache/stats.
-func (c *RustfsAdmin) GetObjectDataCacheStats() (ObjectDataCacheStats, error) {
+func (c *RustfsAdmin) GetObjectDataCacheStats(ctx context.Context) (ObjectDataCacheStats, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "object-data-cache/stats",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ObjectDataCacheStats{}, c.featureError(err, FeatureObjectDataCacheStats)
+		return ObjectDataCacheStats{}, c.featureError(ctx, err, FeatureObjectDataCacheStats)
 	}
 	defer drainClose(resp)
 
@@ -82,7 +80,7 @@ func (c *RustfsAdmin) GetObjectDataCacheStats() (ObjectDataCacheStats, error) {
 // FlushObjectDataCache drops cached object bodies. An empty bucket flushes the
 // whole cache; a bucket flushes that bucket; a bucket plus object flushes one
 // identity. The server rejects an object without a bucket.
-func (c *RustfsAdmin) FlushObjectDataCache(bucket, object string) (ObjectDataCacheFlushResult, error) {
+func (c *RustfsAdmin) FlushObjectDataCache(ctx context.Context, bucket, object string) (ObjectDataCacheFlushResult, error) {
 	if object != "" && bucket == "" {
 		return ObjectDataCacheFlushResult{}, errors.New("an object flush requires a bucket")
 	}
@@ -100,12 +98,10 @@ func (c *RustfsAdmin) FlushObjectDataCache(bucket, object string) (ObjectDataCac
 		RelPath:     "object-data-cache/flush",
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ObjectDataCacheFlushResult{}, c.featureError(err, FeatureObjectDataCacheFlush)
+		return ObjectDataCacheFlushResult{}, c.featureError(ctx, err, FeatureObjectDataCacheFlush)
 	}
 	defer drainClose(resp)
 

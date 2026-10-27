@@ -119,7 +119,7 @@ func (d *ObjectDataCacheStatsDataSource) Configure(_ context.Context, req dataso
 }
 
 func (d *ObjectDataCacheStatsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	stats, err := d.client.RustClient.GetObjectDataCacheStats()
+	stats, err := d.client.RustClient.GetObjectDataCacheStats(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

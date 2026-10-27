@@ -243,7 +243,7 @@ func (r *ScannerUsageStateResetResource) runReset(
 // used, so a lock that never frees fails the apply with the server's error.
 func (r *ScannerUsageStateResetResource) resetUsageState(ctx context.Context) (rustfs.ScannerUsageStateResetResult, error) {
 	return resetWithScannerLeaderRetry(ctx, func() (rustfs.ScannerUsageStateResetResult, error) {
-		return r.client.RustClient.ResetScannerUsageState()
+		return r.client.RustClient.ResetScannerUsageState(ctx)
 	})
 }
 

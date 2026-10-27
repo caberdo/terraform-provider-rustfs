@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -35,7 +36,7 @@ func TestGetGroup(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	info, err := client.GetGroup("developers")
+	info, err := client.GetGroup(context.Background(), "developers")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,7 +108,7 @@ func TestUpdateGroupMembers(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.UpdateGroupMembers(GroupAddRemove{
+	err := client.UpdateGroupMembers(context.Background(), GroupAddRemove{
 		Group:    "developers",
 		Members:  []string{"alice", "bob"},
 		IsRemove: false,
@@ -133,7 +134,7 @@ func TestDeleteGroup(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.DeleteGroup("developers")
+	err := client.DeleteGroup(context.Background(), "developers")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestSetGroupStatus(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.SetGroupStatus("developers", "disabled")
+	err := client.SetGroupStatus(context.Background(), "developers", "disabled")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

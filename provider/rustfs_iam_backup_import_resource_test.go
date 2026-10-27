@@ -330,7 +330,7 @@ func testAccIamBackupArchive(t *testing.T) string {
 	t.Helper()
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	data, err := client.ExportIam()
+	data, err := client.ExportIam(context.Background())
 	if err != nil {
 		t.Fatalf("exporting the live IAM data: %v", err)
 	}

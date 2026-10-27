@@ -130,7 +130,7 @@ func TestAccGroupPolicyAttachmentResource_keepsOtherPolicies(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheck(t)
 			client := testAccRustClient()
-			if err := client.CreatePolicy(rustfs.Policy{
+			if err := client.CreatePolicy(context.Background(), rustfs.Policy{
 				Name: outOfBandPolicy,
 				Statement: []rustfs.PolicyStatement{{
 					Effect:   "Allow",
@@ -141,7 +141,7 @@ func TestAccGroupPolicyAttachmentResource_keepsOtherPolicies(t *testing.T) {
 				t.Fatalf("failed to create out-of-band policy %s: %v", outOfBandPolicy, err)
 			}
 			t.Cleanup(func() {
-				if err := client.DeletePolicy(outOfBandPolicy); err != nil {
+				if err := client.DeletePolicy(context.Background(), outOfBandPolicy); err != nil {
 					t.Errorf("failed to delete out-of-band policy %s: %v", outOfBandPolicy, err)
 				}
 			})
@@ -269,10 +269,10 @@ func TestAccGroupPolicyAttachmentResource_updateReattaches(t *testing.T) {
 	client := testAccRustClient()
 	// The admin API creates a group implicitly via update-group-members, so it
 	// must be called even with no members.
-	if err := client.UpdateGroupMembers(rustfs.GroupAddRemove{Group: groupName, Status: "enabled"}); err != nil {
+	if err := client.UpdateGroupMembers(ctx, rustfs.GroupAddRemove{Group: groupName, Status: "enabled"}); err != nil {
 		t.Fatalf("failed to create group %s: %v", groupName, err)
 	}
-	if err := client.CreatePolicy(rustfs.Policy{
+	if err := client.CreatePolicy(ctx, rustfs.Policy{
 		Name: policyName,
 		Statement: []rustfs.PolicyStatement{{
 			Effect:   "Allow",
@@ -283,13 +283,13 @@ func TestAccGroupPolicyAttachmentResource_updateReattaches(t *testing.T) {
 		t.Fatalf("failed to create policy %s: %v", policyName, err)
 	}
 	t.Cleanup(func() {
-		if err := client.DetachGroupPolicy(groupName, policyName); err != nil {
+		if err := client.DetachGroupPolicy(ctx, groupName, policyName); err != nil {
 			t.Errorf("failed to detach %s from %s: %v", policyName, groupName, err)
 		}
-		if err := client.DeleteGroup(groupName); err != nil {
+		if err := client.DeleteGroup(ctx, groupName); err != nil {
 			t.Errorf("failed to delete group %s: %v", groupName, err)
 		}
-		if err := client.DeletePolicy(policyName); err != nil {
+		if err := client.DeletePolicy(ctx, policyName); err != nil {
 			t.Errorf("failed to delete policy %s: %v", policyName, err)
 		}
 	})
@@ -330,7 +330,7 @@ func TestAccGroupPolicyAttachmentResource_updateReattaches(t *testing.T) {
 			groupName, policyName, identifier)
 	}
 
-	info, err := client.GetGroup(groupName)
+	info, err := client.GetGroup(ctx, groupName)
 	if err != nil {
 		t.Fatalf("failed to read group %s: %v", groupName, err)
 	}
@@ -491,7 +491,7 @@ resource "rustfs_group_policy_attachment" "b" {
 func testAccAttachGroupPolicyOutOfBand(group, policy string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.AttachGroupPolicy(group, policy); err != nil {
+		if err := client.AttachGroupPolicy(context.Background(), group, policy); err != nil {
 			return fmt.Errorf("failed to attach %s to %s outside Terraform: %w", policy, group, err)
 		}
 		return nil
@@ -516,7 +516,7 @@ func testAccCheckGroupPolicyAttachmentExists(resourceName string) resource.TestC
 		}
 
 		client := testAccRustClient()
-		info, err := client.GetGroup(group)
+		info, err := client.GetGroup(context.Background(), group)
 		if err != nil {
 			return fmt.Errorf("failed to read group %s: %w", group, err)
 		}
@@ -532,7 +532,7 @@ func testAccCheckGroupPolicyAttachmentExists(resourceName string) resource.TestC
 func testAccDetachGroupPolicyOutOfBand(group, policy string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.DetachGroupPolicy(group, policy); err != nil {
+		if err := client.DetachGroupPolicy(context.Background(), group, policy); err != nil {
 			return fmt.Errorf("failed to detach %s from %s outside Terraform: %w", policy, group, err)
 		}
 		return nil
@@ -545,7 +545,7 @@ func testAccDetachGroupPolicyOutOfBand(group, policy string) resource.TestCheckF
 func testAccCheckGroupPolicies(group string, policies ...string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		info, err := client.GetGroup(group)
+		info, err := client.GetGroup(context.Background(), group)
 		if err != nil {
 			return fmt.Errorf("failed to read group %s: %w", group, err)
 		}
@@ -576,7 +576,7 @@ func testAccCheckGroupPolicyAttachmentDestroy(s *terraform.State) error {
 		if group == "" {
 			continue
 		}
-		info, err := client.GetGroup(group)
+		info, err := client.GetGroup(context.Background(), group)
 		if err != nil {
 			continue
 		}

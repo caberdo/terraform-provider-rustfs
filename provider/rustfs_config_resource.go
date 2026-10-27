@@ -144,7 +144,7 @@ func (r *ConfigResource) Create(ctx context.Context, req resource.CreateRequest,
 		resp.Diagnostics.AddError("Error parsing settings", err.Error())
 		return
 	}
-	if err := r.client.RustClient.SetConfig(plan.SubSystem.ValueString(), kvs); err != nil {
+	if err := r.client.RustClient.SetConfig(ctx, plan.SubSystem.ValueString(), kvs); err != nil {
 		resp.Diagnostics.AddError(
 			"Error setting config",
 			"Could not set config, unexpected error: "+err.Error(),
@@ -163,7 +163,7 @@ func (r *ConfigResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	kvs, err := r.client.RustClient.GetConfig(state.SubSystem.ValueString())
+	kvs, err := r.client.RustClient.GetConfig(ctx, state.SubSystem.ValueString())
 	if err != nil {
 		if configScopeGone(err) {
 			resp.State.RemoveResource(ctx)
@@ -199,7 +199,7 @@ func (r *ConfigResource) Update(ctx context.Context, req resource.UpdateRequest,
 		resp.Diagnostics.AddError("Error parsing settings", err.Error())
 		return
 	}
-	if err := r.client.RustClient.SetConfig(plan.SubSystem.ValueString(), kvs); err != nil {
+	if err := r.client.RustClient.SetConfig(ctx, plan.SubSystem.ValueString(), kvs); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating config",
 			"Could not update config, unexpected error: "+err.Error(),
@@ -218,7 +218,7 @@ func (r *ConfigResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	if err := r.client.RustClient.DeleteConfig(data.SubSystem.ValueString()); err != nil {
+	if err := r.client.RustClient.DeleteConfig(ctx, data.SubSystem.ValueString()); err != nil {
 		if configScopeGone(err) {
 			// The scope is already gone; del-config-kv answers 400
 			// InvalidRequest "unsupported config subsystem" rather than

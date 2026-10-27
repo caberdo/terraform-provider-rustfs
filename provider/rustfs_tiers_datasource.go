@@ -107,7 +107,7 @@ func (d *TiersDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	tiers, err := d.client.RustClient.ListTiers()
+	tiers, err := d.client.RustClient.ListTiers(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing tiers",

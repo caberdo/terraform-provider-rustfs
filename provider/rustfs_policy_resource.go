@@ -147,7 +147,7 @@ func (r *PolicyResource) Create(ctx context.Context, req resource.CreateRequest,
 		Name:      plan.Name.ValueString(),
 		Statement: policyStatementsFromModel(plan.Statement),
 	}
-	err := r.client.RustClient.CreatePolicy(policy)
+	err := r.client.RustClient.CreatePolicy(ctx, policy)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating policy",
@@ -176,7 +176,7 @@ func (r *PolicyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	// Make the read request
-	actual, err := r.client.RustClient.ReadPolicy(state.Name.ValueString())
+	actual, err := r.client.RustClient.ReadPolicy(ctx, state.Name.ValueString())
 	if err != nil {
 		// RustFS answers 404 NoSuchResource for a policy it does not have.
 		if rustfs.IsAPIErrorCode(err, "NoSuchResource") {
@@ -214,7 +214,7 @@ func (r *PolicyResource) Update(ctx context.Context, req resource.UpdateRequest,
 		Name:      plan.Name.ValueString(),
 		Statement: policyStatementsFromModel(plan.Statement),
 	}
-	err := r.client.RustClient.CreatePolicy(policy)
+	err := r.client.RustClient.CreatePolicy(ctx, policy)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating policy",
@@ -241,7 +241,7 @@ func (r *PolicyResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		return
 	}
 
-	err := r.client.RustClient.DeletePolicy(data.Name.ValueString())
+	err := r.client.RustClient.DeletePolicy(ctx, data.Name.ValueString())
 	if err != nil {
 		// RustFS answers 200 for an already-deleted policy, but treat an
 		// explicit NoSuchResource the same way if a server ever returns it.

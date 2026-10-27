@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,7 +35,7 @@ func TestReadUserMFA(t *testing.T) {
 		_, _ = w.Write([]byte(`{"access_key":"alice","enabled":true,"activated_at":"2024-01-01T00:00:00Z","recovery_codes_remaining":5}`))
 	})
 
-	status, err := client.ReadUserMFA("alice")
+	status, err := client.ReadUserMFA(context.Background(), "alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestReadUserMFAWhenDisabled(t *testing.T) {
 		_, _ = w.Write([]byte(`{"access_key":"alice","enabled":false,"recovery_codes_remaining":0}`))
 	})
 
-	status, err := client.ReadUserMFA("alice")
+	status, err := client.ReadUserMFA(context.Background(), "alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -78,7 +79,7 @@ func TestClearUserMFA(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.ClearUserMFA("alice"); err != nil {
+	if err := client.ClearUserMFA(context.Background(), "alice"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotMethod != http.MethodDelete {

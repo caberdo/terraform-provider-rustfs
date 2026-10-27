@@ -102,7 +102,7 @@ func (r *LDAPPolicyAttachmentResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.client.RustClient.AttachLDAPPolicy(rustfs.LDAPPolicyAttachment{
+	err := r.client.RustClient.AttachLDAPPolicy(ctx, rustfs.LDAPPolicyAttachment{
 		UserOrGroup: plan.UserOrGroup.ValueString(),
 		PolicyName:  plan.Policy.ValueString(),
 		IsGroup:     plan.IsGroup.ValueBool(),
@@ -145,7 +145,7 @@ func (r *LDAPPolicyAttachmentResource) Update(ctx context.Context, req resource.
 	}
 	// All attributes are RequiresReplace, so Terraform normally plans a
 	// replacement; re-attaching keeps this method correct if it is invoked.
-	err := r.client.RustClient.AttachLDAPPolicy(rustfs.LDAPPolicyAttachment{
+	err := r.client.RustClient.AttachLDAPPolicy(ctx, rustfs.LDAPPolicyAttachment{
 		UserOrGroup: plan.UserOrGroup.ValueString(),
 		PolicyName:  plan.Policy.ValueString(),
 		IsGroup:     plan.IsGroup.ValueBool(),
@@ -168,7 +168,7 @@ func (r *LDAPPolicyAttachmentResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.client.RustClient.DetachLDAPPolicy(rustfs.LDAPPolicyAttachment{
+	err := r.client.RustClient.DetachLDAPPolicy(ctx, rustfs.LDAPPolicyAttachment{
 		UserOrGroup: data.UserOrGroup.ValueString(),
 		PolicyName:  data.Policy.ValueString(),
 		IsGroup:     data.IsGroup.ValueBool(),

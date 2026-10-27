@@ -78,12 +78,12 @@ func (d *ExtensionsDataSource) Configure(_ context.Context, req datasource.Confi
 }
 
 func (d *ExtensionsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	catalog, err := d.client.RustClient.GetExtensionCatalog()
+	catalog, err := d.client.RustClient.GetExtensionCatalog(ctx)
 	if err != nil {
 		d.reportError(resp, err)
 		return
 	}
-	instances, err := d.client.RustClient.ListExtensionInstances()
+	instances, err := d.client.RustClient.ListExtensionInstances(ctx)
 	if err != nil {
 		d.reportError(resp, err)
 		return
