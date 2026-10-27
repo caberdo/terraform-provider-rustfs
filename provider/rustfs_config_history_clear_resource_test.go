@@ -478,7 +478,7 @@ func testAccRestoreDeletedHistoryFails(restoreID *string) resource.TestCheckFunc
 			return fmt.Errorf("the pre-clear restore id was not captured")
 		}
 		client := testAccRustClient()
-		err := client.RestoreConfigHistory(*restoreID)
+		err := client.RestoreConfigHistory(context.Background(), *restoreID)
 		if err == nil {
 			return fmt.Errorf("restoring the cleared entry %q succeeded, want a not-found error", *restoreID)
 		}
@@ -498,7 +498,7 @@ func testAccConfigHistoryClearPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 
 	client := testAccRustClient()
-	if err := client.ClearConfigHistory(); err != nil {
+	if err := client.ClearConfigHistory(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("config history clear is not implemented by the running RustFS, skipping: %v", err)
 		}

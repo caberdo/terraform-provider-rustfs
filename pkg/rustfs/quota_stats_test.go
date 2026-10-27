@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -22,7 +23,7 @@ func TestGetQuotaStats(t *testing.T) {
 			`"remaining_quota":786432,"usage_percentage":25}`)
 	})
 
-	stats, err := client.GetQuotaStats("my-bucket")
+	stats, err := client.GetQuotaStats(context.Background(), "my-bucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestGetQuotaStatsKeepsNulls(t *testing.T) {
 			`"remaining_quota":null,"usage_percentage":null}`)
 	})
 
-	stats, err := client.GetQuotaStats("my-bucket")
+	stats, err := client.GetQuotaStats(context.Background(), "my-bucket")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestGetQuotaStatsErrors(t *testing.T) {
 			_, _ = io.WriteString(w, `{}`)
 		})
 
-		_, err := client.GetQuotaStats("")
+		_, err := client.GetQuotaStats(context.Background(), "")
 		if err == nil || !strings.Contains(err.Error(), "bucket name is required") {
 			t.Fatalf("err = %v", err)
 		}
@@ -90,7 +91,7 @@ func TestGetQuotaStatsErrors(t *testing.T) {
 			_, _ = io.WriteString(w, s3ErrorXML("NoSuchBucket", "bucket not found: missing"))
 		})
 
-		_, err := client.GetQuotaStats("missing")
+		_, err := client.GetQuotaStats(context.Background(), "missing")
 		if err == nil {
 			t.Fatal("expected an error")
 		}
@@ -112,7 +113,7 @@ func TestGetQuotaStatsErrors(t *testing.T) {
 			_, _ = io.WriteString(w, s3ErrorXML("NotImplemented", "not implemented"))
 		})
 
-		_, err := client.GetQuotaStats("my-bucket")
+		_, err := client.GetQuotaStats(context.Background(), "my-bucket")
 		if !rustfs.IsUnsupportedFeature(err) {
 			t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 		}
@@ -133,7 +134,7 @@ func TestCheckQuota(t *testing.T) {
 			`"allowed":true,"current_usage":2048,"quota_limit":4096,"remaining_quota":1024}`)
 	})
 
-	check, err := client.CheckQuota("my-bucket", "PUT", 1024)
+	check, err := client.CheckQuota(context.Background(), "my-bucket", "PUT", 1024)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestCheckQuotaErrors(t *testing.T) {
 		{name: "negative size", bucket: "my-bucket", operationType: "PUT", size: -1, want: "must not be negative"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := client.CheckQuota(tc.bucket, tc.operationType, tc.size)
+			_, err := client.CheckQuota(context.Background(), tc.bucket, tc.operationType, tc.size)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
 			}
@@ -207,7 +208,7 @@ func TestCheckQuotaErrors(t *testing.T) {
 			_, _ = io.WriteString(w, s3ErrorXML("AccessDenied", "denied by admin gate"))
 		})
 
-		_, err := client.CheckQuota("my-bucket", "PUT", 1)
+		_, err := client.CheckQuota(context.Background(), "my-bucket", "PUT", 1)
 		if err == nil || !strings.Contains(err.Error(), "denied by admin gate") {
 			t.Fatalf("err = %v", err)
 		}

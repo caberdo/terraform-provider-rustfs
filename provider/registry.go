@@ -49,6 +49,11 @@ func registerDataSource(factory func() datasource.DataSource) {
 
 // registeredResources returns the registered resource constructors sorted by
 // Terraform type name, so Resources() is deterministic.
+//
+// Metadata() only resolves a type name from a local schema and performs no I/O;
+// Resources() and DataSources() receive no caller context, so the background
+// context used for that call (here, below and in RegistrySnapshot) is the one
+// documented exception to the ctx-first client rule.
 func registeredResources() []func() resource.Resource {
 	registryMu.RLock()
 	factories := append([]func() resource.Resource(nil), resourceFactories...)

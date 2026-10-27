@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -123,6 +124,7 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	// admin requests through rustfs.New, and `insecure` has to reach both.
 	httpClient := &http.Client{Transport: newHTTPTransport(resolved.Secure, config.Insecure.ValueBool())}
 	generatedConfig := generateRustClientConfig(resolved.HostPort, resolved.Secure, config, httpClient)
+	generatedConfig.UserAgent = rustfs.UserAgentForVersion(p.version)
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion("us-east-1"),
@@ -139,6 +141,12 @@ func (p *RustfsProvider) Configure(ctx context.Context, req provider.ConfigureRe
 	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpointURL)
 		o.UsePathStyle = true
+		// The AWS SDK's AppID is sanitized and loses its slash, so the
+		// version token is added as a user-agent key/value pair instead: it
+		// emits exactly terraform-provider-rustfs/<version>, the same token
+		// the admin client sends.
+		o.APIOptions = append(o.APIOptions,
+			awsmiddleware.AddUserAgentKeyValue("terraform-provider-rustfs", p.version))
 	})
 
 	client := &AllClient{

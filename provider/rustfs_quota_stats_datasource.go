@@ -108,7 +108,7 @@ func (d *QuotaStatsDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	bucket := config.Bucket.ValueString()
 
-	stats, err := d.client.RustClient.GetQuotaStats(bucket)
+	stats, err := d.client.RustClient.GetQuotaStats(ctx, bucket)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket quota statistics",

@@ -144,7 +144,7 @@ func (r *kmsBackupResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	status, statusErr := r.client.RustClient.GetKmsBackupStatus()
+	status, statusErr := r.client.RustClient.GetKmsBackupStatus(ctx)
 	if statusErr != nil {
 		resp.Diagnostics.AddError(
 			"Error creating KMS backup",
@@ -163,7 +163,7 @@ func (r *kmsBackupResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	bundle, err := r.client.RustClient.CreateKmsBackup(plan.BackupID.ValueString())
+	bundle, err := r.client.RustClient.CreateKmsBackup(ctx, plan.BackupID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating KMS backup",
@@ -195,7 +195,7 @@ func (r *kmsBackupResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	status, err := r.client.RustClient.GetKmsBackupStatus()
+	status, err := r.client.RustClient.GetKmsBackupStatus(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading KMS backup status",

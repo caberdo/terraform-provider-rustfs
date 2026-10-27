@@ -66,7 +66,7 @@ func (d *PoolsDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 
-	pools, err := d.client.RustClient.ListPools()
+	pools, err := d.client.RustClient.ListPools(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing pools",

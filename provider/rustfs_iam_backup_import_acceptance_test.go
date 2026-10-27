@@ -57,7 +57,7 @@ func TestAccIamBackupImportResource_replaceAndErrors(t *testing.T) {
 	t.Cleanup(func() {
 		client := testAccRustClient()
 		for _, name := range []string{policyA, policyB} {
-			_ = client.DeletePolicy(name)
+			_ = client.DeletePolicy(context.Background(), name)
 		}
 	})
 
@@ -228,7 +228,7 @@ func testAccIamBackupImportArchive(t *testing.T, entries map[string]string) stri
 func testAccCheckIamBackupImportPolicy(name, action string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		policy, err := client.ReadPolicy(name)
+		policy, err := client.ReadPolicy(context.Background(), name)
 		if err != nil {
 			return fmt.Errorf("imported policy %s not found on the server: %w", name, err)
 		}
@@ -253,10 +253,10 @@ func testAccIamBackupImportDeletePolicyOutOfBand(t *testing.T, name string) reso
 
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.DeletePolicy(name); err != nil {
+		if err := client.DeletePolicy(context.Background(), name); err != nil {
 			return fmt.Errorf("out-of-band delete of policy %s: %w", name, err)
 		}
-		if _, err := client.ReadPolicy(name); err == nil {
+		if _, err := client.ReadPolicy(context.Background(), name); err == nil {
 			return fmt.Errorf("policy %s still readable after the out-of-band delete", name)
 		}
 		t.Logf("deleted policy %s out of band; the follow-up plan must still be empty", name)

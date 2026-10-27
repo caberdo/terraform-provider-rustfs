@@ -152,7 +152,7 @@ func (r *RemoteTargetResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	arn, err := r.client.RustClient.AddRemoteTarget(plan.Bucket.ValueString(), r.targetFromModel(plan))
+	arn, err := r.client.RustClient.AddRemoteTarget(ctx, plan.Bucket.ValueString(), r.targetFromModel(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating remote target", err.Error())
 		return
@@ -168,7 +168,7 @@ func (r *RemoteTargetResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	targets, err := r.client.RustClient.ListRemoteTargets(state.Bucket.ValueString())
+	targets, err := r.client.RustClient.ListRemoteTargets(ctx, state.Bucket.ValueString())
 	if err != nil {
 		// Live evidence (RustFS latest, 2026-10-19): list-remote-targets on a
 		// bucket that does not exist answers 404 NoSuchBucket. A source bucket
@@ -223,7 +223,7 @@ func (r *RemoteTargetResource) Update(ctx context.Context, req resource.UpdateRe
 
 	target := r.targetFromModel(plan)
 	target.Arn = state.Arn.ValueString()
-	if _, err := r.client.RustClient.AddRemoteTarget(plan.Bucket.ValueString(), target); err != nil {
+	if _, err := r.client.RustClient.AddRemoteTarget(ctx, plan.Bucket.ValueString(), target); err != nil {
 		resp.Diagnostics.AddError("Error updating remote target", err.Error())
 		return
 	}
@@ -240,7 +240,7 @@ func (r *RemoteTargetResource) Delete(ctx context.Context, req resource.DeleteRe
 	// A replication configuration that references the target removes it as
 	// part of its own deletion, so the target may already be gone by the time
 	// Terraform destroys this resource; that is not an error.
-	if err := r.client.RustClient.DeleteRemoteTarget(data.Bucket.ValueString(), data.Arn.ValueString()); err != nil {
+	if err := r.client.RustClient.DeleteRemoteTarget(ctx, data.Bucket.ValueString(), data.Arn.ValueString()); err != nil {
 		// Two ways the target is already gone: a removal that reports the
 		// target missing (a replication configuration deletes the targets it
 		// references), or a source bucket that no longer exists, which the

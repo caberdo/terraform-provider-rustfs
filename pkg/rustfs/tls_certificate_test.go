@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -44,7 +45,7 @@ func TestGetTLSCertificateState(t *testing.T) {
 		_, _ = io.WriteString(w, tlsCertificateStatePayload)
 	})
 
-	state, err := client.GetTLSCertificateState()
+	state, err := client.GetTLSCertificateState(context.Background())
 	if err != nil {
 		t.Fatalf("get TLS certificate state: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestGetTLSCertificateStateNotImplemented(t *testing.T) {
 		_, _ = io.WriteString(w, tlsNotImplementedBody)
 	})
 
-	_, err := client.GetTLSCertificateState()
+	_, err := client.GetTLSCertificateState(context.Background())
 	if !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -135,7 +136,7 @@ func TestPublishTLSCertificate(t *testing.T) {
 		}
 	})
 
-	receipt, err := client.PublishTLSCertificate("CERT-PEM", "KEY-PEM")
+	receipt, err := client.PublishTLSCertificate(context.Background(), "CERT-PEM", "KEY-PEM")
 	if err != nil {
 		t.Fatalf("publish TLS certificate: %v", err)
 	}
@@ -177,7 +178,7 @@ func TestPublishTLSCertificateTooLarge(t *testing.T) {
 	})
 
 	large := strings.Repeat("A", rustfs.TLSPublishBodyLimit)
-	_, err := client.PublishTLSCertificate(large, "KEY-PEM")
+	_, err := client.PublishTLSCertificate(context.Background(), large, "KEY-PEM")
 	if !errors.Is(err, rustfs.ErrTLSPublishTooLarge) {
 		t.Fatalf("expected ErrTLSPublishTooLarge, got %T: %v", err, err)
 	}
@@ -192,7 +193,7 @@ func TestGetTLSCertificateStateInvalidJSON(t *testing.T) {
 		_, _ = io.WriteString(w, `not-json`)
 	})
 
-	_, err := client.GetTLSCertificateState()
+	_, err := client.GetTLSCertificateState(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "decode tls/certificate-state response") {
 		t.Fatalf("expected a decode error, got %v", err)
 	}
@@ -211,7 +212,7 @@ func TestPublishTLSCertificateBodyLimitAfterEncoding(t *testing.T) {
 	// The PEM pair fits the limit on its own, but the JSON envelope pushes the
 	// request body over it.
 	certificate := strings.Repeat("A", rustfs.TLSPublishBodyLimit-100)
-	_, err := client.PublishTLSCertificate(certificate, "K")
+	_, err := client.PublishTLSCertificate(context.Background(), certificate, "K")
 	if !errors.Is(err, rustfs.ErrTLSPublishTooLarge) {
 		t.Fatalf("expected ErrTLSPublishTooLarge, got %T: %v", err, err)
 	}
@@ -230,7 +231,7 @@ func TestPublishTLSCertificateInvalidReceipt(t *testing.T) {
 		_, _ = io.WriteString(w, tlsCertificateStatePayload)
 	})
 
-	_, err := client.PublishTLSCertificate("CERT-PEM", "KEY-PEM")
+	_, err := client.PublishTLSCertificate(context.Background(), "CERT-PEM", "KEY-PEM")
 	if err == nil || !strings.Contains(err.Error(), "decode tls/certificate response") {
 		t.Fatalf("expected a decode error, got %v", err)
 	}
@@ -248,7 +249,7 @@ func TestPublishTLSCertificateSurfacesStateErrors(t *testing.T) {
 		_, _ = io.WriteString(w, tlsNotImplementedBody)
 	})
 
-	if _, err := client.PublishTLSCertificate("CERT-PEM", "KEY-PEM"); !rustfs.IsUnsupportedFeature(err) {
+	if _, err := client.PublishTLSCertificate(context.Background(), "CERT-PEM", "KEY-PEM"); !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected the state read to fail with *UnsupportedFeatureError, got %T: %v", err, err)
 	}
 }

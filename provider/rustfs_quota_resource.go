@@ -23,6 +23,11 @@ const (
 	// read tolerates RustFS returning ServiceUnavailable while the scanner is
 	// still computing the bucket's authoritative usage on a freshly started
 	// server (usually available within tens of seconds).
+	//
+	// This loop stays beside the resource instead of using the client's retry
+	// policy: it waits for cluster readiness for up to ~90s and matches only the
+	// readiness wording, while the shared policy retries request-level glitches
+	// for about a second. The quota routes are on that policy's allow-list too.
 	quotaReadMaxAttempts   = 30
 	quotaReadRetryInterval = 3 * time.Second
 )
@@ -41,10 +46,10 @@ func isTransientQuotaError(err error) bool {
 
 // quotaReadWithRetry retries the quota read while the server reports that the
 // bucket's authoritative usage is not computed yet. Other errors fail fast.
-func quotaReadWithRetry(ctx context.Context, bucket string, read func(string) (rustfs.Quota, error)) (rustfs.Quota, error) {
+func quotaReadWithRetry(ctx context.Context, bucket string, read func(context.Context, string) (rustfs.Quota, error)) (rustfs.Quota, error) {
 	var lastErr error
 	for attempt := 0; attempt < quotaReadMaxAttempts; attempt++ {
-		quota, err := read(bucket)
+		quota, err := read(ctx, bucket)
 		if err == nil {
 			return quota, nil
 		}
@@ -66,10 +71,10 @@ func quotaReadWithRetry(ctx context.Context, bucket string, read func(string) (r
 // quotaSetWithRetry retries setting the bucket quota while the cluster has not
 // yet confirmed the durable quota capability (fresh single-node startup).
 // Other errors fail fast.
-func quotaSetWithRetry(ctx context.Context, quota rustfs.Quota, set func(rustfs.Quota) (rustfs.Quota, error)) (rustfs.Quota, error) {
+func quotaSetWithRetry(ctx context.Context, quota rustfs.Quota, set func(context.Context, rustfs.Quota) (rustfs.Quota, error)) (rustfs.Quota, error) {
 	var lastErr error
 	for attempt := 0; attempt < quotaReadMaxAttempts; attempt++ {
-		got, err := set(quota)
+		got, err := set(ctx, quota)
 		if err == nil {
 			return got, nil
 		}
@@ -259,7 +264,7 @@ func (r *quotaResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 		return
 	}
 
-	err := r.client.RustClient.DeletQuota(data.Bucket.ValueString())
+	err := r.client.RustClient.DeletQuota(ctx, data.Bucket.ValueString())
 	if err != nil {
 		if quotaBucketGone(err) {
 			// The bucket is already gone, so its quota is too: the desired end

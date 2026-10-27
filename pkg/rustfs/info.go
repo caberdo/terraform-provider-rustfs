@@ -100,13 +100,11 @@ type PoolSetInfo struct {
 }
 
 // ServerInfo returns cluster and server information from GET /v3/info.
-func (c *RustfsAdmin) ServerInfo() (ServerInfo, error) {
+func (c *RustfsAdmin) ServerInfo(ctx context.Context) (ServerInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "info",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return ServerInfo{}, err

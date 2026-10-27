@@ -54,7 +54,7 @@ func testAccLdapPolicyPreCheck(t *testing.T, target string, isGroup bool) {
 		PolicyName:  "readwrite",
 		IsGroup:     isGroup,
 	}
-	if err := client.AttachLDAPPolicy(req); err != nil {
+	if err := client.AttachLDAPPolicy(context.Background(), req); err != nil {
 		if strings.Contains(err.Error(), "not exist") || strings.Contains(err.Error(), "does not exist") {
 			t.Skipf("no LDAP identity provider configured (or target %q does not exist); "+
 				"skipping LDAP policy attachment acceptance test. RustFS 1.0.x has no way to "+
@@ -66,7 +66,7 @@ func testAccLdapPolicyPreCheck(t *testing.T, target string, isGroup bool) {
 		}
 		t.Fatalf("unexpected error probing LDAP policy attachment: %v", err)
 	}
-	if err := client.DetachLDAPPolicy(req); err != nil {
+	if err := client.DetachLDAPPolicy(context.Background(), req); err != nil {
 		t.Fatalf("failed to clean up LDAP policy probe: %v", err)
 	}
 }

@@ -3,7 +3,10 @@
 
 package rustfs
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // groupPolicyAssociationMu serializes the group attach/detach calls made by
 // this process. RustFS implements both as a read-modify-write of the group's
@@ -16,8 +19,8 @@ var groupPolicyAssociationMu sync.Mutex
 // other policy the group holds attached. RustFS stores a group's policies as a
 // comma-separated list and idp/builtin/policy/attach appends to it (unlike PUT
 // set-user-or-group-policy, which replaces the whole mapping).
-func (c *RustfsAdmin) AttachGroupPolicy(group, policy string) error {
-	return c.groupPolicyAssociation(group, policy, "idp/builtin/policy/attach")
+func (c *RustfsAdmin) AttachGroupPolicy(ctx context.Context, group, policy string) error {
+	return c.groupPolicyAssociation(ctx, group, policy, "idp/builtin/policy/attach")
 }
 
 // DetachGroupPolicy detaches a single canned policy from an IAM group, leaving
@@ -25,15 +28,15 @@ func (c *RustfsAdmin) AttachGroupPolicy(group, policy string) error {
 // variant of set-user-or-group-policy, and an empty policyName there would drop
 // the group's whole mapping, so removal goes through the dedicated additive
 // POST idp/builtin/policy/detach endpoint.
-func (c *RustfsAdmin) DetachGroupPolicy(group, policy string) error {
-	return c.groupPolicyAssociation(group, policy, "idp/builtin/policy/detach")
+func (c *RustfsAdmin) DetachGroupPolicy(ctx context.Context, group, policy string) error {
+	return c.groupPolicyAssociation(ctx, group, policy, "idp/builtin/policy/detach")
 }
 
-func (c *RustfsAdmin) groupPolicyAssociation(group, policy, relPath string) error {
+func (c *RustfsAdmin) groupPolicyAssociation(ctx context.Context, group, policy, relPath string) error {
 	groupPolicyAssociationMu.Lock()
 	defer groupPolicyAssociationMu.Unlock()
 
-	return c.policyAssociation(relPath, policyAssociationRequest{
+	return c.policyAssociation(ctx, relPath, policyAssociationRequest{
 		Group:    group,
 		Policies: []string{policy},
 	})

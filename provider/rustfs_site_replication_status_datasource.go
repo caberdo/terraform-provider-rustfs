@@ -526,7 +526,7 @@ func (d *SiteReplicationStatusDataSource) Configure(_ context.Context, req datas
 }
 
 func (d *SiteReplicationStatusDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	info, err := d.client.RustClient.SiteReplicationInfo()
+	info, err := d.client.RustClient.SiteReplicationInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading site replication info",
@@ -537,7 +537,7 @@ func (d *SiteReplicationStatusDataSource) Read(ctx context.Context, _ datasource
 
 	var status rustfs.SiteReplicationStatusInfo
 	statusAvailable := true
-	status, err = d.client.RustClient.SiteReplicationStatus()
+	status, err = d.client.RustClient.SiteReplicationStatus(ctx)
 	if err != nil {
 		if !rustfs.IsUnsupportedFeature(err) {
 			resp.Diagnostics.AddError(
@@ -550,7 +550,7 @@ func (d *SiteReplicationStatusDataSource) Read(ctx context.Context, _ datasource
 		status = rustfs.SiteReplicationStatusInfo{}
 	}
 
-	metainfo, err := d.client.RustClient.SiteReplicationMetaInfo()
+	metainfo, err := d.client.RustClient.SiteReplicationMetaInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading site replication metainfo",

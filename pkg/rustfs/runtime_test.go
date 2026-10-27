@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -25,7 +26,7 @@ func TestGetRuntimeCapabilities(t *testing.T) {
 		_, _ = w.Write([]byte(runtimeCapabilitiesPayload))
 	})
 
-	capabilities, err := client.GetRuntimeCapabilities()
+	capabilities, err := client.GetRuntimeCapabilities(context.Background())
 	if err != nil {
 		t.Fatalf("GetRuntimeCapabilities: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestGetRuntimeCapabilitiesDecodeError(t *testing.T) {
 		_, _ = w.Write([]byte(`{"storage_classes":"not-an-object"}`))
 	})
 
-	_, err := client.GetRuntimeCapabilities()
+	_, err := client.GetRuntimeCapabilities(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "decode runtime capabilities") {
 		t.Fatalf("expected a decode error, got %v", err)
 	}
@@ -73,7 +74,7 @@ func TestGetRuntimeCapabilitiesRequiresContract(t *testing.T) {
 				_, _ = w.Write([]byte(tt.payload))
 			})
 
-			_, err := client.GetRuntimeCapabilities()
+			_, err := client.GetRuntimeCapabilities(context.Background())
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("expected an error containing %q, got %v", tt.want, err)
 			}
@@ -88,11 +89,11 @@ func TestV4OpaqueEndpointsRejectNonJSON(t *testing.T) {
 		name string
 		call func(*rustfs.RustfsAdmin) (string, error)
 	}{
-		{"plugin catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetPluginCatalog() }},
-		{"plugin instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListPluginInstances() }},
-		{"extension catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetExtensionCatalog() }},
-		{"extension instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListExtensionInstances() }},
-		{"cluster snapshot", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetClusterSnapshot() }},
+		{"plugin catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetPluginCatalog(context.Background()) }},
+		{"plugin instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListPluginInstances(context.Background()) }},
+		{"extension catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetExtensionCatalog(context.Background()) }},
+		{"extension instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListExtensionInstances(context.Background()) }},
+		{"cluster snapshot", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetClusterSnapshot(context.Background()) }},
 	}
 
 	for _, tt := range tests {
@@ -120,11 +121,11 @@ func TestV4OpaqueEndpoints(t *testing.T) {
 		relPath string
 		call    func(*rustfs.RustfsAdmin) (string, error)
 	}{
-		{"plugin catalog", "plugins/catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetPluginCatalog() }},
-		{"plugin instances", "plugins/instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListPluginInstances() }},
-		{"extension catalog", "extensions/catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetExtensionCatalog() }},
-		{"extension instances", "extensions/instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListExtensionInstances() }},
-		{"cluster snapshot", "cluster/snapshot", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetClusterSnapshot() }},
+		{"plugin catalog", "plugins/catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetPluginCatalog(context.Background()) }},
+		{"plugin instances", "plugins/instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListPluginInstances(context.Background()) }},
+		{"extension catalog", "extensions/catalog", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetExtensionCatalog(context.Background()) }},
+		{"extension instances", "extensions/instances", func(c *rustfs.RustfsAdmin) (string, error) { return c.ListExtensionInstances(context.Background()) }},
+		{"cluster snapshot", "cluster/snapshot", func(c *rustfs.RustfsAdmin) (string, error) { return c.GetClusterSnapshot(context.Background()) }},
 	}
 
 	for _, tt := range tests {
@@ -155,7 +156,7 @@ func TestV4UpgradeRequiredIsNegotiationSignal(t *testing.T) {
 		w.WriteHeader(http.StatusUpgradeRequired)
 	})
 
-	_, err := client.GetRuntimeCapabilities()
+	_, err := client.GetRuntimeCapabilities(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -192,7 +193,7 @@ func TestV4NotImplementedIsNotUpgradeRequired(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`))
 	})
 
-	_, err := client.GetClusterSnapshot()
+	_, err := client.GetClusterSnapshot(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -217,7 +218,7 @@ func TestV4UnexpectedErrorStaysPlain(t *testing.T) {
 		_, _ = w.Write([]byte(`<Error><Code>InternalError</Code><Message>boom</Message></Error>`))
 	})
 
-	_, err := client.GetPluginCatalog()
+	_, err := client.GetPluginCatalog(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}

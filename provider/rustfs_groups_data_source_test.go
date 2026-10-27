@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -41,7 +42,7 @@ data "rustfs_groups" "all" {}
 func createAccTestGroup(t *testing.T, name string) {
 	t.Helper()
 	client := testAccAdminClient()
-	if err := client.UpdateGroupMembers(rustfs.GroupAddRemove{Group: name, Members: []string{}, Status: "enabled"}); err != nil {
+	if err := client.UpdateGroupMembers(context.Background(), rustfs.GroupAddRemove{Group: name, Members: []string{}, Status: "enabled"}); err != nil {
 		t.Fatalf("creating group %s: %v", name, err)
 	}
 }
@@ -49,7 +50,7 @@ func createAccTestGroup(t *testing.T, name string) {
 func deleteAccTestGroup(t *testing.T, name string) {
 	t.Helper()
 	client := testAccAdminClient()
-	if err := client.DeleteGroup(name); err != nil {
+	if err := client.DeleteGroup(context.Background(), name); err != nil {
 		t.Fatalf("deleting group %s: %v", name, err)
 	}
 }

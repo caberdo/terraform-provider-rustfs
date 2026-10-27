@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -210,7 +211,7 @@ func testAccCheckUserExists(n string, expectedStatus string) resource.TestCheckF
 		}
 
 		client := testAccRustClient()
-		user, err := client.ReadUserAccount(accessKey)
+		user, err := client.ReadUserAccount(context.Background(), accessKey)
 		if err != nil {
 			return fmt.Errorf("user not found: %s", err)
 		}
@@ -225,7 +226,7 @@ func testAccCheckUserExists(n string, expectedStatus string) resource.TestCheckF
 func testAccCheckUserAbsent(accessKey string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		client := testAccRustClient()
-		_, err := client.ReadUserAccount(accessKey)
+		_, err := client.ReadUserAccount(context.Background(), accessKey)
 		if err == nil {
 			return fmt.Errorf("user %s still exists on the server", accessKey)
 		}
@@ -241,7 +242,7 @@ func testAccCheckUserAbsent(accessKey string) resource.TestCheckFunc {
 func testAccDeleteUserOutOfBand(accessKey string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		client := testAccRustClient()
-		err := client.DeleteUserAccount(rustfs.UserAccount{AccessKey: accessKey})
+		err := client.DeleteUserAccount(context.Background(), rustfs.UserAccount{AccessKey: accessKey})
 		if err != nil {
 			return fmt.Errorf("out-of-band delete of user %s failed: %s", accessKey, err)
 		}
@@ -268,7 +269,7 @@ func testAccRustClientFor(accessKey, secretKey string) rustfs.RustfsAdmin {
 func testAccCheckUserSecretActive(accessKey, secretKey string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		client := testAccRustClientFor(accessKey, secretKey)
-		_, err := client.ReadUserAccount(accessKey)
+		_, err := client.ReadUserAccount(context.Background(), accessKey)
 		if err == nil || !rustfs.IsAPIErrorCode(err, "SignatureDoesNotMatch") {
 			return nil
 		}
@@ -281,7 +282,7 @@ func testAccCheckUserSecretActive(accessKey, secretKey string) resource.TestChec
 func testAccCheckUserSecretRejected(accessKey, secretKey string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		client := testAccRustClientFor(accessKey, secretKey)
-		_, err := client.ReadUserAccount(accessKey)
+		_, err := client.ReadUserAccount(context.Background(), accessKey)
 		if rustfs.IsAPIErrorCode(err, "SignatureDoesNotMatch", "InvalidAccessKeyId") {
 			return nil
 		}
@@ -302,7 +303,7 @@ func testAccCheckUserDestroy(s *terraform.State) error {
 		if accessKey == "" {
 			continue
 		}
-		_, err := client.ReadUserAccount(accessKey)
+		_, err := client.ReadUserAccount(context.Background(), accessKey)
 		if err == nil {
 			return fmt.Errorf("user %s still exists", accessKey)
 		}

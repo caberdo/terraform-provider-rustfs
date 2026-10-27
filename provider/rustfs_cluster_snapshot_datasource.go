@@ -70,7 +70,7 @@ func (d *ClusterSnapshotDataSource) Configure(_ context.Context, req datasource.
 }
 
 func (d *ClusterSnapshotDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	snapshot, err := d.client.RustClient.GetClusterSnapshot()
+	snapshot, err := d.client.RustClient.GetClusterSnapshot(ctx)
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

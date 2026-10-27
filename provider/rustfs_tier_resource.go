@@ -135,7 +135,7 @@ func (r *TierResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	if err := tierMutation(func() error {
-		return r.client.RustClient.AddTier(json.RawMessage(plan.ConfigJson.ValueString()))
+		return r.client.RustClient.AddTier(ctx, json.RawMessage(plan.ConfigJson.ValueString()))
 	}); err != nil {
 		resp.Diagnostics.AddError("Error adding tier", "Could not add tier: "+err.Error())
 		return
@@ -157,14 +157,14 @@ func (r *TierResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	// it holds the tier, 500 TierNotFound when it does not (probed on 1.0.1 and
 	// latest). It answers for the one name in state even when the listing is
 	// incomplete, so it always decides whether the tier exists.
-	exists, err := r.client.RustClient.TierExists(name)
+	exists, err := r.client.RustClient.TierExists(ctx, name)
 	if err != nil {
 		// A server that does not implement the route cannot answer the
 		// question, so keep the last known state instead of guessing; the
 		// tier's destroy path has the same rule. An import still needs the
 		// type from the listing, so fill it when the state lacks it.
 		if rustfs.IsUnsupportedFeature(err) || isUnsupportedTierRoute(err) {
-			if !r.fillTierType(resp, &state) {
+			if !r.fillTierType(ctx, resp, &state) {
 				return
 			}
 			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -179,7 +179,7 @@ func (r *TierResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 
-	if !r.fillTierType(resp, &state) {
+	if !r.fillTierType(ctx, resp, &state) {
 		return
 	}
 
@@ -195,12 +195,12 @@ func (r *TierResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 // A missing type is reported as an error rather than left empty: planning a
 // destructive replacement is worse than failing the import with a reason. A
 // state that already carries the type costs no extra request.
-func (r *TierResource) fillTierType(resp *resource.ReadResponse, state *tierResourceModel) bool {
+func (r *TierResource) fillTierType(ctx context.Context, resp *resource.ReadResponse, state *tierResourceModel) bool {
 	if !state.TierType.IsNull() {
 		return true
 	}
 
-	tiers, err := r.client.RustClient.ListTiers()
+	tiers, err := r.client.RustClient.ListTiers(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading tier type", "Could not list tiers: "+err.Error())
 		return false
@@ -253,7 +253,7 @@ func (r *TierResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	if err := tierMutation(func() error {
-		return r.client.RustClient.EditTier(plan.Name.ValueString(), json.RawMessage(plan.ConfigJson.ValueString()))
+		return r.client.RustClient.EditTier(ctx, plan.Name.ValueString(), json.RawMessage(plan.ConfigJson.ValueString()))
 	}); err != nil {
 		resp.Diagnostics.AddError("Error editing tier", "Could not edit tier: "+err.Error())
 		return
@@ -270,7 +270,7 @@ func (r *TierResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	if err := tierMutation(func() error {
-		return r.client.RustClient.RemoveTier(data.Name.ValueString())
+		return r.client.RustClient.RemoveTier(ctx, data.Name.ValueString())
 	}); err != nil {
 		resp.Diagnostics.AddError("Error removing tier", "Could not remove tier: "+err.Error())
 		return

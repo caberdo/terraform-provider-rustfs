@@ -4,10 +4,13 @@
 package rustfs_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
 )
@@ -24,6 +27,42 @@ func newTestAdminServer(t *testing.T, handler http.HandlerFunc) *rustfs.RustfsAd
 		Endpoint:     strings.TrimPrefix(srv.URL, "http://"),
 	})
 	return &c
+}
+
+// A public admin method must hand the caller's context to the request, so a
+// cancelled Terraform operation stops a blocked call instead of waiting for the
+// HTTP client timeout.
+func TestAdminMethodHonoursCallerContext(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer srv.Close()
+	defer close(release)
+
+	client := rustfs.New(&rustfs.RustfsAdminConfig{
+		AccessKey:    "admin",
+		AccessSecret: "secret",
+		Endpoint:     strings.TrimPrefix(srv.URL, "http://"),
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := client.GetKmsStatus(ctx)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("GetKmsStatus with a cancelled context returned %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("an admin call ignored the caller's cancelled context")
+	}
 }
 
 // Endpoint reports the configured value before the scheme is filled in; the

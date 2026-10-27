@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -20,7 +21,7 @@ func TestUserPolicyAttachmentAttach(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.AttachUserPolicy("alice", "readonly"); err != nil {
+	if err := client.AttachUserPolicy(context.Background(), "alice", "readonly"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -46,7 +47,7 @@ func TestUserPolicyAttachmentDetach(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.DetachUserPolicy("alice", "readonly"); err != nil {
+	if err := client.DetachUserPolicy(context.Background(), "alice", "readonly"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -67,7 +68,7 @@ func TestUserPolicyAttachmentError(t *testing.T) {
 		w.WriteHeader(http.StatusBadRequest)
 	})
 
-	if err := client.AttachUserPolicy("alice", "readonly"); err == nil {
+	if err := client.AttachUserPolicy(context.Background(), "alice", "readonly"); err == nil {
 		t.Fatal("expected error for non-2xx response, got nil")
 	}
 }

@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"testing"
@@ -27,7 +28,7 @@ func TestAccBucketRecovery_refusesLiveVolume(t *testing.T) {
 	testAccPreCheck(t)
 
 	client := testAccAdminClient()
-	version, raw, err := client.ServerVersion()
+	version, raw, err := client.ServerVersion(context.Background())
 	if err != nil {
 		t.Skipf("cannot determine the RustFS version, skipping: %v", err)
 	}

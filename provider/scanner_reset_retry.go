@@ -22,6 +22,11 @@ var (
 // RustFS reports that the scanner leader still holds the state lock. Both reset
 // routes are idempotent, so repeating them is safe; a lock that never frees
 // still fails with the server's error.
+//
+// This is deliberately not the client's retry policy: the leader holds the lock
+// for a whole scanner cycle, so the waits are seconds (2s x 3) while the shared
+// policy covers transport glitches with sub-second backoff. The reset routes are
+// on that policy's allow-list too, so a busy answer may take both.
 func resetWithScannerLeaderRetry[T any](ctx context.Context, call func() (T, error)) (T, error) {
 	var zero T
 	var lastErr error

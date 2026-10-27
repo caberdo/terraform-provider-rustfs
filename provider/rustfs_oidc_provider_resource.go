@@ -294,7 +294,7 @@ func (r *OIDCProviderResource) Create(ctx context.Context, req resource.CreateRe
 	// Validate before persisting: the server stores a provider without running
 	// discovery, so without this check a typo in config_url would only surface
 	// at Console login.
-	if _, err := r.client.RustClient.ValidateOIDCProvider(rustfs.OIDCProviderValidationInput{
+	if _, err := r.client.RustClient.ValidateOIDCProvider(ctx, rustfs.OIDCProviderValidationInput{
 		ProviderID:        id,
 		OIDCProviderInput: input,
 	}); err != nil {
@@ -305,7 +305,7 @@ func (r *OIDCProviderResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	if err := r.client.RustClient.UpsertOIDCProvider(id, input); err != nil {
+	if err := r.client.RustClient.UpsertOIDCProvider(ctx, id, input); err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating OIDC provider",
 			"Could not create OIDC provider "+id+": "+err.Error(),
@@ -313,7 +313,7 @@ func (r *OIDCProviderResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	config, err := r.client.RustClient.ListOIDCConfig()
+	config, err := r.client.RustClient.ListOIDCConfig(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating OIDC provider",
@@ -344,7 +344,7 @@ func (r *OIDCProviderResource) Read(ctx context.Context, req resource.ReadReques
 	}
 
 	id := state.ID.ValueString()
-	config, err := r.client.RustClient.ListOIDCConfig()
+	config, err := r.client.RustClient.ListOIDCConfig(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading OIDC provider",
@@ -381,7 +381,7 @@ func (r *OIDCProviderResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if _, err := r.client.RustClient.ValidateOIDCProvider(rustfs.OIDCProviderValidationInput{
+	if _, err := r.client.RustClient.ValidateOIDCProvider(ctx, rustfs.OIDCProviderValidationInput{
 		ProviderID:        id,
 		OIDCProviderInput: input,
 	}); err != nil {
@@ -392,7 +392,7 @@ func (r *OIDCProviderResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	if err := r.client.RustClient.UpsertOIDCProvider(id, input); err != nil {
+	if err := r.client.RustClient.UpsertOIDCProvider(ctx, id, input); err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating OIDC provider",
 			"Could not update OIDC provider "+id+": "+err.Error(),
@@ -400,7 +400,7 @@ func (r *OIDCProviderResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	config, err := r.client.RustClient.ListOIDCConfig()
+	config, err := r.client.RustClient.ListOIDCConfig(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating OIDC provider",
@@ -433,7 +433,7 @@ func (r *OIDCProviderResource) Delete(ctx context.Context, req resource.DeleteRe
 	id := state.ID.ValueString()
 	warnIfLastOIDCProvider(ctx, r.client.RustClient, id, &resp.Diagnostics)
 
-	if err := r.client.RustClient.DeleteOIDCProvider(id); err != nil {
+	if err := r.client.RustClient.DeleteOIDCProvider(ctx, id); err != nil {
 		// An out-of-band delete has nothing left to remove.
 		if oidcProviderDeleteGone(err) {
 			tflog.Trace(ctx, "OIDC provider was already deleted", map[string]any{"provider_id": id})
@@ -569,7 +569,7 @@ func oidcProviderSecret(configured bool, prior types.String) types.String {
 // server does not report this condition itself, so the provider counts the
 // effective list. Failure to read the list is not a reason to block the delete.
 func warnIfLastOIDCProvider(ctx context.Context, client rustfs.RustfsAdmin, id string, diags *diag.Diagnostics) {
-	config, err := client.ListOIDCConfig()
+	config, err := client.ListOIDCConfig(ctx)
 	if err != nil {
 		return
 	}

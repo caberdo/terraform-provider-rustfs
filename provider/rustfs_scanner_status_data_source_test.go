@@ -269,7 +269,7 @@ data "rustfs_scanner_status" "test" {}
 func testAccScannerStatusPreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.GetScannerStatus(); err != nil {
+	if _, err := client.GetScannerStatus(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("scanner status is not implemented by the running RustFS, skipping: %v", err)
 		}

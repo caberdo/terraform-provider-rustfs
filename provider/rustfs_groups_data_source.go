@@ -61,7 +61,7 @@ func (d *GroupsDataSource) Configure(_ context.Context, req datasource.Configure
 }
 
 func (d *GroupsDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	names, err := d.client.RustClient.ListGroups()
+	names, err := d.client.RustClient.ListGroups(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing groups",

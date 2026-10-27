@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -82,7 +83,7 @@ func testAccCheckTableBucketEnabled(n string) resource.TestCheckFunc {
 		if err != nil {
 			return err
 		}
-		tableBucket, err := client.RustClient.GetTableBucket(bucketName)
+		tableBucket, err := client.RustClient.GetTableBucket(context.Background(), bucketName)
 		if err != nil {
 			return fmt.Errorf("error reading table bucket: %s", err)
 		}
@@ -102,7 +103,7 @@ func testAccCheckTableBucketDestroy(s *terraform.State) error {
 	if err != nil {
 		return err
 	}
-	version, _, err := client.RustClient.ServerVersion()
+	version, _, err := client.RustClient.ServerVersion(context.Background())
 	supportsDisable := err == nil && version.AtLeast(rustfs.Version{Major: 1, Minor: 0, Patch: 2})
 
 	for _, rs := range s.RootModule().Resources {
@@ -116,7 +117,7 @@ func testAccCheckTableBucketDestroy(s *terraform.State) error {
 		if !supportsDisable {
 			continue
 		}
-		tableBucket, err := client.RustClient.GetTableBucket(bucketName)
+		tableBucket, err := client.RustClient.GetTableBucket(context.Background(), bucketName)
 		if err != nil {
 			// A missing bucket has no catalog switch left to verify.
 			continue

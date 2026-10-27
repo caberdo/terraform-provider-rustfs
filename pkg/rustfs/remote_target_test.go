@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -45,7 +46,7 @@ func TestAddRemoteTarget(t *testing.T) {
 			SecretKey: "peersecret",
 		},
 	}
-	arn, err := c.AddRemoteTarget("src-bkt", target)
+	arn, err := c.AddRemoteTarget(context.Background(), "src-bkt", target)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +90,7 @@ func TestUpdateRemoteTarget(t *testing.T) {
 			SecretKey: "peersecret",
 		},
 	}
-	if _, err := c.AddRemoteTarget("src-bkt", target); err != nil {
+	if _, err := c.AddRemoteTarget(context.Background(), "src-bkt", target); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotQuery, "update=true") {
@@ -120,7 +121,7 @@ func TestListRemoteTargets(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	targets, err := c.ListRemoteTargets("src-bkt")
+	targets, err := c.ListRemoteTargets(context.Background(), "src-bkt")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestDeleteRemoteTarget(t *testing.T) {
 		AccessSecret: "secret",
 		Endpoint:     strings.TrimPrefix(server.URL, "http://"),
 	})
-	if err := c.DeleteRemoteTarget("src-bkt", "arn:minio:replication::abc:dst-bkt"); err != nil {
+	if err := c.DeleteRemoteTarget(context.Background(), "src-bkt", "arn:minio:replication::abc:dst-bkt"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

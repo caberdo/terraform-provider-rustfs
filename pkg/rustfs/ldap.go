@@ -15,7 +15,7 @@ import (
 // RustFS has no LDAP directory backend, so the target user must already exist
 // in the identity store (e.g. provisioned by a configured LDAP IdP), otherwise
 // the server rejects the request with "target user not exist".
-func (c *RustfsAdmin) CreateLDAPServiceAccount(account ServiceAccount) error {
+func (c *RustfsAdmin) CreateLDAPServiceAccount(ctx context.Context, account ServiceAccount) error {
 	normalizeServiceAccount(&account)
 	//#nosec G117 — AccessKey is a public identifier, not a secret
 	bytes, err := json.Marshal(account)
@@ -27,8 +27,6 @@ func (c *RustfsAdmin) CreateLDAPServiceAccount(account ServiceAccount) error {
 		RelPath: "idp/ldap/add-service-account",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err

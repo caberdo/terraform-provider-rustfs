@@ -22,13 +22,11 @@ type BucketDurability struct {
 // GetBucketDurability returns the durability override for the given bucket. When
 // the bucket has no override (i.e. it inherits the process-wide mode), the
 // server responds with a null mode.
-func (c *RustfsAdmin) GetBucketDurability(bucket string) (BucketDurability, error) {
+func (c *RustfsAdmin) GetBucketDurability(ctx context.Context, bucket string) (BucketDurability, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "bucket-durability/" + bucket,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return BucketDurability{}, err
@@ -41,7 +39,7 @@ func (c *RustfsAdmin) GetBucketDurability(bucket string) (BucketDurability, erro
 
 // SetBucketDurability sets the durability override for the given bucket and
 // returns the resulting (normalized) configuration read back from the server.
-func (c *RustfsAdmin) SetBucketDurability(bucket string, d BucketDurability) (BucketDurability, error) {
+func (c *RustfsAdmin) SetBucketDurability(ctx context.Context, bucket string, d BucketDurability) (BucketDurability, error) {
 	bytes, err := json.Marshal(d)
 	if err != nil {
 		return BucketDurability{}, err
@@ -51,8 +49,6 @@ func (c *RustfsAdmin) SetBucketDurability(bucket string, d BucketDurability) (Bu
 		RelPath: "bucket-durability/" + bucket,
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return BucketDurability{}, err
@@ -65,13 +61,11 @@ func (c *RustfsAdmin) SetBucketDurability(bucket string, d BucketDurability) (Bu
 
 // DeleteBucketDurability removes the durability override for the given bucket,
 // so the bucket inherits the process-wide durability mode again.
-func (c *RustfsAdmin) DeleteBucketDurability(bucket string) error {
+func (c *RustfsAdmin) DeleteBucketDurability(ctx context.Context, bucket string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: "bucket-durability/" + bucket,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

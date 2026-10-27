@@ -21,14 +21,12 @@ func init() {
 	})
 }
 
-func (c *RustfsAdmin) AddTier(config json.RawMessage) error {
+func (c *RustfsAdmin) AddTier(ctx context.Context, config json.RawMessage) error {
 	reqData := RequestData{
 		Method:  "PUT",
 		RelPath: "tier",
 		Content: []byte(config),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -37,14 +35,12 @@ func (c *RustfsAdmin) AddTier(config json.RawMessage) error {
 	return nil
 }
 
-func (c *RustfsAdmin) EditTier(name string, config json.RawMessage) error {
+func (c *RustfsAdmin) EditTier(ctx context.Context, name string, config json.RawMessage) error {
 	reqData := RequestData{
 		Method:  "POST",
 		RelPath: "tier/" + name,
 		Content: []byte(config),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -53,13 +49,11 @@ func (c *RustfsAdmin) EditTier(name string, config json.RawMessage) error {
 	return nil
 }
 
-func (c *RustfsAdmin) RemoveTier(name string) error {
+func (c *RustfsAdmin) RemoveTier(ctx context.Context, name string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: "tier/" + name,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -77,13 +71,11 @@ func (c *RustfsAdmin) RemoveTier(name string) error {
 //
 // Any other failure, including a server that does not implement the route, is
 // returned as an error so the caller can decide whether it can verify at all.
-func (c *RustfsAdmin) TierExists(name string) (bool, error) {
+func (c *RustfsAdmin) TierExists(ctx context.Context, name string) (bool, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "tier/" + name,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		if IsAPIErrorCode(err, "TierNotFound", "NoSuchTier") {
@@ -178,16 +170,14 @@ func redactTierValue(value any) any {
 // ({"type":"rustfs","rustfs":{"name":"COLD",...}}); the tier name is the
 // backend's own name field, because the enclosing object omits it. The result
 // is sorted by name so Terraform state is deterministic.
-func (c *RustfsAdmin) ListTiers() ([]TierInfo, error) {
+func (c *RustfsAdmin) ListTiers(ctx context.Context) ([]TierInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "tier",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureErrorPreservingCode(err, FeatureTierList)
+		return nil, c.featureErrorPreservingCode(ctx, err, FeatureTierList)
 	}
 	defer drainClose(resp)
 
@@ -257,13 +247,11 @@ type tierInfoBody struct {
 // the cluster-wide stored inventory and falls back to the rolling 24-hour
 // transition counters when the scanner has not accounted the tier yet. When no
 // tiers are configured the server returns an empty list.
-func (c *RustfsAdmin) TierStats() (map[string]TierStat, error) {
+func (c *RustfsAdmin) TierStats(ctx context.Context) (map[string]TierStat, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "tier-stats",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err

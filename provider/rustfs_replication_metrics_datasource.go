@@ -270,7 +270,7 @@ func (d *ReplicationMetricsDataSource) Read(ctx context.Context, req datasource.
 		return
 	}
 
-	metrics, err := d.client.RustClient.ReplicationMetrics(bucket)
+	metrics, err := d.client.RustClient.ReplicationMetrics(ctx, bucket)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading replication metrics",

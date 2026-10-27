@@ -183,11 +183,11 @@ func TestAccServiceAccountResource_replace(t *testing.T) {
 	// the rustfs_user resource.
 	createTargetUser := func(s *terraform.State) error {
 		client := testAccSAClient()
-		return client.CreateUserAccount(rustfs.UserAccount{AccessKey: userAccessKey, SecretKey: "userSecret123!"})
+		return client.CreateUserAccount(context.Background(), rustfs.UserAccount{AccessKey: userAccessKey, SecretKey: "userSecret123!"})
 	}
 	deleteTargetUser := func(s *terraform.State) error {
 		client := testAccSAClient()
-		err := client.DeleteUserAccount(rustfs.UserAccount{AccessKey: userAccessKey})
+		err := client.DeleteUserAccount(context.Background(), rustfs.UserAccount{AccessKey: userAccessKey})
 		if err != nil && !rustfs.IsAPIErrorCode(err, "NoSuchResource") {
 			return fmt.Errorf("could not clean up target user %s: %w", userAccessKey, err)
 		}
@@ -385,7 +385,7 @@ func testAccCheckServiceAccountExists(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no access_key set")
 		}
 		client := testAccSAClient()
-		_, err := client.ReadServiceAccount(accessKey)
+		_, err := client.ReadServiceAccount(context.Background(), accessKey)
 		if err != nil {
 			return fmt.Errorf("service account not found: %s", err)
 		}
@@ -405,7 +405,7 @@ func testAccReadServiceAccount(n string, s *terraform.State) (rustfs.ServiceAcco
 		return rustfs.ServiceAccount{}, fmt.Errorf("no access_key set")
 	}
 	client := testAccSAClient()
-	return client.ReadServiceAccount(accessKey)
+	return client.ReadServiceAccount(context.Background(), accessKey)
 }
 
 // testAccCheckServiceAccountServerAttr asserts one attribute as the server
@@ -490,10 +490,10 @@ func testAccDeleteServiceAccountOutOfBand(n string) resource.TestCheckFunc {
 			return fmt.Errorf("no access_key set")
 		}
 		client := testAccSAClient()
-		if err := client.DeleteServiceAccount(rustfs.ServiceAccount{AccessKey: accessKey}); err != nil {
+		if err := client.DeleteServiceAccount(context.Background(), rustfs.ServiceAccount{AccessKey: accessKey}); err != nil {
 			return fmt.Errorf("out-of-band delete of service account %s: %w", accessKey, err)
 		}
-		if _, err := client.ReadServiceAccount(accessKey); err == nil {
+		if _, err := client.ReadServiceAccount(context.Background(), accessKey); err == nil {
 			return fmt.Errorf("service account %s still readable after out-of-band delete", accessKey)
 		}
 		return nil
@@ -510,7 +510,7 @@ func testAccCheckServiceAccountDestroy(s *terraform.State) error {
 		if accessKey == "" {
 			continue
 		}
-		_, err := client.ReadServiceAccount(accessKey)
+		_, err := client.ReadServiceAccount(context.Background(), accessKey)
 		if err == nil {
 			return fmt.Errorf("service account %s still exists", accessKey)
 		}

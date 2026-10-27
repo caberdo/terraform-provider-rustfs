@@ -67,18 +67,16 @@ type RuntimeCapabilities struct {
 // adminV4Get issues one GET against the v4 admin namespace and returns the
 // body. A 511/501 answer is converted into an *UnsupportedFeatureError naming
 // the route, the API version and the server version.
-func (c *RustfsAdmin) adminV4Get(relPath string, feature Feature) ([]byte, error) {
+func (c *RustfsAdmin) adminV4Get(ctx context.Context, relPath string, feature Feature) ([]byte, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: relPath,
 		Version: adminVersionV4,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, feature)
+		return nil, c.featureError(ctx, err, feature)
 	}
 	defer drainClose(resp)
 
@@ -90,8 +88,8 @@ func (c *RustfsAdmin) adminV4Get(relPath string, feature Feature) ([]byte, error
 // provider does not model yet. A 200 response that omits the contract (or its
 // version) is an error: reporting a zero-valued contract would make a gating
 // expression silently evaluate false.
-func (c *RustfsAdmin) GetRuntimeCapabilities() (RuntimeCapabilities, error) {
-	raw, err := c.adminV4Get("runtime/capabilities", FeatureRuntimeCapabilities)
+func (c *RustfsAdmin) GetRuntimeCapabilities(ctx context.Context) (RuntimeCapabilities, error) {
+	raw, err := c.adminV4Get(ctx, "runtime/capabilities", FeatureRuntimeCapabilities)
 	if err != nil {
 		return RuntimeCapabilities{}, err
 	}
@@ -134,8 +132,8 @@ func validateOpaqueV4JSON(raw []byte, what string) error {
 // GetPluginCatalog reads GET /v4/plugins/catalog. The payload is returned as
 // the server's JSON verbatim: the v4 plugin schema is new and the provider does
 // not invent a Terraform shape for it.
-func (c *RustfsAdmin) GetPluginCatalog() (string, error) {
-	raw, err := c.adminV4Get("plugins/catalog", FeaturePluginCatalog)
+func (c *RustfsAdmin) GetPluginCatalog(ctx context.Context) (string, error) {
+	raw, err := c.adminV4Get(ctx, "plugins/catalog", FeaturePluginCatalog)
 	if err != nil {
 		return "", err
 	}
@@ -147,8 +145,8 @@ func (c *RustfsAdmin) GetPluginCatalog() (string, error) {
 
 // ListPluginInstances reads GET /v4/plugins/instances. Secrets the server
 // reports are already redacted in the payload.
-func (c *RustfsAdmin) ListPluginInstances() (string, error) {
-	raw, err := c.adminV4Get("plugins/instances", FeaturePluginInstances)
+func (c *RustfsAdmin) ListPluginInstances(ctx context.Context) (string, error) {
+	raw, err := c.adminV4Get(ctx, "plugins/instances", FeaturePluginInstances)
 	if err != nil {
 		return "", err
 	}
@@ -159,8 +157,8 @@ func (c *RustfsAdmin) ListPluginInstances() (string, error) {
 }
 
 // GetExtensionCatalog reads GET /v4/extensions/catalog, returned as raw JSON.
-func (c *RustfsAdmin) GetExtensionCatalog() (string, error) {
-	raw, err := c.adminV4Get("extensions/catalog", FeatureExtensionCatalog)
+func (c *RustfsAdmin) GetExtensionCatalog(ctx context.Context) (string, error) {
+	raw, err := c.adminV4Get(ctx, "extensions/catalog", FeatureExtensionCatalog)
 	if err != nil {
 		return "", err
 	}
@@ -172,8 +170,8 @@ func (c *RustfsAdmin) GetExtensionCatalog() (string, error) {
 
 // ListExtensionInstances reads GET /v4/extensions/instances, returned as raw
 // JSON.
-func (c *RustfsAdmin) ListExtensionInstances() (string, error) {
-	raw, err := c.adminV4Get("extensions/instances", FeatureExtensionInstances)
+func (c *RustfsAdmin) ListExtensionInstances(ctx context.Context) (string, error) {
+	raw, err := c.adminV4Get(ctx, "extensions/instances", FeatureExtensionInstances)
 	if err != nil {
 		return "", err
 	}
@@ -185,8 +183,8 @@ func (c *RustfsAdmin) ListExtensionInstances() (string, error) {
 
 // GetClusterSnapshot reads GET /v4/cluster/snapshot. The snapshot is a large,
 // deployment-shaped payload, so it stays raw JSON.
-func (c *RustfsAdmin) GetClusterSnapshot() (string, error) {
-	raw, err := c.adminV4Get("cluster/snapshot", FeatureClusterSnapshot)
+func (c *RustfsAdmin) GetClusterSnapshot(ctx context.Context) (string, error) {
+	raw, err := c.adminV4Get(ctx, "cluster/snapshot", FeatureClusterSnapshot)
 	if err != nil {
 		return "", err
 	}

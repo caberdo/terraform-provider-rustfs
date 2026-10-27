@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"sync"
@@ -21,7 +22,7 @@ func liveGroupPolicyFixture(t *testing.T, client *rustfs.RustfsAdmin, policies .
 	suffix := time.Now().UnixNano()
 	group := fmt.Sprintf("tf-live-group-%d", suffix)
 
-	if err := client.UpdateGroupMembers(rustfs.GroupAddRemove{
+	if err := client.UpdateGroupMembers(context.Background(), rustfs.GroupAddRemove{
 		Group:    group,
 		Members:  []string{},
 		IsRemove: false,
@@ -32,7 +33,7 @@ func liveGroupPolicyFixture(t *testing.T, client *rustfs.RustfsAdmin, policies .
 
 	for i := range policies {
 		policies[i] = fmt.Sprintf("tf-live-policy-%d-%d", suffix, i)
-		if err := client.CreatePolicy(rustfs.Policy{
+		if err := client.CreatePolicy(context.Background(), rustfs.Policy{
 			Name: policies[i],
 			Statement: []rustfs.PolicyStatement{{
 				Effect:   "Allow",
@@ -44,7 +45,7 @@ func liveGroupPolicyFixture(t *testing.T, client *rustfs.RustfsAdmin, policies .
 		}
 		policy := policies[i]
 		t.Cleanup(func() {
-			if err := client.DeletePolicy(policy); err != nil {
+			if err := client.DeletePolicy(context.Background(), policy); err != nil {
 				t.Errorf("failed to delete policy %s: %v", policy, err)
 			}
 		})
@@ -53,7 +54,7 @@ func liveGroupPolicyFixture(t *testing.T, client *rustfs.RustfsAdmin, policies .
 	// Registered last so it runs first: a canned policy cannot be removed while
 	// a group still holds it, and deleting the group drops its bindings.
 	t.Cleanup(func() {
-		if err := client.DeleteGroup(group); err != nil {
+		if err := client.DeleteGroup(context.Background(), group); err != nil {
 			t.Errorf("failed to delete group %s: %v", group, err)
 		}
 	})
@@ -64,7 +65,7 @@ func liveGroupPolicyFixture(t *testing.T, client *rustfs.RustfsAdmin, policies .
 func liveGroupPolicies(t *testing.T, client *rustfs.RustfsAdmin, group string) []string {
 	t.Helper()
 
-	info, err := client.GetGroup(group)
+	info, err := client.GetGroup(context.Background(), group)
 	if err != nil {
 		t.Fatalf("failed to read group %s: %v", group, err)
 	}
@@ -79,10 +80,10 @@ func TestLiveGroupPolicyAttachmentIsAdditive(t *testing.T) {
 	group := liveGroupPolicyFixture(t, &client, policies...)
 	policyA, policyB := policies[0], policies[1]
 
-	if err := client.AttachGroupPolicy(group, policyA); err != nil {
+	if err := client.AttachGroupPolicy(context.Background(), group, policyA); err != nil {
 		t.Fatalf("failed to attach %s: %v", policyA, err)
 	}
-	if err := client.AttachGroupPolicy(group, policyB); err != nil {
+	if err := client.AttachGroupPolicy(context.Background(), group, policyB); err != nil {
 		t.Fatalf("failed to attach %s: %v", policyB, err)
 	}
 
@@ -93,7 +94,7 @@ func TestLiveGroupPolicyAttachmentIsAdditive(t *testing.T) {
 		}
 	}
 
-	if err := client.DetachGroupPolicy(group, policyA); err != nil {
+	if err := client.DetachGroupPolicy(context.Background(), group, policyA); err != nil {
 		t.Fatalf("failed to detach %s: %v", policyA, err)
 	}
 
@@ -105,7 +106,7 @@ func TestLiveGroupPolicyAttachmentIsAdditive(t *testing.T) {
 		t.Errorf("detaching %s must leave %s attached, got %v", policyA, policyB, remaining)
 	}
 
-	if err := client.DetachGroupPolicy(group, policyB); err != nil {
+	if err := client.DetachGroupPolicy(context.Background(), group, policyB); err != nil {
 		t.Fatalf("failed to detach %s: %v", policyB, err)
 	}
 	if remaining := liveGroupPolicies(t, &client, group); len(remaining) != 0 {
@@ -126,7 +127,7 @@ func TestLiveGroupPolicyAttachmentConcurrentAttach(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := client.AttachGroupPolicy(group, policy); err != nil {
+			if err := client.AttachGroupPolicy(context.Background(), group, policy); err != nil {
 				t.Errorf("failed to attach %s: %v", policy, err)
 			}
 		}()

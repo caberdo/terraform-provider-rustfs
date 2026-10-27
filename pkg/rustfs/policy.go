@@ -146,7 +146,7 @@ type policyPost struct {
 	Statement []PolicyStatement `json:"Statement"`
 }
 
-func (c *RustfsAdmin) CreatePolicy(policy Policy) error {
+func (c *RustfsAdmin) CreatePolicy(ctx context.Context, policy Policy) error {
 	urlValues := make(url.Values)
 	urlValues.Set("name", policy.Name)
 	policy.Version = "2012-10-17" // only this is working
@@ -165,8 +165,6 @@ func (c *RustfsAdmin) CreatePolicy(policy Policy) error {
 		Content:     bytes,
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -225,7 +223,7 @@ func parsePolicyField(policy json.RawMessage) ([]PolicyStatement, error) {
 	return nil, errors.Join(errStatement, errSingle)
 }
 
-func (c *RustfsAdmin) ReadPolicy(policy string) (Policy, error) {
+func (c *RustfsAdmin) ReadPolicy(ctx context.Context, policy string) (Policy, error) {
 	var instance policyReply
 	var read Policy
 	urlValues := make(url.Values)
@@ -236,8 +234,6 @@ func (c *RustfsAdmin) ReadPolicy(policy string) (Policy, error) {
 		QueryValues: urlValues,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return Policy{}, err
@@ -259,7 +255,7 @@ func (c *RustfsAdmin) ReadPolicy(policy string) (Policy, error) {
 	return read, nil
 }
 
-func (c *RustfsAdmin) DeletePolicy(policy string) error {
+func (c *RustfsAdmin) DeletePolicy(ctx context.Context, policy string) error {
 
 	urlValues := make(url.Values)
 	urlValues.Set("name", policy)
@@ -269,8 +265,6 @@ func (c *RustfsAdmin) DeletePolicy(policy string) error {
 		QueryValues: urlValues,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err

@@ -57,99 +57,103 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"AddTier", func() error { return client.AddTier(raw) }},
+		{"AddTier", func() error { return client.AddTier(context.Background(), raw) }},
 		{"AttachLDAPPolicy", func() error {
-			return client.AttachLDAPPolicy(LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
+			return client.AttachLDAPPolicy(context.Background(), LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
 		}},
-		{"AttachPolicyToUser", func() error { return client.AttachPolicyToUser("alice", "readwrite") }},
-		{"ClearUserMFA", func() error { return client.ClearUserMFA("alice") }},
-		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey("k1"); return err }},
-		{"CreatePolicy", func() error { return client.CreatePolicy(Policy{Name: "p"}) }},
-		{"CreateServiceAccount", func() error { return client.CreateServiceAccount(ServiceAccount{AccessKey: "sa1"}) }},
-		{"CreateUserAccount", func() error { return client.CreateUserAccount(UserAccount{AccessKey: "alice"}) }},
-		{"DeleteBucketDurability", func() error { return client.DeleteBucketDurability("b") }},
-		{"DeleteConfig", func() error { return client.DeleteConfig("scanner") }},
-		{"DeleteGroup", func() error { return client.DeleteGroup("devs") }},
-		{"DeleteKmsKey", func() error { return client.DeleteKmsKey("k1") }},
-		{"DeletePolicy", func() error { return client.DeletePolicy("p") }},
-		{"DeleteRemoteTarget", func() error { return client.DeleteRemoteTarget("b", "arn") }},
+		{"AttachPolicyToUser", func() error { return client.AttachPolicyToUser(context.Background(), "alice", "readwrite") }},
+		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey(context.Background(), "k1"); return err }},
+		{"CreatePolicy", func() error { return client.CreatePolicy(context.Background(), Policy{Name: "p"}) }},
+		{"CreateServiceAccount", func() error {
+			return client.CreateServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1"})
+		}},
+		{"CreateUserAccount", func() error { return client.CreateUserAccount(context.Background(), UserAccount{AccessKey: "alice"}) }},
+		{"DeleteBucketDurability", func() error { return client.DeleteBucketDurability(context.Background(), "b") }},
+		{"DeleteConfig", func() error { return client.DeleteConfig(context.Background(), "scanner") }},
+		{"DeleteGroup", func() error { return client.DeleteGroup(context.Background(), "devs") }},
+		{"DeleteKmsKey", func() error { return client.DeleteKmsKey(context.Background(), "k1") }},
+		{"DeletePolicy", func() error { return client.DeletePolicy(context.Background(), "p") }},
+		{"DeleteRemoteTarget", func() error { return client.DeleteRemoteTarget(context.Background(), "b", "arn") }},
 		{"DeleteServiceAccount", func() error {
-			return client.DeleteServiceAccount(ServiceAccount{AccessKey: "sa1"})
+			return client.DeleteServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1"})
 		}},
-		{"DeleteUserAccount", func() error { return client.DeleteUserAccount(UserAccount{AccessKey: "alice"}) }},
-		{"DescribeKmsKey", func() error { _, err := client.DescribeKmsKey("k1"); return err }},
+		{"DeleteUserAccount", func() error { return client.DeleteUserAccount(context.Background(), UserAccount{AccessKey: "alice"}) }},
+		{"DescribeKmsKey", func() error { _, err := client.DescribeKmsKey(context.Background(), "k1"); return err }},
 		{"DetachLDAPPolicy", func() error {
-			return client.DetachLDAPPolicy(LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
+			return client.DetachLDAPPolicy(context.Background(), LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
 		}},
-		{"DisableKmsKey", func() error { return client.DisableKmsKey("k1") }},
-		{"EditTier", func() error { return client.EditTier("COLD", raw) }},
-		{"EnableKmsKey", func() error { return client.EnableKmsKey("k1") }},
-		{"ExportBucketMetadata", func() error { _, err := client.ExportBucketMetadata(); return err }},
-		{"ExportIam", func() error { _, err := client.ExportIam(); return err }},
-		{"GetBucketDurability", func() error { _, err := client.GetBucketDurability("b"); return err }},
-		{"GetGroup", func() error { _, err := client.GetGroup("devs"); return err }},
-		{"GetHealthInfo", func() error { _, err := client.GetHealthInfo(); return err }},
-		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(); return err }},
-		{"GetObdInfo", func() error { _, err := client.GetObdInfo(); return err }},
-		{"HelpConfig", func() error { _, err := client.HelpConfig("scanner"); return err }},
-		{"ImportBucketMetadata", func() error { return client.ImportBucketMetadata([]byte("zip")) }},
-		{"ImportIam", func() error { return client.ImportIam([]byte("zip")) }},
-		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(); return err }},
-		{"ListCannedPolicies", func() error { _, err := client.ListCannedPolicies(); return err }},
-		{"ListGroups", func() error { _, err := client.ListGroups(); return err }},
-		{"ListKmsKeys", func() error { _, err := client.ListKmsKeys(); return err }},
-		{"ListNotificationTargets", func() error { _, err := client.ListNotificationTargets(); return err }},
-		{"ListPools", func() error { _, err := client.ListPools(); return err }},
-		{"ListRemoteTargets", func() error { _, err := client.ListRemoteTargets("b"); return err }},
-		{"ListUsers", func() error { _, err := client.ListUsers(""); return err }},
-		{"ReadPolicy", func() error { _, err := client.ReadPolicy("p"); return err }},
-		{"ReadQuota", func() error { _, err := client.ReadQuota("b"); return err }},
-		{"ReadServiceAccount", func() error { _, err := client.ReadServiceAccount("sa1"); return err }},
-		{"ReadUserAccount", func() error { _, err := client.ReadUserAccount("alice"); return err }},
-		{"ReadUserMFA", func() error { _, err := client.ReadUserMFA("alice"); return err }},
-		{"RemoveTier", func() error { return client.RemoveTier("COLD") }},
-		{"ResetAuditTarget", func() error { return client.ResetAuditTarget("webhook", "primary") }},
-		{"ResetNotificationTarget", func() error { return client.ResetNotificationTarget("amqp", "primary") }},
-		{"RotateKmsKey", func() error { _, err := client.RotateKmsKey("k1"); return err }},
-		{"ServerInfo", func() error { _, err := client.ServerInfo(); return err }},
-		{"SetAuditTarget", func() error { return client.SetAuditTarget("webhook", "primary", nil) }},
+		{"DisableKmsKey", func() error { return client.DisableKmsKey(context.Background(), "k1") }},
+		{"EditTier", func() error { return client.EditTier(context.Background(), "COLD", raw) }},
+		{"EnableKmsKey", func() error { return client.EnableKmsKey(context.Background(), "k1") }},
+		{"ExportBucketMetadata", func() error { _, err := client.ExportBucketMetadata(context.Background()); return err }},
+		{"ExportIam", func() error { _, err := client.ExportIam(context.Background()); return err }},
+		{"GetBucketDurability", func() error { _, err := client.GetBucketDurability(context.Background(), "b"); return err }},
+		{"GetGroup", func() error { _, err := client.GetGroup(context.Background(), "devs"); return err }},
+		{"GetHealthInfo", func() error { _, err := client.GetHealthInfo(context.Background()); return err }},
+		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(context.Background()); return err }},
+		{"GetObdInfo", func() error { _, err := client.GetObdInfo(context.Background()); return err }},
+		{"ImportBucketMetadata", func() error { return client.ImportBucketMetadata(context.Background(), []byte("zip")) }},
+		{"ImportIam", func() error { return client.ImportIam(context.Background(), []byte("zip")) }},
+		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(context.Background()); return err }},
+		{"ListCannedPolicies", func() error { _, err := client.ListCannedPolicies(context.Background()); return err }},
+		{"ListGroups", func() error { _, err := client.ListGroups(context.Background()); return err }},
+		{"ListKmsKeys", func() error { _, err := client.ListKmsKeys(context.Background()); return err }},
+		{"ListNotificationTargets", func() error { _, err := client.ListNotificationTargets(context.Background()); return err }},
+		{"ListPools", func() error { _, err := client.ListPools(context.Background()); return err }},
+		{"ListRemoteTargets", func() error { _, err := client.ListRemoteTargets(context.Background(), "b"); return err }},
+		{"ListUsers", func() error { _, err := client.ListUsers(context.Background(), ""); return err }},
+		{"ReadPolicy", func() error { _, err := client.ReadPolicy(context.Background(), "p"); return err }},
+		{"ReadQuota", func() error { _, err := client.ReadQuota(context.Background(), "b"); return err }},
+		{"ReadServiceAccount", func() error { _, err := client.ReadServiceAccount(context.Background(), "sa1"); return err }},
+		{"ReadUserAccount", func() error { _, err := client.ReadUserAccount(context.Background(), "alice"); return err }},
+		{"ReadUserMFA", func() error { _, err := client.ReadUserMFA(context.Background(), "alice"); return err }},
+		{"RemoveTier", func() error { return client.RemoveTier(context.Background(), "COLD") }},
+		{"ResetAuditTarget", func() error { return client.ResetAuditTarget(context.Background(), "webhook", "primary") }},
+		{"ResetNotificationTarget", func() error { return client.ResetNotificationTarget(context.Background(), "amqp", "primary") }},
+		{"RotateKmsKey", func() error { _, err := client.RotateKmsKey(context.Background(), "k1"); return err }},
+		{"ServerInfo", func() error { _, err := client.ServerInfo(context.Background()); return err }},
+		{"SetAuditTarget", func() error { return client.SetAuditTarget(context.Background(), "webhook", "primary", nil) }},
 		{"SetBucketDurability", func() error {
-			_, err := client.SetBucketDurability("b", BucketDurability{Bucket: "b", Mode: "strict"})
+			_, err := client.SetBucketDurability(context.Background(), "b", BucketDurability{Bucket: "b", Mode: "strict"})
 			return err
 		}},
-		{"SetConfig", func() error { return client.SetConfig("scanner", nil) }},
-		{"SetGroupStatus", func() error { return client.SetGroupStatus("devs", "disabled") }},
-		{"SetModuleSwitches", func() error { _, err := client.SetModuleSwitches(ModuleSwitchUpdate{}); return err }},
-		{"SetNotificationTarget", func() error { return client.SetNotificationTarget("amqp", "primary", nil) }},
-		{"SetQuota", func() error { _, err := client.SetQuota(Quota{Bucket: "b"}); return err }},
-		{"DeletQuota", func() error { return client.DeletQuota("b") }},
-		{"SetUserSecretKey", func() error { return client.SetUserSecretKey("alice", "s3cret") }},
-		{"SetUserStatus", func() error { return client.SetUserStatus("alice", "disabled") }},
-		{"SiteReplicationAdd", func() error { return client.SiteReplicationAdd(SiteReplicationSite{Name: "peer"}) }},
-		{"EditPeer", func() error { return client.EditPeer(SiteReplicationPeerEdit{Name: "peer"}) }},
-		{"SiteReplicationInfo", func() error { _, err := client.SiteReplicationInfo(); return err }},
-		{"RemovePeer", func() error { return client.RemovePeer([]string{"peer"}) }},
+		{"SetConfig", func() error { return client.SetConfig(context.Background(), "scanner", nil) }},
+		{"SetGroupStatus", func() error { return client.SetGroupStatus(context.Background(), "devs", "disabled") }},
+		{"SetModuleSwitches", func() error {
+			_, err := client.SetModuleSwitches(context.Background(), ModuleSwitchUpdate{})
+			return err
+		}},
+		{"SetNotificationTarget", func() error { return client.SetNotificationTarget(context.Background(), "amqp", "primary", nil) }},
+		{"SetQuota", func() error { _, err := client.SetQuota(context.Background(), Quota{Bucket: "b"}); return err }},
+		{"DeletQuota", func() error { return client.DeletQuota(context.Background(), "b") }},
+		{"SetUserSecretKey", func() error { return client.SetUserSecretKey(context.Background(), "alice", "s3cret") }},
+		{"SetUserStatus", func() error { return client.SetUserStatus(context.Background(), "alice", "disabled") }},
+		{"SiteReplicationAdd", func() error {
+			return client.SiteReplicationAdd(context.Background(), SiteReplicationSite{Name: "peer"})
+		}},
+		{"EditPeer", func() error { return client.EditPeer(context.Background(), SiteReplicationPeerEdit{Name: "peer"}) }},
+		{"SiteReplicationInfo", func() error { _, err := client.SiteReplicationInfo(context.Background()); return err }},
+		{"RemovePeer", func() error { return client.RemovePeer(context.Background(), []string{"peer"}) }},
 		{"SiteReplicationResyncOp", func() error {
-			_, err := client.SiteReplicationResyncOp("start", SiteReplicationPeer{Name: "peer"})
+			_, err := client.SiteReplicationResyncOp(context.Background(), "start", SiteReplicationPeer{Name: "peer"})
 			return err
 		}},
 		{"StartRebalance", func() error { _, err := client.StartRebalance(context.Background()); return err }},
 		{"RebalanceStatus", func() error { _, err := client.RebalanceStatus(context.Background()); return err }},
 		{"StopRebalance", func() error { return client.StopRebalance(context.Background()) }},
-		{"StorageInfo", func() error { _, err := client.StorageInfo(); return err }},
-		{"TierStats", func() error { _, err := client.TierStats(); return err }},
+		{"StorageInfo", func() error { _, err := client.StorageInfo(context.Background()); return err }},
+		{"TierStats", func() error { _, err := client.TierStats(context.Background()); return err }},
 		{"UpdateGroupMembers", func() error {
-			return client.UpdateGroupMembers(GroupAddRemove{Group: "devs", Members: []string{"alice"}})
+			return client.UpdateGroupMembers(context.Background(), GroupAddRemove{Group: "devs", Members: []string{"alice"}})
 		}},
 		{"UpdateServiceAccount", func() error {
-			return client.UpdateServiceAccount(ServiceAccount{AccessKey: "sa1"})
+			return client.UpdateServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1"})
 		}},
-		{"UpdateUserAccount", func() error { return client.UpdateUserAccount(UserAccount{AccessKey: "alice"}) }},
 		{"AddRemoteTarget", func() error {
-			_, err := client.AddRemoteTarget("b", RemoteTarget{Type: "replication"})
+			_, err := client.AddRemoteTarget(context.Background(), "b", RemoteTarget{Type: "replication"})
 			return err
 		}},
-		{"ReplicationMetrics", func() error { _, err := client.ReplicationMetrics("b"); return err }},
+		{"ReplicationMetrics", func() error { _, err := client.ReplicationMetrics(context.Background(), "b"); return err }},
 	}
 
 	for _, tc := range cases {
@@ -178,39 +182,44 @@ func TestAdminClientDecodeErrorBranches(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey("k1"); return err }},
-		{"DescribeKmsKey", func() error { _, err := client.DescribeKmsKey("k1"); return err }},
-		{"DisableKmsKey", func() error { return client.DisableKmsKey("k1") }},
-		{"EnableKmsKey", func() error { return client.EnableKmsKey("k1") }},
-		{"GetBucketDurability", func() error { _, err := client.GetBucketDurability("b"); return err }},
-		{"GetKmsConfig", func() error { _, err := client.GetKmsConfig(); return err }},
-		{"GetKmsStatus", func() error { _, err := client.GetKmsStatus(); return err }},
-		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(); return err }},
-		{"GetObdInfo", func() error { _, err := client.GetObdInfo(); return err }},
-		{"HelpConfig", func() error { _, err := client.HelpConfig("scanner"); return err }},
-		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(); return err }},
-		{"ListKmsKeys", func() error { _, err := client.ListKmsKeys(); return err }},
-		{"ListNotificationTargets", func() error { _, err := client.ListNotificationTargets(); return err }},
-		{"ListRemoteTargets", func() error { _, err := client.ListRemoteTargets("b"); return err }},
-		{"ListUsers", func() error { _, err := client.ListUsers(""); return err }},
-		{"ReadPolicy", func() error { _, err := client.ReadPolicy("p"); return err }},
-		{"ReadQuota", func() error { _, err := client.ReadQuota("b"); return err }},
-		{"ReadServiceAccount", func() error { _, err := client.ReadServiceAccount("sa1"); return err }},
-		{"ReadUserAccount", func() error { _, err := client.ReadUserAccount("alice"); return err }},
-		{"ReadUserMFA", func() error { _, err := client.ReadUserMFA("alice"); return err }},
-		{"ReplicationMetrics", func() error { _, err := client.ReplicationMetrics("b"); return err }},
-		{"RotateKmsKey", func() error { _, err := client.RotateKmsKey("k1"); return err }},
-		{"ServerInfo", func() error { _, err := client.ServerInfo(); return err }},
-		{"SetBucketDurability", func() error { _, err := client.SetBucketDurability("b", BucketDurability{}); return err }},
-		{"SetModuleSwitches", func() error { _, err := client.SetModuleSwitches(ModuleSwitchUpdate{}); return err }},
-		{"SetQuota", func() error { _, err := client.SetQuota(Quota{Bucket: "b"}); return err }},
-		{"SiteReplicationInfo", func() error { _, err := client.SiteReplicationInfo(); return err }},
-		{"SiteReplicationResyncOp", func() error {
-			_, err := client.SiteReplicationResyncOp("status", SiteReplicationPeer{Name: "peer"})
+		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey(context.Background(), "k1"); return err }},
+		{"DescribeKmsKey", func() error { _, err := client.DescribeKmsKey(context.Background(), "k1"); return err }},
+		{"DisableKmsKey", func() error { return client.DisableKmsKey(context.Background(), "k1") }},
+		{"EnableKmsKey", func() error { return client.EnableKmsKey(context.Background(), "k1") }},
+		{"GetBucketDurability", func() error { _, err := client.GetBucketDurability(context.Background(), "b"); return err }},
+		{"GetKmsConfig", func() error { _, err := client.GetKmsConfig(context.Background()); return err }},
+		{"GetKmsStatus", func() error { _, err := client.GetKmsStatus(context.Background()); return err }},
+		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(context.Background()); return err }},
+		{"GetObdInfo", func() error { _, err := client.GetObdInfo(context.Background()); return err }},
+		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(context.Background()); return err }},
+		{"ListKmsKeys", func() error { _, err := client.ListKmsKeys(context.Background()); return err }},
+		{"ListNotificationTargets", func() error { _, err := client.ListNotificationTargets(context.Background()); return err }},
+		{"ListRemoteTargets", func() error { _, err := client.ListRemoteTargets(context.Background(), "b"); return err }},
+		{"ListUsers", func() error { _, err := client.ListUsers(context.Background(), ""); return err }},
+		{"ReadPolicy", func() error { _, err := client.ReadPolicy(context.Background(), "p"); return err }},
+		{"ReadQuota", func() error { _, err := client.ReadQuota(context.Background(), "b"); return err }},
+		{"ReadServiceAccount", func() error { _, err := client.ReadServiceAccount(context.Background(), "sa1"); return err }},
+		{"ReadUserAccount", func() error { _, err := client.ReadUserAccount(context.Background(), "alice"); return err }},
+		{"ReadUserMFA", func() error { _, err := client.ReadUserMFA(context.Background(), "alice"); return err }},
+		{"ReplicationMetrics", func() error { _, err := client.ReplicationMetrics(context.Background(), "b"); return err }},
+		{"RotateKmsKey", func() error { _, err := client.RotateKmsKey(context.Background(), "k1"); return err }},
+		{"ServerInfo", func() error { _, err := client.ServerInfo(context.Background()); return err }},
+		{"SetBucketDurability", func() error {
+			_, err := client.SetBucketDurability(context.Background(), "b", BucketDurability{})
 			return err
 		}},
-		{"StorageInfo", func() error { _, err := client.StorageInfo(); return err }},
-		{"TierStats", func() error { _, err := client.TierStats(); return err }},
+		{"SetModuleSwitches", func() error {
+			_, err := client.SetModuleSwitches(context.Background(), ModuleSwitchUpdate{})
+			return err
+		}},
+		{"SetQuota", func() error { _, err := client.SetQuota(context.Background(), Quota{Bucket: "b"}); return err }},
+		{"SiteReplicationInfo", func() error { _, err := client.SiteReplicationInfo(context.Background()); return err }},
+		{"SiteReplicationResyncOp", func() error {
+			_, err := client.SiteReplicationResyncOp(context.Background(), "status", SiteReplicationPeer{Name: "peer"})
+			return err
+		}},
+		{"StorageInfo", func() error { _, err := client.StorageInfo(context.Background()); return err }},
+		{"TierStats", func() error { _, err := client.TierStats(context.Background()); return err }},
 	}
 
 	for _, tc := range cases {
@@ -258,11 +267,14 @@ func TestAdminClientReadErrorBranches(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"GetConfig", func() error { _, err := c.GetConfig("scanner"); return err }},
-		{"ListCannedPolicies", func() error { _, err := c.ListCannedPolicies(); return err }},
-		{"ListGroups", func() error { _, err := c.ListGroups(); return err }},
-		{"AddRemoteTarget", func() error { _, err := c.AddRemoteTarget("b", RemoteTarget{Type: "replication"}); return err }},
-		{"ReplicationMetrics", func() error { _, err := c.ReplicationMetrics("b"); return err }},
+		{"GetConfig", func() error { _, err := c.GetConfig(context.Background(), "scanner"); return err }},
+		{"ListCannedPolicies", func() error { _, err := c.ListCannedPolicies(context.Background()); return err }},
+		{"ListGroups", func() error { _, err := c.ListGroups(context.Background()); return err }},
+		{"AddRemoteTarget", func() error {
+			_, err := c.AddRemoteTarget(context.Background(), "b", RemoteTarget{Type: "replication"})
+			return err
+		}},
+		{"ReplicationMetrics", func() error { _, err := c.ReplicationMetrics(context.Background(), "b"); return err }},
 	}
 
 	for _, tc := range cases {
@@ -284,7 +296,7 @@ func TestListCannedPoliciesUnrecognizedResponse(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `"just a string"`)
 	})
-	if _, err := client.ListCannedPolicies(); err == nil {
+	if _, err := client.ListCannedPolicies(context.Background()); err == nil {
 		t.Fatal("expected an unrecognized-response error")
 	}
 }
@@ -294,7 +306,7 @@ func TestListGroupsUnrecognizedResponse(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `42`)
 	})
-	if _, err := client.ListGroups(); err == nil {
+	if _, err := client.ListGroups(context.Background()); err == nil {
 		t.Fatal("expected an unrecognized-response error")
 	}
 }
@@ -308,7 +320,7 @@ func TestUpdateGroupMembersNilMembers(t *testing.T) {
 		body = string(raw)
 		w.WriteHeader(http.StatusOK)
 	})
-	if err := client.UpdateGroupMembers(GroupAddRemove{Group: "devs"}); err != nil {
+	if err := client.UpdateGroupMembers(context.Background(), GroupAddRemove{Group: "devs"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(body, `"members":[]`) {
@@ -322,7 +334,7 @@ func TestGetConfigSingleTokenLine(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "scanner\nscanner delay=\"5s\"")
 	})
-	kvs, err := client.GetConfig("scanner")
+	kvs, err := client.GetConfig(context.Background(), "scanner")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -391,7 +403,6 @@ func TestDoDirectRequestNetworkError(t *testing.T) {
 
 // TestCreateRootUrl covers the default-port stripping and scheme choice.
 func TestCreateRootUrl(t *testing.T) {
-	c := RustfsAdmin{}
 	tests := []struct {
 		name     string
 		endpoint string
@@ -408,8 +419,8 @@ func TestCreateRootUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := c.createRootURL(tt.endpoint, tt.secure); got != tt.want {
-				t.Errorf("createRootURL(%q, %v) = %q, want %q", tt.endpoint, tt.secure, got, tt.want)
+			if got := RootURL(tt.endpoint, tt.secure); got != tt.want {
+				t.Errorf("RootURL(%q, %v) = %q, want %q", tt.endpoint, tt.secure, got, tt.want)
 			}
 		})
 	}
@@ -441,7 +452,7 @@ func TestKmsKeyWithoutMetadata(t *testing.T) {
 		client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, `{"success":true,"message":"created","key_id":"k1"}`)
 		})
-		key, err := client.CreateKmsKey("k1")
+		key, err := client.CreateKmsKey(context.Background(), "k1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -457,7 +468,7 @@ func TestKmsKeyWithoutMetadata(t *testing.T) {
 		client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, `{"success":false,"message":"key not found","key_metadata":null}`)
 		})
-		if _, err := client.DescribeKmsKey("k1"); err == nil || err.Error() != "key not found" {
+		if _, err := client.DescribeKmsKey(context.Background(), "k1"); err == nil || err.Error() != "key not found" {
 			t.Fatalf("expected the server message as the error, got %v", err)
 		}
 	})
@@ -466,7 +477,7 @@ func TestKmsKeyWithoutMetadata(t *testing.T) {
 		client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, `{"success":false,"message":"unsupported capability","key_metadata":null}`)
 		})
-		if _, err := client.RotateKmsKey("k1"); err == nil || err.Error() != "unsupported capability" {
+		if _, err := client.RotateKmsKey(context.Background(), "k1"); err == nil || err.Error() != "unsupported capability" {
 			t.Fatalf("expected the server message as the error, got %v", err)
 		}
 	})
@@ -475,7 +486,7 @@ func TestKmsKeyWithoutMetadata(t *testing.T) {
 		client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, `{"success":false,"message":"key is already disabled","key_metadata":null}`)
 		})
-		if err := client.DisableKmsKey("k1"); err == nil || err.Error() != "key is already disabled" {
+		if err := client.DisableKmsKey(context.Background(), "k1"); err == nil || err.Error() != "key is already disabled" {
 			t.Fatalf("expected the server message as the error, got %v", err)
 		}
 	})
@@ -516,7 +527,7 @@ func TestReadPolicyMalformedDocument(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{"policy_name":"p","policy":{"Statement":[{"Action":123}]}}`)
 	})
-	if _, err := client.ReadPolicy("p"); err == nil {
+	if _, err := client.ReadPolicy(context.Background(), "p"); err == nil {
 		t.Fatal("expected a malformed-document error")
 	}
 }
@@ -619,7 +630,7 @@ func TestServerVersionMissingVersion(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{}`)
 	})
-	_, _, err := client.ServerVersion()
+	_, _, err := client.ServerVersion(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "did not report a version") {
 		t.Fatalf("expected a missing-version error, got %v", err)
 	}

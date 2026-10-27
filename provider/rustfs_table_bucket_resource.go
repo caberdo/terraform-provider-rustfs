@@ -113,7 +113,7 @@ func (r *TableBucketResource) Create(ctx context.Context, req resource.CreateReq
 	}
 
 	bucket := plan.Bucket.ValueString()
-	tableBucket, err := r.client.RustClient.EnableTableBucket(bucket)
+	tableBucket, err := r.client.RustClient.EnableTableBucket(ctx, bucket)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating table bucket",
@@ -145,7 +145,7 @@ func (r *TableBucketResource) Read(ctx context.Context, req resource.ReadRequest
 	}
 
 	bucket := state.Bucket.ValueString()
-	tableBucket, err := r.client.RustClient.GetTableBucket(bucket)
+	tableBucket, err := r.client.RustClient.GetTableBucket(ctx, bucket)
 	if err != nil {
 		// RustFS 1.0.1 answers 400 "Config not found" for a bucket that no
 		// longer exists; 1.0.2+ answer 200 with the switch off, handled below.
@@ -193,7 +193,7 @@ func (r *TableBucketResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	bucket := state.Bucket.ValueString()
-	if _, err := r.client.RustClient.DisableTableBucket(bucket); err != nil {
+	if _, err := r.client.RustClient.DisableTableBucket(ctx, bucket); err != nil {
 		// RustFS 1.0.1 registers the disable route but answers 501
 		// NotImplemented. Destroy cannot succeed there, so remove the resource
 		// from state with a warning instead of failing every run.

@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -208,14 +209,14 @@ func checkSiteReplicationAvailable(t *testing.T, endpoint, accessKey, secretKey 
 		Endpoint:     rustfsadminEndpoint(),
 		Ssl:          false,
 	})
-	err := client.SiteReplicationAdd(rustfs.SiteReplicationSite{
+	err := client.SiteReplicationAdd(context.Background(), rustfs.SiteReplicationSite{
 		Name:      "tf-acc-probe",
 		Endpoint:  endpoint,
 		AccessKey: accessKey,
 		SecretKey: secretKey,
 	})
 	if err == nil {
-		_ = client.RemovePeer([]string{"tf-acc-probe"})
+		_ = client.RemovePeer(context.Background(), []string{"tf-acc-probe"})
 		return
 	}
 	// A server without the route answers NotImplemented, and one that rejects
@@ -246,7 +247,7 @@ func testAccCheckSiteReplicationDestroy(s *terraform.State) error {
 		if name == "" {
 			continue
 		}
-		info, err := client.SiteReplicationInfo()
+		info, err := client.SiteReplicationInfo(context.Background())
 		if err != nil {
 			return fmt.Errorf("reading site replication after destroy: %w", err)
 		}

@@ -15,11 +15,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 )
 
 const (
@@ -58,6 +59,15 @@ type RustfsAdminConfig struct {
 	// timeouts and TLS policy, including the provider's `insecure` attribute).
 	// When nil, a default http.Client is used.
 	HTTPClient *http.Client
+	// UserAgent is sent on every admin request. Empty selects
+	// UserAgentForVersion(""), the build-agnostic "dev" identifier.
+	UserAgent string
+	// RetryMaxAttempts bounds the attempts of a retryable request, including
+	// the first one. Zero selects defaultRetryMaxAttempts; 1 disables retries.
+	RetryMaxAttempts int
+	// RetryBaseDelay is the first backoff step; it doubles per attempt.
+	// Zero selects defaultRetryBaseDelay.
+	RetryBaseDelay time.Duration
 }
 
 type RustfsAdmin struct {
@@ -67,6 +77,9 @@ type RustfsAdmin struct {
 	configuredEndpoint string
 	accessKey          string
 	accessSecret       string
+	userAgent          string
+	retryMaxAttempts   int
+	retryBaseDelay     time.Duration
 }
 
 type RequestData struct {
@@ -162,7 +175,7 @@ func IsAPIErrorCode(err error, codes ...string) bool {
 }
 
 func New(config *RustfsAdminConfig) (client RustfsAdmin) {
-	client.rootURL = client.createRootURL(config.Endpoint, config.Ssl)
+	client.rootURL = RootURL(config.Endpoint, config.Ssl)
 	client.adminBaseURL = client.rootURL + adminBasePath
 	client.configuredEndpoint = config.Endpoint
 	client.httpClient = config.HTTPClient
@@ -171,32 +184,106 @@ func New(config *RustfsAdminConfig) (client RustfsAdmin) {
 	}
 	client.accessKey = config.AccessKey
 	client.accessSecret = config.AccessSecret
+	client.userAgent = config.UserAgent
+	if client.userAgent == "" {
+		client.userAgent = UserAgentForVersion("")
+	}
+	client.retryMaxAttempts = config.RetryMaxAttempts
+	if client.retryMaxAttempts <= 0 {
+		client.retryMaxAttempts = defaultRetryMaxAttempts
+	}
+	client.retryBaseDelay = config.RetryBaseDelay
+	if client.retryBaseDelay <= 0 {
+		client.retryBaseDelay = defaultRetryBaseDelay
+	}
 	return
+}
+
+// UserAgentForVersion is the User-Agent both API clients identify with, so a
+// server operator can tell provider traffic from mc and match a bug report to a
+// build: terraform-provider-rustfs/<version> (go1.x; os; arch). version is the
+// value goreleaser injects with ldflags and is "dev" for a local build.
+func UserAgentForVersion(version string) string {
+	if version == "" {
+		version = "dev"
+	}
+	return fmt.Sprintf("terraform-provider-rustfs/%s (%s; %s; %s)",
+		version, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
 // Endpoint returns the endpoint the client was configured with, before the
 // scheme is filled in. It is what a caller can compare against configuration.
+// It is the one method that takes no context because it reads configuration
+// and performs no request.
 func (c RustfsAdmin) Endpoint() string {
 	return c.configuredEndpoint
 }
 
-func (c *RustfsAdmin) doRequest(ctx context.Context, reqData RequestData) (res *http.Response, err error) {
-	req, err := c.createRequest(ctx, reqData)
-	if err != nil {
-		return
-	}
+func (c *RustfsAdmin) doRequest(ctx context.Context, reqData RequestData) (*http.Response, error) {
+	return c.send(ctx, reqData, false)
+}
 
-	res, err = c.httpClient.Do(req)
-	if err != nil {
-		return
+// send performs one admin or direct request, retrying a transient answer while
+// the request class and the caller's context allow it. The request is rebuilt
+// for every attempt from reqData, so the payload is replayed byte for byte.
+func (c *RustfsAdmin) send(ctx context.Context, reqData RequestData, direct bool) (res *http.Response, err error) {
+	attempts := c.retryMaxAttempts
+	if attempts < 1 {
+		attempts = 1
 	}
-	if res.StatusCode > 299 {
+	for attempt := 0; ; attempt++ {
+		var req *http.Request
+		if direct {
+			req, err = c.createDirectRequest(ctx, reqData)
+		} else {
+			req, err = c.createRequest(ctx, reqData)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		res, err = c.httpClient.Do(req)
+		if err != nil {
+			if ctx.Err() != nil || !retryableTransportError(err) ||
+				!retryableRequest(reqData.Method, reqData.RelPath) || attempt+1 >= attempts {
+				return nil, err
+			}
+			if waitErr := sleepRetry(ctx, c.retryDelay(attempt, nil)); waitErr != nil {
+				return nil, waitErr
+			}
+			continue
+		}
+
+		if okAdminStatus(res.StatusCode, direct) {
+			return res, nil
+		}
+
 		body, _ := io.ReadAll(res.Body)
+		delay, hasRetryAfter := retryAfter(res)
 		drainClose(res)
-		return res, parseAPIError(res, body)
+		apiErr := parseAPIError(res, body)
+		if !retryableStatus(res.StatusCode) && !retryableErrorCode(apiErr) {
+			return res, apiErr
+		}
+		if !retryableRequest(reqData.Method, reqData.RelPath) || attempt+1 >= attempts {
+			return res, apiErr
+		}
+		if !hasRetryAfter {
+			delay = c.retryDelay(attempt, nil)
+		}
+		if waitErr := sleepRetry(ctx, delay); waitErr != nil {
+			return nil, waitErr
+		}
 	}
+}
 
-	return
+// okAdminStatus reports the statuses each request kind treats as success: the
+// admin API accepts any 2xx, DoDirectRequest has always required 200 or 204.
+func okAdminStatus(status int, direct bool) bool {
+	if direct {
+		return status == http.StatusOK || status == http.StatusNoContent
+	}
+	return status <= 299
 }
 
 // drainClose discards any unread response body and closes it. Draining keeps the
@@ -242,14 +329,10 @@ func RootURL(endpoint string, secure bool) string {
 	return scheme + "://" + endpoint
 }
 
-func (c *RustfsAdmin) createRootURL(endpoint string, secure bool) string {
-	return RootURL(endpoint, secure)
-}
-
 // adminURL returns the versioned admin API base a request is sent to. The
 // empty version keeps the historical v3 URL. Only v3 and v4 are accepted: the
 // provider deliberately models no other namespace.
-func (c *RustfsAdmin) adminURL(version string) (string, error) {
+func (c *RustfsAdmin) adminURL(ctx context.Context, version string) (string, error) {
 	switch version {
 	case "":
 		version = defaultAdminAPIVersion
@@ -265,7 +348,7 @@ func (c *RustfsAdmin) adminURL(version string) (string, error) {
 
 func (c *RustfsAdmin) createRequest(ctx context.Context, request RequestData) (*http.Request, error) {
 	// Initialize a new HTTP request for the method.
-	adminURL, err := c.adminURL(request.Version)
+	adminURL, err := c.adminURL(ctx, request.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -282,6 +365,7 @@ func (c *RustfsAdmin) createRequest(ctx context.Context, request RequestData) (*
 	if length := len(request.Content); length > 0 {
 		req.ContentLength = int64(length)
 	}
+	req.Header.Set("User-Agent", c.userAgent)
 	if err := c.signRequest(ctx, req, request.Content); err != nil {
 		return nil, err
 	}
@@ -305,13 +389,19 @@ func (c *RustfsAdmin) signRequest(ctx context.Context, req *http.Request, conten
 	return signer.SignHTTP(ctx, credentials, req, payloadHash, adminSigningService, adminSigningRegion, time.Now().UTC())
 }
 
-func (c *RustfsAdmin) DoDirectRequest(ctx context.Context, request RequestData) (res *http.Response, err error) {
+func (c *RustfsAdmin) DoDirectRequest(ctx context.Context, request RequestData) (*http.Response, error) {
 	if request.Version != "" {
 		return nil, fmt.Errorf(
 			"DoDirectRequest targets the host root and does not take an admin API version (got %q)",
 			request.Version,
 		)
 	}
+	return c.send(ctx, request, true)
+}
+
+// createDirectRequest builds a request against the host root instead of the
+// admin API base, for the few routes that live outside it (metrics, health).
+func (c *RustfsAdmin) createDirectRequest(ctx context.Context, request RequestData) (*http.Request, error) {
 	urlStr := c.rootURL + "/" + request.RelPath
 	// If there are any query values, add them to the end.
 	if len(request.QueryValues) > 0 {
@@ -320,24 +410,14 @@ func (c *RustfsAdmin) DoDirectRequest(ctx context.Context, request RequestData) 
 
 	req, err := http.NewRequestWithContext(ctx, request.Method, urlStr, bytes.NewReader(request.Content))
 	if err != nil {
-		return
+		return nil, err
 	}
 	if length := len(request.Content); length > 0 {
 		req.ContentLength = int64(length)
 	}
+	req.Header.Set("User-Agent", c.userAgent)
 	if err := c.signRequest(ctx, req, request.Content); err != nil {
 		return nil, err
 	}
-
-	res, err = c.httpClient.Do(req)
-	if err != nil {
-		return
-	}
-	if res.StatusCode != 200 && res.StatusCode != 204 {
-		body, _ := io.ReadAll(res.Body)
-		drainClose(res)
-		return res, parseAPIError(res, body)
-	}
-
-	return
+	return req, nil
 }

@@ -84,7 +84,7 @@ func testAccCheckRemoteTargetDestroy(s *terraform.State) error {
 		}
 		bucket := rs.Primary.Attributes["bucket"]
 		want := rs.Primary.Attributes["arn"]
-		targets, err := client.ListRemoteTargets(bucket)
+		targets, err := client.ListRemoteTargets(context.Background(), bucket)
 		if err != nil {
 			if isBucketSubresourceAbsent(err) {
 				continue
@@ -125,7 +125,7 @@ func testAccCheckRemoteTargetExists(resourceName string) resource.TestCheckFunc 
 			return fmt.Errorf("remote target %s has no bucket/arn in state", resourceName)
 		}
 		client := testAccRustClient()
-		targets, err := client.ListRemoteTargets(bucket)
+		targets, err := client.ListRemoteTargets(context.Background(), bucket)
 		if err != nil {
 			return err
 		}
@@ -158,10 +158,10 @@ func testAccMutateRemoteTargetOutOfBand(resourceName string) resource.TestCheckF
 		bucket := rs.Primary.Attributes["bucket"]
 		arn := rs.Primary.Attributes["arn"]
 		client := testAccRustClient()
-		if err := client.DeleteRemoteTarget(bucket, arn); err != nil {
+		if err := client.DeleteRemoteTarget(context.Background(), bucket, arn); err != nil {
 			return fmt.Errorf("removing remote target %s out of band: %w", arn, err)
 		}
-		targets, err := client.ListRemoteTargets(bucket)
+		targets, err := client.ListRemoteTargets(context.Background(), bucket)
 		if err != nil {
 			return fmt.Errorf("listing remote targets after out-of-band removal: %w", err)
 		}
@@ -185,7 +185,7 @@ func peerServiceAccount(t *testing.T, peer *remoteTargetPeer, accessKey, secretK
 		AccessSecret: peer.secretKey,
 		Endpoint:     peer.adminEndpoint,
 	})
-	if err := client.CreateServiceAccount(rustfs.ServiceAccount{
+	if err := client.CreateServiceAccount(context.Background(), rustfs.ServiceAccount{
 		AccessKey:     accessKey,
 		SecretKey:     secretKey,
 		ImpliedPolicy: true,
@@ -193,7 +193,7 @@ func peerServiceAccount(t *testing.T, peer *remoteTargetPeer, accessKey, secretK
 		t.Fatalf("creating peer service account %s: %v", accessKey, err)
 	}
 	t.Cleanup(func() {
-		if err := client.DeleteServiceAccount(rustfs.ServiceAccount{AccessKey: accessKey}); err != nil {
+		if err := client.DeleteServiceAccount(context.Background(), rustfs.ServiceAccount{AccessKey: accessKey}); err != nil {
 			t.Logf("could not delete peer service account %s: %v", accessKey, err)
 		}
 	})

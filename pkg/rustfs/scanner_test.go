@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -88,7 +89,7 @@ func TestGetScannerStatus(t *testing.T) {
 		_, _ = io.WriteString(w, scannerStatusPayload)
 	})
 
-	status, err := client.GetScannerStatus()
+	status, err := client.GetScannerStatus(context.Background())
 	if err != nil {
 		t.Fatalf("read scanner status: %v", err)
 	}
@@ -162,7 +163,7 @@ func TestGetScannerStatusKeepsReasonStrings(t *testing.T) {
 		_, _ = io.WriteString(w, payload)
 	})
 
-	status, err := client.GetScannerStatus()
+	status, err := client.GetScannerStatus(context.Background())
 	if err != nil {
 		t.Fatalf("read scanner status: %v", err)
 	}
@@ -192,7 +193,7 @@ func TestGetScannerStatusMalformedBody(t *testing.T) {
 		_, _ = io.WriteString(w, `not-json`)
 	})
 
-	if _, err := client.GetScannerStatus(); err == nil {
+	if _, err := client.GetScannerStatus(context.Background()); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -205,14 +206,14 @@ func TestScannerResetsMalformedBody(t *testing.T) {
 		{
 			name: "cycle-state reset",
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.ResetScannerCycleState()
+				_, err := client.ResetScannerCycleState(context.Background())
 				return err
 			},
 		},
 		{
 			name: "usage-state reset",
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.ResetScannerUsageState()
+				_, err := client.ResetScannerUsageState(context.Background())
 				return err
 			},
 		},
@@ -263,11 +264,11 @@ func TestScannerAndCacheReadErrors(t *testing.T) {
 		name string
 		call func() error
 	}{
-		{"GetScannerStatus", func() error { _, err := client.GetScannerStatus(); return err }},
-		{"ResetScannerCycleState", func() error { _, err := client.ResetScannerCycleState(); return err }},
-		{"ResetScannerUsageState", func() error { _, err := client.ResetScannerUsageState(); return err }},
-		{"GetObjectDataCacheStats", func() error { _, err := client.GetObjectDataCacheStats(); return err }},
-		{"FlushObjectDataCache", func() error { _, err := client.FlushObjectDataCache("", ""); return err }},
+		{"GetScannerStatus", func() error { _, err := client.GetScannerStatus(context.Background()); return err }},
+		{"ResetScannerCycleState", func() error { _, err := client.ResetScannerCycleState(context.Background()); return err }},
+		{"ResetScannerUsageState", func() error { _, err := client.ResetScannerUsageState(context.Background()); return err }},
+		{"GetObjectDataCacheStats", func() error { _, err := client.GetObjectDataCacheStats(context.Background()); return err }},
+		{"FlushObjectDataCache", func() error { _, err := client.FlushObjectDataCache(context.Background(), "", ""); return err }},
 	}
 
 	for _, tc := range tests {
@@ -283,7 +284,7 @@ func TestScannerAndCacheReadErrors(t *testing.T) {
 func TestGetScannerStatusNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 	client := newScannerTestClient(t, unsupportedScannerRoute(t, "/rustfs/admin/v3/scanner/status"))
 
-	_, err := client.GetScannerStatus()
+	_, err := client.GetScannerStatus(context.Background())
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
@@ -315,7 +316,7 @@ func TestResetScannerCycleState(t *testing.T) {
 		_, _ = io.WriteString(w, `{"status":"reset","mode":"full-rescan"}`)
 	})
 
-	result, err := client.ResetScannerCycleState()
+	result, err := client.ResetScannerCycleState(context.Background())
 	if err != nil {
 		t.Fatalf("reset cycle state: %v", err)
 	}
@@ -353,7 +354,7 @@ func TestResetScannerUsageState(t *testing.T) {
 		_, _ = io.WriteString(w, response)
 	})
 
-	result, err := client.ResetScannerUsageState()
+	result, err := client.ResetScannerUsageState(context.Background())
 	if err != nil {
 		t.Fatalf("reset usage state: %v", err)
 	}
@@ -381,6 +382,43 @@ func TestResetScannerUsageState(t *testing.T) {
 	}
 }
 
+// TestScannerResetsPropagateServerErrors covers the request-error branch of
+// both reset routes: a denied or failed call keeps the server's error so the
+// resource can report it, instead of looking like an unsupported route.
+func TestScannerResetsPropagateServerErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(rustfs.RustfsAdmin) error
+	}{
+		{
+			name: "cycle-state reset",
+			call: func(client rustfs.RustfsAdmin) error {
+				_, err := client.ResetScannerCycleState(context.Background())
+				return err
+			},
+		},
+		{
+			name: "usage-state reset",
+			call: func(client rustfs.RustfsAdmin) error {
+				_, err := client.ResetScannerUsageState(context.Background())
+				return err
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newScannerTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(w, `<Error><Code>AccessDenied</Code><Message>denied</Message></Error>`)
+			})
+			err := tc.call(client)
+			if !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+				t.Fatalf("error = %v, want the server's AccessDenied", err)
+			}
+		})
+	}
+}
+
 func TestScannerResetNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -393,7 +431,7 @@ func TestScannerResetNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 			route:   "/rustfs/admin/v3/scanner/cycle-state/reset",
 			feature: rustfs.FeatureScannerCycleStateReset,
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.ResetScannerCycleState()
+				_, err := client.ResetScannerCycleState(context.Background())
 				return err
 			},
 		},
@@ -402,7 +440,7 @@ func TestScannerResetNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 			route:   "/rustfs/admin/v3/scanner/usage-state/reset",
 			feature: rustfs.FeatureScannerUsageStateReset,
 			call: func(client rustfs.RustfsAdmin) error {
-				_, err := client.ResetScannerUsageState()
+				_, err := client.ResetScannerUsageState(context.Background())
 				return err
 			},
 		},

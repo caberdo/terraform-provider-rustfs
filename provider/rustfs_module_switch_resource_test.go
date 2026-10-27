@@ -28,7 +28,7 @@ func readModuleSwitchState(t *testing.T) *rustfs.ModuleSwitchState {
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 	})
-	state, err := client.GetModuleSwitches()
+	state, err := client.GetModuleSwitches(context.Background())
 	if err != nil {
 		t.Fatalf("failed to read original module switches: %v", err)
 	}
@@ -60,7 +60,7 @@ func testAccEnsureModuleEnabled(t *testing.T, module string) {
 	t.Cleanup(moduleSwitchMutex.Unlock)
 
 	client := testAccRustClient()
-	original, err := client.GetModuleSwitches()
+	original, err := client.GetModuleSwitches(context.Background())
 	if err != nil {
 		t.Fatalf("failed to read module switches: %v", err)
 	}
@@ -87,7 +87,7 @@ func testAccEnsureModuleEnabled(t *testing.T, module string) {
 	} else {
 		update.NotifyEnabled = true
 	}
-	if _, err := client.SetModuleSwitches(update); err != nil {
+	if _, err := client.SetModuleSwitches(context.Background(), update); err != nil {
 		if strings.Contains(err.Error(), "managed by environment variable") {
 			t.Skipf("the %s module is pinned by an environment variable; skipping: %v", module, err)
 		}
@@ -98,7 +98,7 @@ func testAccEnsureModuleEnabled(t *testing.T, module string) {
 			NotifyEnabled: original.NotifyEnabled,
 			AuditEnabled:  original.AuditEnabled,
 		}
-		if _, err := client.SetModuleSwitches(restore); err != nil {
+		if _, err := client.SetModuleSwitches(context.Background(), restore); err != nil {
 			t.Errorf("failed to restore module switches: %v", err)
 		}
 	})
@@ -126,7 +126,7 @@ func TestAccModuleSwitchResource(t *testing.T) {
 					NotifyEnabled: originalModuleSwitch.NotifyEnabled,
 					AuditEnabled:  originalModuleSwitch.AuditEnabled,
 				}
-				if _, err := client.SetModuleSwitches(update); err != nil {
+				if _, err := client.SetModuleSwitches(context.Background(), update); err != nil {
 					t.Errorf("failed to restore original module switches: %v", err)
 				}
 			})

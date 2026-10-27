@@ -102,7 +102,7 @@ func (r *UserPolicyAttachmentResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.client.RustClient.AttachUserPolicy(plan.User.ValueString(), plan.Policy.ValueString())
+	err := r.client.RustClient.AttachUserPolicy(ctx, plan.User.ValueString(), plan.Policy.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching policy to user",
@@ -132,7 +132,7 @@ func (r *UserPolicyAttachmentResource) Read(ctx context.Context, req resource.Re
 	user := state.User.ValueString()
 	policy := state.Policy.ValueString()
 
-	account, err := r.client.RustClient.ReadUserAccount(user)
+	account, err := r.client.RustClient.ReadUserAccount(ctx, user)
 	if err != nil {
 		if isMissingUserError(err) {
 			// The user is gone, so the attachment is gone with it.
@@ -169,7 +169,7 @@ func (r *UserPolicyAttachmentResource) Update(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.client.RustClient.AttachUserPolicy(plan.User.ValueString(), plan.Policy.ValueString())
+	err := r.client.RustClient.AttachUserPolicy(ctx, plan.User.ValueString(), plan.Policy.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error attaching policy to user",
@@ -190,7 +190,7 @@ func (r *UserPolicyAttachmentResource) Delete(ctx context.Context, req resource.
 		return
 	}
 
-	err := r.client.RustClient.DetachUserPolicy(data.User.ValueString(), data.Policy.ValueString())
+	err := r.client.RustClient.DetachUserPolicy(ctx, data.User.ValueString(), data.Policy.ValueString())
 	if err != nil {
 		// A user that no longer exists cannot still carry the policy, so the
 		// attachment is already gone. The builtin detach endpoint answers a

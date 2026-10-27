@@ -233,7 +233,7 @@ func (d *IntegrityInventoryDataSource) Read(ctx context.Context, req datasource.
 
 	limit := integrityInventoryLimit(config.Limit)
 	page, err := d.client.RustClient.IntegrityInventory(
-		bucket,
+		ctx, bucket,
 		config.Prefix.ValueString(),
 		keyMarker,
 		versionMarker,

@@ -22,16 +22,14 @@ func init() {
 // (1.0.1 through 1.0.3); that answer is returned as an
 // *UnsupportedFeatureError naming the route and the server version instead of
 // the raw error payload.
-func (c *RustfsAdmin) GetMetrics() (string, error) {
+func (c *RustfsAdmin) GetMetrics(ctx context.Context) (string, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "metrics",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return "", c.featureError(err, FeatureMetrics)
+		return "", c.featureError(ctx, err, FeatureMetrics)
 	}
 	defer drainClose(resp)
 	raw, err := io.ReadAll(resp.Body)

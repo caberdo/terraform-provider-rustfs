@@ -204,7 +204,7 @@ type ODMBackfillSummary struct {
 // SetBucketOnDemandMigration validates and probes the source, then persists the
 // configuration (PUT /rustfs/admin/v3/on-demand-migration/{bucket}). With
 // dryRun the server validates and probes but writes nothing.
-func (c *RustfsAdmin) SetBucketOnDemandMigration(bucket string, config ODMConfig, dryRun bool) (ODMSetResult, error) {
+func (c *RustfsAdmin) SetBucketOnDemandMigration(ctx context.Context, bucket string, config ODMConfig, dryRun bool) (ODMSetResult, error) {
 	body, err := json.Marshal(config)
 	if err != nil {
 		return ODMSetResult{}, err
@@ -219,12 +219,9 @@ func (c *RustfsAdmin) SetBucketOnDemandMigration(bucket string, config ODMConfig
 		reqData.QueryValues = url.Values{"dry-run": []string{"true"}}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ODMSetResult{}, c.odmError(err)
+		return ODMSetResult{}, c.odmError(ctx, err)
 	}
 	defer drainClose(resp)
 
@@ -238,17 +235,15 @@ func (c *RustfsAdmin) SetBucketOnDemandMigration(bucket string, config ODMConfig
 // GetBucketOnDemandMigration reads the saved configuration. The server answers
 // 404 NoSuchConfiguration when the bucket has none; the returned *APIError
 // carries that code.
-func (c *RustfsAdmin) GetBucketOnDemandMigration(bucket string) (ODMGetResult, error) {
+func (c *RustfsAdmin) GetBucketOnDemandMigration(ctx context.Context, bucket string) (ODMGetResult, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "on-demand-migration/" + url.PathEscape(bucket),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ODMGetResult{}, c.odmError(err)
+		return ODMGetResult{}, c.odmError(ctx, err)
 	}
 	defer drainClose(resp)
 
@@ -262,17 +257,15 @@ func (c *RustfsAdmin) GetBucketOnDemandMigration(bucket string) (ODMGetResult, e
 // DeleteBucketOnDemandMigration clears the configuration. The route is
 // idempotent and answers 204 even when nothing was configured; already-pulled
 // objects stay in place.
-func (c *RustfsAdmin) DeleteBucketOnDemandMigration(bucket string) error {
+func (c *RustfsAdmin) DeleteBucketOnDemandMigration(ctx context.Context, bucket string) error {
 	reqData := RequestData{
 		Method:  http.MethodDelete,
 		RelPath: "on-demand-migration/" + url.PathEscape(bucket),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return c.odmError(err)
+		return c.odmError(ctx, err)
 	}
 	drainClose(resp)
 	return nil
@@ -280,17 +273,15 @@ func (c *RustfsAdmin) DeleteBucketOnDemandMigration(bucket string) error {
 
 // GetBucketOnDemandMigrationStatus reads the per-node runtime snapshot. In a
 // distributed deployment it describes only the node that answered.
-func (c *RustfsAdmin) GetBucketOnDemandMigrationStatus(bucket string) (ODMStatus, error) {
+func (c *RustfsAdmin) GetBucketOnDemandMigrationStatus(ctx context.Context, bucket string) (ODMStatus, error) {
 	reqData := RequestData{
 		Method:  http.MethodGet,
 		RelPath: "on-demand-migration/" + url.PathEscape(bucket) + "/status",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return ODMStatus{}, c.odmError(err)
+		return ODMStatus{}, c.odmError(ctx, err)
 	}
 	defer drainClose(resp)
 
@@ -339,14 +330,14 @@ func (config ODMConfig) Redacted() ODMConfig {
 // ...) intact, and only turns a bare 404/405/501 into the server-capability
 // diagnostic. featureError alone would mistake NoSuchConfiguration for a
 // missing route.
-func (c *RustfsAdmin) odmError(err error) error {
+func (c *RustfsAdmin) odmError(ctx context.Context, err error) error {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
 		if apiErr.Code != "" && !strings.EqualFold(apiErr.Code, "NotImplemented") {
 			return err
 		}
 	}
-	return c.featureError(err, FeatureOnDemandMigration)
+	return c.featureError(ctx, err, FeatureOnDemandMigration)
 }
 
 func init() {

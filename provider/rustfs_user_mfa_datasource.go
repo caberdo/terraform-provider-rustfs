@@ -80,7 +80,7 @@ func (d *UserMfaDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	status, err := d.client.RustClient.ReadUserMFA(config.AccessKey.ValueString())
+	status, err := d.client.RustClient.ReadUserMFA(ctx, config.AccessKey.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading MFA status",

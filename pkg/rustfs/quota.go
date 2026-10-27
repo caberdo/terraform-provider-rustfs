@@ -51,13 +51,11 @@ type Quota struct {
 	Quota_Type string `json:"quota_type"`
 }
 
-func (c *RustfsAdmin) ReadQuota(bucket string) (quota Quota, err error) {
+func (c *RustfsAdmin) ReadQuota(ctx context.Context, bucket string) (quota Quota, err error) {
 	req_data := RequestData{
 		Method:  "GET",
 		RelPath: "quota/" + bucket,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return quota, err
@@ -67,7 +65,7 @@ func (c *RustfsAdmin) ReadQuota(bucket string) (quota Quota, err error) {
 	return quota, err
 }
 
-func (c *RustfsAdmin) SetQuota(new Quota) (quota Quota, err error) {
+func (c *RustfsAdmin) SetQuota(ctx context.Context, new Quota) (quota Quota, err error) {
 	new.Quota_Type = "HARD"
 	bytes, err := json.Marshal(new)
 	if err != nil {
@@ -78,8 +76,6 @@ func (c *RustfsAdmin) SetQuota(new Quota) (quota Quota, err error) {
 		RelPath: "quota/" + new.Bucket,
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return Quota{}, err
@@ -89,13 +85,11 @@ func (c *RustfsAdmin) SetQuota(new Quota) (quota Quota, err error) {
 	return quota, err
 }
 
-func (c *RustfsAdmin) DeletQuota(bucket string) (err error) {
+func (c *RustfsAdmin) DeletQuota(ctx context.Context, bucket string) (err error) {
 	req_data := RequestData{
 		Method:  "DELETE",
 		RelPath: "quota/" + bucket,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -110,19 +104,17 @@ func (c *RustfsAdmin) DeletQuota(bucket string) (err error) {
 // The route reads bucket quota metadata and the reservation ledger; it does not
 // scan the namespace. A missing bucket is reported as NoSuchBucket, so the
 // caller sees the server's error instead of zeroed fields.
-func (c *RustfsAdmin) GetQuotaStats(bucket string) (QuotaStats, error) {
+func (c *RustfsAdmin) GetQuotaStats(ctx context.Context, bucket string) (QuotaStats, error) {
 	if bucket == "" {
 		return QuotaStats{}, errors.New("bucket name is required")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:  "GET",
 		RelPath: "quota-stats/" + bucket,
 	})
 	if err != nil {
-		return QuotaStats{}, c.featureErrorPreservingCode(err, FeatureQuotaStats)
+		return QuotaStats{}, c.featureErrorPreservingCode(ctx, err, FeatureQuotaStats)
 	}
 	defer drainClose(resp)
 
@@ -140,7 +132,7 @@ func (c *RustfsAdmin) GetQuotaStats(bucket string) (QuotaStats, error) {
 // operationType is one of PUT, POST, COPY or DELETE. RustFS treats an unknown
 // value as PUT. The call is read-only: it asks the quota checker for a
 // decision, it does not reserve bytes or modify the bucket.
-func (c *RustfsAdmin) CheckQuota(bucket, operationType string, operationSize int64) (QuotaCheck, error) {
+func (c *RustfsAdmin) CheckQuota(ctx context.Context, bucket, operationType string, operationSize int64) (QuotaCheck, error) {
 	if bucket == "" {
 		return QuotaCheck{}, errors.New("bucket name is required")
 	}
@@ -162,15 +154,13 @@ func (c *RustfsAdmin) CheckQuota(bucket, operationType string, operationSize int
 		return QuotaCheck{}, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:  "POST",
 		RelPath: "quota-check/" + bucket,
 		Content: body,
 	})
 	if err != nil {
-		return QuotaCheck{}, c.featureErrorPreservingCode(err, FeatureQuotaCheck)
+		return QuotaCheck{}, c.featureErrorPreservingCode(ctx, err, FeatureQuotaCheck)
 	}
 	defer drainClose(resp)
 

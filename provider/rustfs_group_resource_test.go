@@ -273,7 +273,7 @@ func testAccCheckGroupExists(n string) resource.TestCheckFunc {
 		}
 
 		client := testAccRustClient()
-		info, err := client.GetGroup(name)
+		info, err := client.GetGroup(context.Background(), name)
 		if err != nil {
 			return fmt.Errorf("group %s not found: %w", name, err)
 		}
@@ -290,7 +290,7 @@ func testAccCheckGroupExists(n string) resource.TestCheckFunc {
 func testAccCheckGroupState(group, status string, members ...string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		info, err := client.GetGroup(group)
+		info, err := client.GetGroup(context.Background(), group)
 		if err != nil {
 			return fmt.Errorf("failed to read group %s: %w", group, err)
 		}
@@ -315,12 +315,12 @@ func testAccCheckGroupState(group, status string, members ...string) resource.Te
 func testAccDeleteGroupOutOfBand(group string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		info, err := client.GetGroup(group)
+		info, err := client.GetGroup(context.Background(), group)
 		if err != nil {
 			return fmt.Errorf("failed to read group %s before deleting it outside Terraform: %w", group, err)
 		}
 		if len(info.Members) > 0 {
-			if err := client.UpdateGroupMembers(rustfs.GroupAddRemove{
+			if err := client.UpdateGroupMembers(context.Background(), rustfs.GroupAddRemove{
 				Group:    group,
 				Members:  info.Members,
 				IsRemove: true,
@@ -328,7 +328,7 @@ func testAccDeleteGroupOutOfBand(group string) resource.TestCheckFunc {
 				return fmt.Errorf("failed to detach the members of %s outside Terraform: %w", group, err)
 			}
 		}
-		if err := client.DeleteGroup(group); err != nil {
+		if err := client.DeleteGroup(context.Background(), group); err != nil {
 			return fmt.Errorf("failed to delete group %s outside Terraform: %w", group, err)
 		}
 		return nil
@@ -347,7 +347,7 @@ func testAccCheckGroupDestroy(s *terraform.State) error {
 		if name == "" {
 			continue
 		}
-		if _, err := client.GetGroup(name); err != nil {
+		if _, err := client.GetGroup(context.Background(), name); err != nil {
 			if rustfs.IsAPIErrorCode(err, "NoSuchResource", "NoSuchGroup") {
 				continue
 			}

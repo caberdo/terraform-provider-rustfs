@@ -29,13 +29,11 @@ type TableBucket struct {
 // decodes the catalog state the server returns. DELETE answers 200 with the
 // state on 1.0.2+, and both PUT and GET answer 200, so only an empty body is
 // tolerated as "no state".
-func (c *RustfsAdmin) tableBucket(method, bucket string) (TableBucket, error) {
+func (c *RustfsAdmin) tableBucket(ctx context.Context, method, bucket string) (TableBucket, error) {
 	reqData := RequestData{
 		Method:  method,
 		RelPath: "iceberg/v1/buckets/" + url.PathEscape(bucket),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	resp, err := c.DoDirectRequest(ctx, reqData)
 	if err != nil {
@@ -55,24 +53,24 @@ func (c *RustfsAdmin) tableBucket(method, bucket string) (TableBucket, error) {
 
 // EnableTableBucket turns an existing bucket into a table bucket by enabling
 // the built-in Iceberg REST catalog on it (PUT /iceberg/v1/buckets/<bucket>).
-func (c *RustfsAdmin) EnableTableBucket(bucket string) (TableBucket, error) {
-	return c.tableBucket(http.MethodPut, bucket)
+func (c *RustfsAdmin) EnableTableBucket(ctx context.Context, bucket string) (TableBucket, error) {
+	return c.tableBucket(ctx, http.MethodPut, bucket)
 }
 
 // GetTableBucket reads the catalog state of one bucket
 // (GET /iceberg/v1/buckets/<bucket>).
-func (c *RustfsAdmin) GetTableBucket(bucket string) (TableBucket, error) {
-	return c.tableBucket(http.MethodGet, bucket)
+func (c *RustfsAdmin) GetTableBucket(ctx context.Context, bucket string) (TableBucket, error) {
+	return c.tableBucket(ctx, http.MethodGet, bucket)
 }
 
 // DisableTableBucket turns the catalog switch off again
 // (DELETE /iceberg/v1/buckets/<bucket>). RustFS 1.0.1 registers the route but
 // answers 501 NotImplemented, which is returned as an
 // *UnsupportedFeatureError naming the route and the server version.
-func (c *RustfsAdmin) DisableTableBucket(bucket string) (TableBucket, error) {
-	tableBucket, err := c.tableBucket(http.MethodDelete, bucket)
+func (c *RustfsAdmin) DisableTableBucket(ctx context.Context, bucket string) (TableBucket, error) {
+	tableBucket, err := c.tableBucket(ctx, http.MethodDelete, bucket)
 	if err != nil {
-		return TableBucket{}, c.featureError(err, FeatureTableBucket)
+		return TableBucket{}, c.featureError(ctx, err, FeatureTableBucket)
 	}
 	return tableBucket, nil
 }

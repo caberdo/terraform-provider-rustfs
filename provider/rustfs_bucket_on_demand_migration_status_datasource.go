@@ -294,7 +294,7 @@ func (d *bucketOnDemandMigrationStatusDataSource) Read(ctx context.Context, req 
 	}
 
 	bucket := config.Bucket.ValueString()
-	status, err := d.client.RustClient.GetBucketOnDemandMigrationStatus(bucket)
+	status, err := d.client.RustClient.GetBucketOnDemandMigrationStatus(ctx, bucket)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket on-demand migration status",

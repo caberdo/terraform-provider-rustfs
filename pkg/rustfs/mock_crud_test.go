@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -82,7 +83,7 @@ func newMockCRUDAdminClient(t *testing.T) *RustfsAdmin {
 func TestMockQuotaLifecycle(t *testing.T) {
 	client := newMockCRUDAdminClient(t)
 
-	read, err := client.ReadQuota("mock-bucket")
+	read, err := client.ReadQuota(context.Background(), "mock-bucket")
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -90,7 +91,7 @@ func TestMockQuotaLifecycle(t *testing.T) {
 		t.Errorf("unexpected quota: %+v", read)
 	}
 
-	set, err := client.SetQuota(Quota{Bucket: "mock-bucket", Quota: 2048})
+	set, err := client.SetQuota(context.Background(), Quota{Bucket: "mock-bucket", Quota: 2048})
 	if err != nil {
 		t.Fatalf("set: %v", err)
 	}
@@ -98,7 +99,7 @@ func TestMockQuotaLifecycle(t *testing.T) {
 		t.Errorf("unexpected quota readback: %+v", set)
 	}
 
-	if err := client.DeletQuota("mock-bucket"); err != nil {
+	if err := client.DeletQuota(context.Background(), "mock-bucket"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
@@ -108,21 +109,21 @@ func TestMockReadQuotaDecodeError(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `not-json`)
 	})
-	if _, err := client.ReadQuota("b"); err == nil {
+	if _, err := client.ReadQuota(context.Background(), "b"); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
 
-// TestMockUserAccountLifecycle covers CreateUserAccount, ReadUserAccount,
-// UpdateUserAccount and DeleteUserAccount against a stubbed admin API.
+// TestMockUserAccountLifecycle covers CreateUserAccount, ReadUserAccount and
+// DeleteUserAccount against a stubbed admin API.
 func TestMockUserAccountLifecycle(t *testing.T) {
 	client := newMockCRUDAdminClient(t)
 
-	if err := client.CreateUserAccount(UserAccount{AccessKey: "alice", SecretKey: "s3cret"}); err != nil {
+	if err := client.CreateUserAccount(context.Background(), UserAccount{AccessKey: "alice", SecretKey: "s3cret"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
-	read, err := client.ReadUserAccount("alice")
+	read, err := client.ReadUserAccount(context.Background(), "alice")
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -133,17 +134,13 @@ func TestMockUserAccountLifecycle(t *testing.T) {
 		t.Errorf("unexpected groups: %v", read.Groups)
 	}
 
-	if err := client.UpdateUserAccount(UserAccount{AccessKey: "alice", Status: "disabled"}); err != nil {
-		t.Fatalf("update: %v", err)
-	}
-
-	if err := client.DeleteUserAccount(UserAccount{AccessKey: "alice"}); err != nil {
+	if err := client.DeleteUserAccount(context.Background(), UserAccount{AccessKey: "alice"}); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
 
 // TestMockUserAccountCreatesWithPolicy covers the AttachPolicyToUser follow-up
-// of CreateUserAccount and of UpdateUserAccount.
+// of CreateUserAccount.
 func TestMockUserAccountCreatesWithPolicy(t *testing.T) {
 	var attached []string
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -160,14 +157,10 @@ func TestMockUserAccountCreatesWithPolicy(t *testing.T) {
 		}
 	})
 
-	if err := client.CreateUserAccount(UserAccount{AccessKey: "alice", Policy: "readwrite"}); err != nil {
+	if err := client.CreateUserAccount(context.Background(), UserAccount{AccessKey: "alice", Policy: "readwrite"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := client.UpdateUserAccount(UserAccount{AccessKey: "alice", Policy: "readonly"}); err != nil {
-		t.Fatalf("update: %v", err)
-	}
-
-	if len(attached) != 2 || attached[0] != "readwrite" || attached[1] != "readonly" {
+	if len(attached) != 1 || attached[0] != "readwrite" {
 		t.Errorf("unexpected policy attachments: %v", attached)
 	}
 }
@@ -177,11 +170,11 @@ func TestMockUserAccountCreatesWithPolicy(t *testing.T) {
 func TestMockServiceAccountLifecycle(t *testing.T) {
 	client := newMockCRUDAdminClient(t)
 
-	if err := client.CreateServiceAccount(ServiceAccount{AccessKey: "sa1", SecretKey: "s3cret", Name: "svc"}); err != nil {
+	if err := client.CreateServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1", SecretKey: "s3cret", Name: "svc"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
-	read, err := client.ReadServiceAccount("sa1")
+	read, err := client.ReadServiceAccount(context.Background(), "sa1")
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -189,11 +182,11 @@ func TestMockServiceAccountLifecycle(t *testing.T) {
 		t.Errorf("unexpected service account: %+v", read)
 	}
 
-	if err := client.UpdateServiceAccount(ServiceAccount{AccessKey: "sa1", SecretKey: "s3cret", Name: "svc"}); err != nil {
+	if err := client.UpdateServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1", SecretKey: "s3cret", Name: "svc"}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
-	if err := client.DeleteServiceAccount(ServiceAccount{AccessKey: "sa1"}); err != nil {
+	if err := client.DeleteServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1"}); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
@@ -203,7 +196,7 @@ func TestMockReadServiceAccountDecodeError(t *testing.T) {
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `not-json`)
 	})
-	if _, err := client.ReadServiceAccount("sa1"); err == nil {
+	if _, err := client.ReadServiceAccount(context.Background(), "sa1"); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -218,7 +211,7 @@ func TestMockEditTier(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.EditTier("COLD", json.RawMessage(`{"tier_type":"s3"}`)); err != nil {
+	if err := client.EditTier(context.Background(), "COLD", json.RawMessage(`{"tier_type":"s3"}`)); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotBody != `{"tier_type":"s3"}` {
@@ -236,14 +229,14 @@ func TestMockPolicyLifecycle(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.CreatePolicy(Policy{Name: "readwrite"}); err != nil {
+	if err := client.CreatePolicy(context.Background(), Policy{Name: "readwrite"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if !strings.HasSuffix(gotPath, "/add-canned-policy") || gotQuery != "name=readwrite" {
 		t.Errorf("unexpected create request: %s?%s", gotPath, gotQuery)
 	}
 
-	if err := client.DeletePolicy("readwrite"); err != nil {
+	if err := client.DeletePolicy(context.Background(), "readwrite"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !strings.HasSuffix(gotPath, "/remove-canned-policy") || gotQuery != "name=readwrite" {

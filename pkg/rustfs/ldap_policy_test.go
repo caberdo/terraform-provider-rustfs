@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -31,7 +32,7 @@ func TestAttachLdapPolicy(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.AttachLDAPPolicy(LDAPPolicyAttachment{
+	err := client.AttachLDAPPolicy(context.Background(), LDAPPolicyAttachment{
 		UserOrGroup: "uid=alice,ou=people,dc=example,dc=com",
 		PolicyName:  "readwrite",
 		IsGroup:     false,
@@ -75,7 +76,7 @@ func TestAttachLdapPolicyGroup(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.AttachLDAPPolicy(LDAPPolicyAttachment{
+	err := client.AttachLDAPPolicy(context.Background(), LDAPPolicyAttachment{
 		UserOrGroup: "cn=engineers,ou=groups,dc=example,dc=com",
 		PolicyName:  "readwrite",
 		IsGroup:     true,
@@ -118,7 +119,7 @@ func TestDetachLdapPolicy(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.DetachLDAPPolicy(LDAPPolicyAttachment{
+	err := client.DetachLDAPPolicy(context.Background(), LDAPPolicyAttachment{
 		UserOrGroup: "uid=alice,ou=people,dc=example,dc=com",
 		PolicyName:  "readwrite",
 		IsGroup:     false,

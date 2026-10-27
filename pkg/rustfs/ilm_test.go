@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -71,7 +72,7 @@ func TestRunILMTransitionAsync(t *testing.T) {
 		_, _ = io.WriteString(w, ilmTransitionRunPayload)
 	})
 
-	run, err := client.RunILMTransition(rustfs.ILMTransitionRunOptions{
+	run, err := client.RunILMTransition(context.Background(), rustfs.ILMTransitionRunOptions{
 		Bucket:             "logs",
 		Prefix:             "archive/",
 		Tier:               "WARM",
@@ -119,7 +120,7 @@ func TestRunILMTransitionSynchronousOmitsBudgets(t *testing.T) {
 		_, _ = io.WriteString(w, `{"state":"completed","mode":"enqueue_only","report":{"bucket":"logs","enqueued":2}}`)
 	})
 
-	run, err := client.RunILMTransition(rustfs.ILMTransitionRunOptions{Bucket: "logs", DryRun: true})
+	run, err := client.RunILMTransition(context.Background(), rustfs.ILMTransitionRunOptions{Bucket: "logs", DryRun: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,7 +150,7 @@ func TestRunILMTransitionUnsupported(t *testing.T) {
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NotImplemented</Code><Message>not implemented</Message></Error>`)
 	})
 
-	_, err := client.RunILMTransition(rustfs.ILMTransitionRunOptions{Bucket: "logs"})
+	_, err := client.RunILMTransition(context.Background(), rustfs.ILMTransitionRunOptions{Bucket: "logs"})
 	if !rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -179,7 +180,7 @@ func TestILMTransitionJob(t *testing.T) {
 		_, _ = io.WriteString(w, ilmTransitionJobPayload)
 	})
 
-	job, err := client.ILMTransitionJob("6f2b1a3c-6c47-4a0e-9d43-2d7f1b9a0c11")
+	job, err := client.ILMTransitionJob(context.Background(), "6f2b1a3c-6c47-4a0e-9d43-2d7f1b9a0c11")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +211,7 @@ func TestILMTransitionJobMissing(t *testing.T) {
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchKey</Code><Message>manual transition job not found</Message></Error>`)
 	})
 
-	_, err := client.ILMTransitionJob("6f2b1a3c-6c47-4a0e-9d43-2d7f1b9a0c11")
+	_, err := client.ILMTransitionJob(context.Background(), "6f2b1a3c-6c47-4a0e-9d43-2d7f1b9a0c11")
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -219,22 +220,6 @@ func TestILMTransitionJobMissing(t *testing.T) {
 	}
 	if !rustfs.IsAPIErrorCode(err, "NoSuchKey") {
 		t.Fatalf("expected NoSuchKey, got %v", err)
-	}
-}
-
-func TestCancelILMTransitionJob(t *testing.T) {
-	var gotMethod, gotPath string
-	client := newILMClient(t, func(w http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path
-		w.WriteHeader(http.StatusOK)
-	})
-
-	if err := client.CancelILMTransitionJob("job-1"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotMethod != http.MethodDelete || !strings.HasSuffix(gotPath, "/ilm/transition/jobs/job-1") {
-		t.Errorf("request = %s %s", gotMethod, gotPath)
 	}
 }
 
@@ -260,7 +245,7 @@ func TestILMExpiryStatus(t *testing.T) {
 		_, _ = io.WriteString(w, ilmExpiryStatusPayload)
 	})
 
-	status, err := client.ILMExpiryStatus()
+	status, err := client.ILMExpiryStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -302,7 +287,7 @@ func TestListILMRecoveryRecords(t *testing.T) {
 			`"next_marker":"control-1","truncated":true,"incomplete":false}`)
 	})
 
-	page, err := client.ListILMRecoveryRecords(rustfs.ILMRecoveryRecordQuery{
+	page, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{
 		Protocol:       "transition_transaction",
 		Classification: "retrying",
 		Limit:          25,
@@ -350,7 +335,7 @@ func TestListILMRecoveryRecordsOmitsOptionalQuery(t *testing.T) {
 		_, _ = io.WriteString(w, `{"records":[],"next_marker":null,"truncated":false,"incomplete":true}`)
 	})
 
-	page, err := client.ListILMRecoveryRecords(rustfs.ILMRecoveryRecordQuery{Protocol: "tier_delete_journal"})
+	page, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{Protocol: "tier_delete_journal"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -359,54 +344,6 @@ func TestListILMRecoveryRecordsOmitsOptionalQuery(t *testing.T) {
 	}
 	if len(page.Records) != 0 || !page.Incomplete {
 		t.Errorf("unexpected page: %+v", page)
-	}
-}
-
-func TestILMRecoveryAndReconcileRawRoutes(t *testing.T) {
-	var requests []string
-	var bodies []string
-	client := newILMClient(t, func(w http.ResponseWriter, r *http.Request) {
-		requests = append(requests, r.Method+" "+r.URL.EscapedPath()+"?"+r.URL.RawQuery)
-		body, _ := io.ReadAll(r.Body)
-		bodies = append(bodies, string(body))
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"ok":true}`)
-	})
-
-	if _, err := client.InspectILMRecoveryRecord("control/1"); err != nil {
-		t.Fatalf("inspect recovery record: %v", err)
-	}
-	if _, err := client.InspectILMTransitionReconcile("tx-1"); err != nil {
-		t.Fatalf("inspect reconcile: %v", err)
-	}
-	if _, err := client.ApplyILMTransitionReconcile("tx-2", "delete_candidate", "remote-version"); err != nil {
-		t.Fatalf("apply reconcile: %v", err)
-	}
-	if _, err := client.InspectILMLegacyTransitionState("logs", "archive/a.txt", "null"); err != nil {
-		t.Fatalf("inspect legacy state: %v", err)
-	}
-
-	wantRequests := []string{
-		"GET /rustfs/admin/v3/ilm/recovery/records/control%2F1?",
-		"GET /rustfs/admin/v3/ilm/transition/reconcile/tx-1?",
-		"POST /rustfs/admin/v3/ilm/transition/reconcile/tx-2?",
-		"GET /rustfs/admin/v3/ilm/transition/state/reconcile?bucket=logs&object=archive%2Fa.txt&versionId=null",
-	}
-	for i, want := range wantRequests {
-		if i >= len(requests) || requests[i] != want {
-			t.Errorf("request %d = %q, want %q", i, requests[i], want)
-		}
-	}
-	if len(bodies) < 3 {
-		t.Fatalf("bodies = %v", bodies)
-	}
-	var reconcileBody map[string]any
-	if err := json.Unmarshal([]byte(bodies[2]), &reconcileBody); err != nil {
-		t.Fatalf("reconcile body is not JSON: %v", err)
-	}
-	if reconcileBody["action"] != "delete_candidate" || reconcileBody["confirm"] != true ||
-		reconcileBody["remote_version_id"] != "remote-version" {
-		t.Errorf("unexpected reconcile body: %v", reconcileBody)
 	}
 }
 
@@ -419,28 +356,28 @@ func TestILMResponsesThatAreNotJSONFail(t *testing.T) {
 		{
 			name: "run",
 			call: func(client *rustfs.RustfsAdmin) error {
-				_, err := client.RunILMTransition(rustfs.ILMTransitionRunOptions{Bucket: "logs"})
+				_, err := client.RunILMTransition(context.Background(), rustfs.ILMTransitionRunOptions{Bucket: "logs"})
 				return err
 			},
 		},
 		{
 			name: "job",
 			call: func(client *rustfs.RustfsAdmin) error {
-				_, err := client.ILMTransitionJob("job-1")
+				_, err := client.ILMTransitionJob(context.Background(), "job-1")
 				return err
 			},
 		},
 		{
 			name: "expiry status",
 			call: func(client *rustfs.RustfsAdmin) error {
-				_, err := client.ILMExpiryStatus()
+				_, err := client.ILMExpiryStatus(context.Background())
 				return err
 			},
 		},
 		{
 			name: "recovery records",
 			call: func(client *rustfs.RustfsAdmin) error {
-				_, err := client.ListILMRecoveryRecords(rustfs.ILMRecoveryRecordQuery{Protocol: "transition_transaction"})
+				_, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{Protocol: "transition_transaction"})
 				return err
 			},
 		},
@@ -458,30 +395,20 @@ func TestILMResponsesThatAreNotJSONFail(t *testing.T) {
 	}
 }
 
-func TestILMDestructiveRawRoutePropagatesServerErrors(t *testing.T) {
-	client := newILMClient(t, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/xml")
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InternalError</Code><Message>boom</Message></Error>`)
-	})
-
-	if _, err := client.ApplyILMTransitionReconcile("tx-1", "finalize_missing", ""); err == nil {
-		t.Fatal("expected the reconcile error to propagate")
-	}
-	if _, err := client.InspectILMRecoveryRecord("control-1"); err == nil {
-		t.Fatal("expected the inspect error to propagate")
-	}
-}
-
-func TestCancelILMTransitionJobPropagatesErrors(t *testing.T) {
-	client := newILMClient(t, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/xml")
+// TestILMReadRequestErrorsKeepServerAnswer covers the request-error branch of
+// the two ILM read routes: a denied call keeps the server's code instead of
+// being reported as a missing route.
+func TestILMReadRequestErrorsKeepServerAnswer(t *testing.T) {
+	client := newILMClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code><Message>no</Message></Error>`)
 	})
 
-	if err := client.CancelILMTransitionJob("job-1"); err == nil {
-		t.Fatal("expected the cancel error to propagate")
+	if _, err := client.ILMExpiryStatus(context.Background()); !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+		t.Fatalf("expiry status error = %v, want AccessDenied", err)
+	}
+	if _, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{}); !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+		t.Fatalf("recovery records error = %v, want AccessDenied", err)
 	}
 }
 
@@ -493,17 +420,12 @@ func TestILMReadsPropagateTruncatedBodies(t *testing.T) {
 	})
 
 	t.Run("expiry status", func(t *testing.T) {
-		if _, err := client.ILMExpiryStatus(); err == nil {
+		if _, err := client.ILMExpiryStatus(context.Background()); err == nil {
 			t.Fatal("expected the truncated body to fail the read")
 		}
 	})
 	t.Run("recovery records", func(t *testing.T) {
-		if _, err := client.ListILMRecoveryRecords(rustfs.ILMRecoveryRecordQuery{Protocol: "transition_transaction"}); err == nil {
-			t.Fatal("expected the truncated body to fail the read")
-		}
-	})
-	t.Run("raw route", func(t *testing.T) {
-		if _, err := client.InspectILMRecoveryRecord("control-1"); err == nil {
+		if _, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{Protocol: "transition_transaction"}); err == nil {
 			t.Fatal("expected the truncated body to fail the read")
 		}
 	})

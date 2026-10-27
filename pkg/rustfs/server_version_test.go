@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -153,7 +154,7 @@ func versionResponse(version string) http.HandlerFunc {
 func TestGetMetricsNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 	client := newAdminTestServer(t, notImplemented, versionResponse("refs/tags/1.0.3"))
 
-	raw, err := client.GetMetrics()
+	raw, err := client.GetMetrics(context.Background())
 	if raw != "" {
 		t.Errorf("expected an empty metrics body, got %q", raw)
 	}
@@ -200,7 +201,7 @@ func TestGetMetricsCapabilityGapWithoutServerVersion(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
-	_, err := client.GetMetrics()
+	_, err := client.GetMetrics(context.Background())
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
@@ -221,7 +222,7 @@ func TestGetMetricsStatusCodesThatSignalMissingRoute(t *testing.T) {
 				_, _ = io.WriteString(w, `<Error><Code>Whatever</Code></Error>`)
 			}, versionResponse("refs/tags/1.0.2"))
 
-			_, err := client.GetMetrics()
+			_, err := client.GetMetrics(context.Background())
 			if !rustfs.IsUnsupportedFeature(err) {
 				t.Fatalf("status %d: expected *UnsupportedFeatureError, got %T: %v", status, err, err)
 			}
@@ -235,7 +236,7 @@ func TestGetMetricsServerErrorStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, `<Error><Code>InternalError</Code><Message>boom</Message></Error>`)
 	}, versionResponse("refs/tags/1.0.3"))
 
-	_, err := client.GetMetrics()
+	_, err := client.GetMetrics(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -254,7 +255,7 @@ func TestGetMetricsServerErrorStaysAnAPIError(t *testing.T) {
 func TestServerVersion(t *testing.T) {
 	client := newAdminTestServer(t, notImplemented, versionResponse("2026-09-01T17:35:49Z@1.0.0-rc.5"))
 
-	version, raw, err := client.ServerVersion()
+	version, raw, err := client.ServerVersion(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -269,7 +270,7 @@ func TestServerVersion(t *testing.T) {
 func TestServerVersionUnparseableKeepsTheRawString(t *testing.T) {
 	client := newAdminTestServer(t, notImplemented, versionResponse("nightly"))
 
-	_, raw, err := client.ServerVersion()
+	_, raw, err := client.ServerVersion(context.Background())
 	if err == nil {
 		t.Fatal("expected a parse error")
 	}

@@ -43,21 +43,19 @@ type BatchJobs struct {
 //
 // RustFS ships the MinIO-compatible route without a batch-job execution
 // backend, so the list is empty on every release that implements it.
-func (c *RustfsAdmin) ListBatchJobs(jobType string) (BatchJobs, error) {
+func (c *RustfsAdmin) ListBatchJobs(ctx context.Context, jobType string) (BatchJobs, error) {
 	query := url.Values{}
 	if jobType != "" {
 		query.Set("jobType", jobType)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:      "GET",
 		RelPath:     "list-jobs",
 		QueryValues: query,
 	})
 	if err != nil {
-		return BatchJobs{}, c.featureErrorPreservingCode(err, FeatureBatchJobs)
+		return BatchJobs{}, c.featureErrorPreservingCode(ctx, err, FeatureBatchJobs)
 	}
 	defer drainClose(resp)
 
@@ -79,23 +77,21 @@ func (c *RustfsAdmin) ListBatchJobs(jobType string) (BatchJobs, error) {
 // DescribeBatchJob returns the job definition of one batch job from
 // GET /rustfs/admin/v3/describe-job. The document is returned verbatim
 // because the provider does not own the MinIO batch-job schema.
-func (c *RustfsAdmin) DescribeBatchJob(jobID string) (json.RawMessage, error) {
-	return c.batchJobDocument("describe-job", jobID, FeatureBatchJobDescribe)
+func (c *RustfsAdmin) DescribeBatchJob(ctx context.Context, jobID string) (json.RawMessage, error) {
+	return c.batchJobDocument(ctx, "describe-job", jobID, FeatureBatchJobDescribe)
 }
 
 // StatusBatchJob returns the runtime status of one batch job from
 // GET /rustfs/admin/v3/status-job, verbatim.
-func (c *RustfsAdmin) StatusBatchJob(jobID string) (json.RawMessage, error) {
-	return c.batchJobDocument("status-job", jobID, FeatureBatchJobStatus)
+func (c *RustfsAdmin) StatusBatchJob(ctx context.Context, jobID string) (json.RawMessage, error) {
+	return c.batchJobDocument(ctx, "status-job", jobID, FeatureBatchJobStatus)
 }
 
-func (c *RustfsAdmin) batchJobDocument(relPath, jobID string, feature Feature) (json.RawMessage, error) {
+func (c *RustfsAdmin) batchJobDocument(ctx context.Context, relPath, jobID string, feature Feature) (json.RawMessage, error) {
 	if jobID == "" {
 		return nil, errors.New("job ID is required")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:      "GET",
 		RelPath:     relPath,
@@ -105,7 +101,7 @@ func (c *RustfsAdmin) batchJobDocument(relPath, jobID string, feature Feature) (
 		if IsNoSuchBatchJob(err) {
 			return nil, err
 		}
-		return nil, c.featureErrorPreservingCode(err, feature)
+		return nil, c.featureErrorPreservingCode(ctx, err, feature)
 	}
 	defer drainClose(resp)
 

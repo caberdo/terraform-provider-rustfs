@@ -109,7 +109,7 @@ func (r *SiteReplicationResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 	site := modelToSite(plan)
-	if err := r.client.RustClient.SiteReplicationAdd(site); err != nil {
+	if err := r.client.RustClient.SiteReplicationAdd(ctx, site); err != nil {
 		resp.Diagnostics.AddError("Error creating site replication", "Could not create site replication: "+err.Error())
 		return
 	}
@@ -122,7 +122,7 @@ func (r *SiteReplicationResource) Read(ctx context.Context, req resource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	info, err := r.client.RustClient.SiteReplicationInfo()
+	info, err := r.client.RustClient.SiteReplicationInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading site replication", "Could not read site replication: "+err.Error())
 		return
@@ -153,7 +153,7 @@ func (r *SiteReplicationResource) Update(ctx context.Context, req resource.Updat
 	// remaining peers, so endpoint, credential and TLS changes land in place:
 	// only `name` (the peer identity) forces a replacement.
 	peer := modelToPeerEdit(plan)
-	if err := r.client.RustClient.EditPeer(peer); err != nil {
+	if err := r.client.RustClient.EditPeer(ctx, peer); err != nil {
 		resp.Diagnostics.AddError("Error updating site replication", "Could not update site replication: "+err.Error())
 		return
 	}
@@ -166,7 +166,7 @@ func (r *SiteReplicationResource) Delete(ctx context.Context, req resource.Delet
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.RustClient.RemovePeer([]string{data.Name.ValueString()}); err != nil {
+	if err := r.client.RustClient.RemovePeer(ctx, []string{data.Name.ValueString()}); err != nil {
 		// A site that is not (or no longer) configured is already gone: RustFS
 		// answers 400 InvalidRequest "none of the requested sites are
 		// configured" for the public remove route when none of the requested

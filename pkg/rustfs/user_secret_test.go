@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,7 +34,7 @@ func TestSetUserSecretKey(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.SetUserSecretKey("alice", "new-secret"); err != nil {
+	if err := client.SetUserSecretKey(context.Background(), "alice", "new-secret"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/set-user-secret-key") || !strings.Contains(gotPath, "accessKey=alice") {
@@ -54,7 +55,7 @@ func TestSetUserStatus(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.SetUserStatus("alice", "disabled"); err != nil {
+	if err := client.SetUserStatus(context.Background(), "alice", "disabled"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/set-user-status") ||
@@ -71,7 +72,7 @@ func TestAttachPolicyToUser(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	if err := client.AttachPolicyToUser("alice", "readwrite"); err != nil {
+	if err := client.AttachPolicyToUser(context.Background(), "alice", "readwrite"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/set-user-or-group-policy") ||

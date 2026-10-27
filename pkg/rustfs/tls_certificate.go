@@ -74,9 +74,7 @@ type TLSCertificatePublishReceipt struct {
 
 // tlsCertificate issues one request against an admin route below
 // /rustfs/admin/v3 and decodes the JSON response into out.
-func (c *RustfsAdmin) tlsCertificate(method, relPath string, body []byte, out any) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+func (c *RustfsAdmin) tlsCertificate(ctx context.Context, method, relPath string, body []byte, out any) error {
 
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:  method,
@@ -98,11 +96,11 @@ func (c *RustfsAdmin) tlsCertificate(method, relPath string, body []byte, out an
 // (GET /rustfs/admin/v3/tls/certificate-state). The route is registered on
 // RustFS 1.0.1 but answers 501, which is returned as an
 // *UnsupportedFeatureError naming the route and the server version.
-func (c *RustfsAdmin) GetTLSCertificateState() (TLSCertificateState, error) {
+func (c *RustfsAdmin) GetTLSCertificateState(ctx context.Context) (TLSCertificateState, error) {
 	var state TLSCertificateState
-	err := c.tlsCertificate(http.MethodGet, "tls/certificate-state", nil, &state)
+	err := c.tlsCertificate(ctx, http.MethodGet, "tls/certificate-state", nil, &state)
 	if err != nil {
-		return TLSCertificateState{}, c.featureError(err, FeatureTLSCertificate)
+		return TLSCertificateState{}, c.featureError(ctx, err, FeatureTLSCertificate)
 	}
 	return state, nil
 }
@@ -119,12 +117,12 @@ func (c *RustfsAdmin) GetTLSCertificateState() (TLSCertificateState, error) {
 //
 // The request must fit the server's 128 KiB body limit, otherwise
 // ErrTLSPublishTooLarge is returned without contacting the server.
-func (c *RustfsAdmin) PublishTLSCertificate(certificatePEM, privateKeyPEM string) (TLSCertificatePublishReceipt, error) {
+func (c *RustfsAdmin) PublishTLSCertificate(ctx context.Context, certificatePEM, privateKeyPEM string) (TLSCertificatePublishReceipt, error) {
 	if len(certificatePEM)+len(privateKeyPEM) > TLSPublishBodyLimit {
 		return TLSCertificatePublishReceipt{}, ErrTLSPublishTooLarge
 	}
 
-	state, err := c.GetTLSCertificateState()
+	state, err := c.GetTLSCertificateState(ctx)
 	if err != nil {
 		return TLSCertificatePublishReceipt{}, err
 	}
@@ -145,8 +143,8 @@ func (c *RustfsAdmin) PublishTLSCertificate(certificatePEM, privateKeyPEM string
 	}
 
 	var receipt TLSCertificatePublishReceipt
-	if err := c.tlsCertificate(http.MethodPost, "tls/certificate", body, &receipt); err != nil {
-		return TLSCertificatePublishReceipt{}, c.featureError(err, FeatureTLSCertificate)
+	if err := c.tlsCertificate(ctx, http.MethodPost, "tls/certificate", body, &receipt); err != nil {
+		return TLSCertificatePublishReceipt{}, c.featureError(ctx, err, FeatureTLSCertificate)
 	}
 	return receipt, nil
 }

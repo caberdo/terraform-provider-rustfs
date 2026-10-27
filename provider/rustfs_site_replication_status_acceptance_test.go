@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -35,7 +36,7 @@ func siteReplicationAcceptancePeer(t *testing.T) (name, deploymentID string) {
 		Ssl:          false,
 	})
 
-	info, err := client.SiteReplicationInfo()
+	info, err := client.SiteReplicationInfo(context.Background())
 	if err != nil {
 		t.Skipf("site-replication info is unavailable on this server: %v", err)
 	}
@@ -50,7 +51,7 @@ func siteReplicationAcceptancePeer(t *testing.T) (name, deploymentID string) {
 		}
 	}
 
-	status, err := client.SiteReplicationStatus()
+	status, err := client.SiteReplicationStatus(context.Background())
 	if err != nil {
 		t.Skipf("site-replication status is unavailable on this server: %v", err)
 	}

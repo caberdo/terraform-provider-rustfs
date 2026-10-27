@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -34,7 +35,7 @@ func TestListNotificationTargets(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"notify_enabled":true,"notification_endpoints":[{"account_id":"primary","service":"amqp","status":"online","health_state":"online","health_reason":"reachable","source":"persisted"}]}`))
 	})
-	targets, err := client.ListNotificationTargets()
+	targets, err := client.ListNotificationTargets(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +69,7 @@ func TestSetNotificationTarget(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	err := client.SetNotificationTarget("amqp", "primary", []TargetKeyValue{
+	err := client.SetNotificationTarget(context.Background(), "amqp", "primary", []TargetKeyValue{
 		{Key: "url", Value: "amqps://mq:5671/"},
 		{Key: "enable", Value: "on"},
 	})
@@ -87,7 +88,7 @@ func TestResetNotificationTarget(t *testing.T) {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	if err := client.ResetNotificationTarget("amqp", "primary"); err != nil {
+	if err := client.ResetNotificationTarget(context.Background(), "amqp", "primary"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

@@ -38,7 +38,7 @@ func TestQuotaReadWithRetry(t *testing.T) {
 
 	t.Run("retries transient then succeeds", func(t *testing.T) {
 		calls := 0
-		read := func(bucket string) (rustfs.Quota, error) {
+		read := func(_ context.Context, bucket string) (rustfs.Quota, error) {
 			calls++
 			if calls < 3 {
 				return rustfs.Quota{}, transientErr
@@ -55,7 +55,7 @@ func TestQuotaReadWithRetry(t *testing.T) {
 	})
 
 	t.Run("permanent error fails fast", func(t *testing.T) {
-		read := func(bucket string) (rustfs.Quota, error) {
+		read := func(_ context.Context, bucket string) (rustfs.Quota, error) {
 			return rustfs.Quota{}, errors.New("NoSuchBucket")
 		}
 		start := time.Now()
@@ -72,7 +72,7 @@ func TestQuotaReadWithRetry(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		calls := 0
-		read := func(bucket string) (rustfs.Quota, error) {
+		read := func(_ context.Context, bucket string) (rustfs.Quota, error) {
 			calls++
 			cancel()
 			return rustfs.Quota{}, transientErr
@@ -89,7 +89,7 @@ func TestQuotaSetWithRetry(t *testing.T) {
 
 	t.Run("retries transient then succeeds", func(t *testing.T) {
 		calls := 0
-		set := func(q rustfs.Quota) (rustfs.Quota, error) {
+		set := func(_ context.Context, q rustfs.Quota) (rustfs.Quota, error) {
 			calls++
 			if calls < 3 {
 				return rustfs.Quota{}, transientErr
@@ -107,7 +107,7 @@ func TestQuotaSetWithRetry(t *testing.T) {
 	})
 
 	t.Run("permanent error fails fast", func(t *testing.T) {
-		set := func(q rustfs.Quota) (rustfs.Quota, error) {
+		set := func(_ context.Context, q rustfs.Quota) (rustfs.Quota, error) {
 			return rustfs.Quota{}, errors.New("InvalidArgument")
 		}
 		start := time.Now()

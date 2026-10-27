@@ -17,7 +17,7 @@ type UserMFAStatus struct {
 }
 
 // ReadUserMFA returns the MFA status of a user.
-func (c *RustfsAdmin) ReadUserMFA(accessKey string) (UserMFAStatus, error) {
+func (c *RustfsAdmin) ReadUserMFA(ctx context.Context, accessKey string) (UserMFAStatus, error) {
 	var status UserMFAStatus
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", accessKey)
@@ -26,8 +26,6 @@ func (c *RustfsAdmin) ReadUserMFA(accessKey string) (UserMFAStatus, error) {
 		RelPath:     "user/mfa",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return status, err
@@ -35,23 +33,4 @@ func (c *RustfsAdmin) ReadUserMFA(accessKey string) (UserMFAStatus, error) {
 	defer drainClose(resp)
 	err = json.NewDecoder(resp.Body).Decode(&status)
 	return status, err
-}
-
-// ClearUserMFA clears the second factor of a user.
-func (c *RustfsAdmin) ClearUserMFA(accessKey string) error {
-	urlValues := make(url.Values)
-	urlValues.Set("accessKey", accessKey)
-	req_data := RequestData{
-		Method:      "DELETE",
-		RelPath:     "user/mfa",
-		QueryValues: urlValues,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	resp, err := c.doRequest(ctx, req_data)
-	if err != nil {
-		return err
-	}
-	drainClose(resp)
-	return nil
 }

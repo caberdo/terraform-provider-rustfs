@@ -67,7 +67,7 @@ func (d *IamBackupDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	data, err := d.client.RustClient.ExportIam()
+	data, err := d.client.RustClient.ExportIam(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error exporting IAM data",

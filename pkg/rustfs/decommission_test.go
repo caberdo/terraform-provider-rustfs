@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -59,7 +60,7 @@ func TestDecommissionStatuses(t *testing.T) {
 
 	client := newDecommissionTestClient(server)
 
-	statuses, err := client.DecommissionStatuses()
+	statuses, err := client.DecommissionStatuses(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestDecommissionStatusesRejectsMalformedPayload(t *testing.T) {
 
 	client := newDecommissionTestClient(server)
 
-	if _, err := client.DecommissionStatuses(); err == nil {
+	if _, err := client.DecommissionStatuses(context.Background()); err == nil {
 		t.Fatal("expected a decode error")
 	}
 }
@@ -109,9 +110,9 @@ func TestPoolDecommissionMutations(t *testing.T) {
 		call    func(*RustfsAdmin) error
 		relPath string
 	}{
-		{name: "start", call: func(c *RustfsAdmin) error { return c.StartPoolDecommission(pool) }, relPath: "/rustfs/admin/v3/pools/decommission"},
-		{name: "cancel", call: func(c *RustfsAdmin) error { return c.CancelPoolDecommission(pool) }, relPath: "/rustfs/admin/v3/pools/cancel"},
-		{name: "clear", call: func(c *RustfsAdmin) error { return c.ClearPoolDecommission(pool) }, relPath: "/rustfs/admin/v3/pools/clear"},
+		{name: "start", call: func(c *RustfsAdmin) error { return c.StartPoolDecommission(context.Background(), pool) }, relPath: "/rustfs/admin/v3/pools/decommission"},
+		{name: "cancel", call: func(c *RustfsAdmin) error { return c.CancelPoolDecommission(context.Background(), pool) }, relPath: "/rustfs/admin/v3/pools/cancel"},
+		{name: "clear", call: func(c *RustfsAdmin) error { return c.ClearPoolDecommission(context.Background(), pool) }, relPath: "/rustfs/admin/v3/pools/clear"},
 	}
 
 	for _, tc := range cases {
@@ -151,7 +152,7 @@ func TestDecommissionErrorsAreStructured(t *testing.T) {
 
 	client := newDecommissionTestClient(server)
 
-	err := client.StartPoolDecommission("/nope")
+	err := client.StartPoolDecommission(context.Background(), "/nope")
 	if !IsAPIErrorCode(err, "InvalidArgument") {
 		t.Fatalf("expected an InvalidArgument APIError, got %T: %v", err, err)
 	}
@@ -179,7 +180,7 @@ func TestDecommissionNotImplementedIsFeatureGated(t *testing.T) {
 
 	client := newDecommissionTestClient(server)
 
-	_, err := client.DecommissionStatuses()
+	_, err := client.DecommissionStatuses(context.Background())
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}

@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -122,7 +123,7 @@ func TestIntegrityReadiness(t *testing.T) {
 		_, _ = io.WriteString(w, integrityReadinessPayload)
 	})
 
-	readiness, err := client.IntegrityReadiness()
+	readiness, err := client.IntegrityReadiness(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,7 +147,7 @@ func TestIntegrityInventorySendsPageParameters(t *testing.T) {
 		_, _ = io.WriteString(w, integrityInventoryPayload)
 	})
 
-	page, err := client.IntegrityInventory("logs", "reports/", "reports/a.csv", "null", 25)
+	page, err := client.IntegrityInventory(context.Background(), "logs", "reports/", "reports/a.csv", "null", 25)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -195,7 +196,7 @@ func TestIntegrityInventoryOmitsEmptyParameters(t *testing.T) {
 		_, _ = io.WriteString(w, integrityInventoryPayload)
 	})
 
-	if _, err := client.IntegrityInventory("logs", "", "", "", 0); err != nil {
+	if _, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotQuery != "" {
@@ -216,7 +217,7 @@ func TestIntegrityCreateJob(t *testing.T) {
 		_, _ = io.WriteString(w, integrityJobPayload)
 	})
 
-	job, err := client.CreateIntegrityJob("logs", rustfs.IntegrityJobRequest{
+	job, err := client.CreateIntegrityJob(context.Background(), "logs", rustfs.IntegrityJobRequest{
 		Mode: "audit",
 		Items: []rustfs.IntegrityItemRequest{{
 			Key:            "reports/2026.csv",
@@ -263,7 +264,7 @@ func TestIntegrityGetJob(t *testing.T) {
 		_, _ = io.WriteString(w, integrityJobPayload)
 	})
 
-	job, err := client.IntegrityJob("logs", integrityJobID)
+	job, err := client.IntegrityJob(context.Background(), "logs", integrityJobID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -282,7 +283,7 @@ func TestIntegrityJobMissingIsNoSuchKey(t *testing.T) {
 		_, _ = io.WriteString(w, `<Error><Code>NoSuchKey</Code><Message>integrity job not found</Message></Error>`)
 	})
 
-	_, err := client.IntegrityJob("logs", integrityJobID)
+	_, err := client.IntegrityJob(context.Background(), "logs", integrityJobID)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -307,7 +308,7 @@ func TestIntegrityControlJobSendsOperation(t *testing.T) {
 		_, _ = io.WriteString(w, integrityJobPayload)
 	})
 
-	if _, err := client.ControlIntegrityJob("logs", integrityJobID, rustfs.IntegrityControlCancel); err != nil {
+	if _, err := client.ControlIntegrityJob(context.Background(), "logs", integrityJobID, rustfs.IntegrityControlCancel); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotMethod != http.MethodPost || !strings.HasSuffix(gotPath, "/integrity/logs/jobs/"+integrityJobID+"/control") {
@@ -332,7 +333,7 @@ func TestIntegrityJobUnsupportedRouteCarriesVersion(t *testing.T) {
 		}
 	})
 
-	_, err := client.CreateIntegrityJob("logs", rustfs.IntegrityJobRequest{Mode: "audit"})
+	_, err := client.CreateIntegrityJob(context.Background(), "logs", rustfs.IntegrityJobRequest{Mode: "audit"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -355,18 +356,18 @@ func TestIntegrityDecodeErrors(t *testing.T) {
 	})
 
 	calls := map[string]func() error{
-		"readiness": func() error { _, err := client.IntegrityReadiness(); return err },
+		"readiness": func() error { _, err := client.IntegrityReadiness(context.Background()); return err },
 		"inventory": func() error {
-			_, err := client.IntegrityInventory("logs", "", "", "", 0)
+			_, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0)
 			return err
 		},
 		"create": func() error {
-			_, err := client.CreateIntegrityJob("logs", rustfs.IntegrityJobRequest{Mode: "audit"})
+			_, err := client.CreateIntegrityJob(context.Background(), "logs", rustfs.IntegrityJobRequest{Mode: "audit"})
 			return err
 		},
-		"status": func() error { _, err := client.IntegrityJob("logs", integrityJobID); return err },
+		"status": func() error { _, err := client.IntegrityJob(context.Background(), "logs", integrityJobID); return err },
 		"control": func() error {
-			_, err := client.ControlIntegrityJob("logs", integrityJobID, rustfs.IntegrityControlPause)
+			_, err := client.ControlIntegrityJob(context.Background(), "logs", integrityJobID, rustfs.IntegrityControlPause)
 			return err
 		},
 	}
@@ -387,18 +388,18 @@ func TestIntegrityServerErrorsAreNotCapabilityGaps(t *testing.T) {
 	})
 
 	calls := map[string]func() error{
-		"readiness": func() error { _, err := client.IntegrityReadiness(); return err },
+		"readiness": func() error { _, err := client.IntegrityReadiness(context.Background()); return err },
 		"inventory": func() error {
-			_, err := client.IntegrityInventory("logs", "", "", "", 0)
+			_, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0)
 			return err
 		},
 		"create": func() error {
-			_, err := client.CreateIntegrityJob("logs", rustfs.IntegrityJobRequest{Mode: "audit"})
+			_, err := client.CreateIntegrityJob(context.Background(), "logs", rustfs.IntegrityJobRequest{Mode: "audit"})
 			return err
 		},
-		"status": func() error { _, err := client.IntegrityJob("logs", integrityJobID); return err },
+		"status": func() error { _, err := client.IntegrityJob(context.Background(), "logs", integrityJobID); return err },
 		"control": func() error {
-			_, err := client.ControlIntegrityJob("logs", integrityJobID, rustfs.IntegrityControlPause)
+			_, err := client.ControlIntegrityJob(context.Background(), "logs", integrityJobID, rustfs.IntegrityControlPause)
 			return err
 		},
 	}
@@ -425,7 +426,7 @@ func TestIntegrityMethodNotAllowedIsUnsupported(t *testing.T) {
 		_, _ = io.WriteString(w, `<Error><Code>MethodNotAllowed</Code><Message>method not allowed</Message></Error>`)
 	})
 
-	_, err := client.IntegrityReadiness()
+	_, err := client.IntegrityReadiness(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -448,7 +449,7 @@ func TestIntegrityReadinessMissingRouteIsUnsupported(t *testing.T) {
 		}
 	})
 
-	_, err := client.IntegrityReadiness()
+	_, err := client.IntegrityReadiness(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -469,7 +470,7 @@ func TestIntegrityTransportErrorIsNotACapabilityGap(t *testing.T) {
 	})
 	server.Close()
 
-	if _, err := client.IntegrityInventory("logs", "", "", "", 0); err == nil {
+	if _, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0); err == nil {
 		t.Fatal("expected a transport error")
 	} else if rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("a transport error must not be a capability gap: %v", err)
@@ -485,11 +486,11 @@ func TestIntegrityMissingBucketIsNotACapabilityGap(t *testing.T) {
 
 	calls := map[string]func() error{
 		"inventory": func() error {
-			_, err := client.IntegrityInventory("logs", "", "", "", 0)
+			_, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0)
 			return err
 		},
 		"create": func() error {
-			_, err := client.CreateIntegrityJob("logs", rustfs.IntegrityJobRequest{Mode: "audit"})
+			_, err := client.CreateIntegrityJob(context.Background(), "logs", rustfs.IntegrityJobRequest{Mode: "audit"})
 			return err
 		},
 	}
@@ -523,7 +524,7 @@ func TestIntegrityUnregisteredBucketRouteIsUnsupported(t *testing.T) {
 		}
 	})
 
-	_, err := client.IntegrityInventory("logs", "", "", "", 0)
+	_, err := client.IntegrityInventory(context.Background(), "logs", "", "", "", 0)
 	if err == nil {
 		t.Fatal("expected an error")
 	}

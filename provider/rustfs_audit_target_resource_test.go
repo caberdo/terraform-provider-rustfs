@@ -423,7 +423,7 @@ func testAccAuditTargetPreCheck(t *testing.T) {
 	probeConfig := []rustfs.TargetKeyValue{
 		{Key: "endpoint", Value: "https://hooks.example.com/webhook/" + probe},
 	}
-	err := client.SetAuditTarget("audit_webhook", probe, probeConfig)
+	err := client.SetAuditTarget(context.Background(), "audit_webhook", probe, probeConfig)
 	if err != nil {
 		if strings.Contains(err.Error(), "audit module is disabled") {
 			t.Skipf("audit module is disabled on the running RustFS; skipping: %v", err)
@@ -431,7 +431,7 @@ func testAccAuditTargetPreCheck(t *testing.T) {
 		t.Fatalf("audit target management is not available on the running RustFS, skipping: %v", err)
 	}
 	// Clean up the probe target so it does not linger in the server config.
-	if err := client.ResetAuditTarget("audit_webhook", probe); err != nil {
+	if err := client.ResetAuditTarget(context.Background(), "audit_webhook", probe); err != nil {
 		t.Logf("could not clean up audit target probe %s: %v", probe, err)
 	}
 }
@@ -460,7 +460,7 @@ func testAccCheckAuditTargetExists(name string) resource.TestCheckFunc {
 		}
 
 		client := testAccRustClient()
-		targets, err := client.ListAuditTargets()
+		targets, err := client.ListAuditTargets(context.Background())
 		if err != nil {
 			return err
 		}
@@ -480,7 +480,7 @@ func testAccCheckAuditTargetExists(name string) resource.TestCheckFunc {
 func testAccCheckAuditTargetConfigValue(name, key, want string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		kvs, err := client.GetConfig("audit_webhook:" + name)
+		kvs, err := client.GetConfig(context.Background(), "audit_webhook:"+name)
 		if err != nil {
 			return fmt.Errorf("failed to read audit target %s config from the server: %w", name, err)
 		}
@@ -502,7 +502,7 @@ func testAccCheckAuditTargetConfigValue(name, key, want string) resource.TestChe
 func testAccCheckAuditTargetGone(name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		targets, err := client.ListAuditTargets()
+		targets, err := client.ListAuditTargets(context.Background())
 		if err != nil {
 			return err
 		}
@@ -520,7 +520,7 @@ func testAccCheckAuditTargetGone(name string) resource.TestCheckFunc {
 func testAccAuditTargetResetOutOfBand(name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.ResetAuditTarget("audit_webhook", name); err != nil {
+		if err := client.ResetAuditTarget(context.Background(), "audit_webhook", name); err != nil {
 			return fmt.Errorf("failed to reset audit target %s out of band: %w", name, err)
 		}
 		return nil
@@ -529,7 +529,7 @@ func testAccAuditTargetResetOutOfBand(name string) resource.TestCheckFunc {
 
 func testAccCheckAuditTargetDestroy(s *terraform.State) error {
 	client := testAccRustClient()
-	targets, err := client.ListAuditTargets()
+	targets, err := client.ListAuditTargets(context.Background())
 	if err != nil {
 		return err
 	}

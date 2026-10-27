@@ -50,7 +50,7 @@ func TestAccLdapServiceAccount(t *testing.T) {
 	// rejects the create with "target user not exist". Skip in that case so
 	// the acceptance run stays green on clusters without an LDAP IdP.
 	probeKey := accessKey + "-probe"
-	err := client.CreateLDAPServiceAccount(rustfs.ServiceAccount{
+	err := client.CreateLDAPServiceAccount(context.Background(), rustfs.ServiceAccount{
 		AccessKey:  probeKey,
 		SecretKey:  "probeSecret",
 		Name:       "ldap-probe",
@@ -61,7 +61,7 @@ func TestAccLdapServiceAccount(t *testing.T) {
 			"(RustFS 1.0.x cannot be given an LDAP identity provider; the CRUD flows are covered "+
 			"by TestLDAPServiceAccountResource* against a mocked admin API)", dn, err)
 	}
-	if delErr := client.DeleteServiceAccount(rustfs.ServiceAccount{AccessKey: probeKey}); delErr != nil {
+	if delErr := client.DeleteServiceAccount(context.Background(), rustfs.ServiceAccount{AccessKey: probeKey}); delErr != nil {
 		t.Fatalf("could not clean up probe service account: %v", delErr)
 	}
 
@@ -121,7 +121,7 @@ func testAccCheckLdapServiceAccountDestroy(s *terraform.State) error {
 		if accessKey == "" {
 			continue
 		}
-		_, err := client.ReadServiceAccount(accessKey)
+		_, err := client.ReadServiceAccount(context.Background(), accessKey)
 		if err == nil {
 			return fmt.Errorf("service account %s still exists", accessKey)
 		}

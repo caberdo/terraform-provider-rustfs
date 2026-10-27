@@ -269,7 +269,7 @@ func testAccScannerCycleStateResetPreCheck(t *testing.T) {
 
 	client := testAccRustClient()
 	_, err := resetWithScannerLeaderRetry(context.Background(), func() (rustfs.ScannerCycleStateResetResult, error) {
-		return client.ResetScannerCycleState()
+		return client.ResetScannerCycleState(context.Background())
 	})
 	if err != nil {
 		if rustfs.IsUnsupportedFeature(err) {

@@ -391,7 +391,7 @@ func TestAccPluginsDataSource(t *testing.T) {
 		PreCheck: func() {
 			testAccV4Readable(t, func() error {
 				client := testAccRustClient()
-				_, err := client.GetPluginCatalog()
+				_, err := client.GetPluginCatalog(context.Background())
 				return err
 			})
 		},
@@ -416,7 +416,7 @@ func TestAccExtensionsDataSource(t *testing.T) {
 		PreCheck: func() {
 			testAccV4Readable(t, func() error {
 				client := testAccRustClient()
-				_, err := client.GetExtensionCatalog()
+				_, err := client.GetExtensionCatalog(context.Background())
 				return err
 			})
 		},
@@ -441,7 +441,7 @@ func TestAccClusterSnapshotDataSource(t *testing.T) {
 		PreCheck: func() {
 			testAccV4Readable(t, func() error {
 				client := testAccRustClient()
-				_, err := client.GetClusterSnapshot()
+				_, err := client.GetClusterSnapshot(context.Background())
 				return err
 			})
 		},

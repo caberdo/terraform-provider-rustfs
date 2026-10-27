@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
@@ -30,17 +31,17 @@ func TestCreateAndDeletePolicy(t *testing.T) {
 		Name:      name,
 		Statement: statements,
 	}
-	err := dut.CreatePolicy(policy)
+	err := dut.CreatePolicy(context.Background(), policy)
 	if err != nil {
 		t.Error(err)
 	}
 
-	read, _ := dut.ReadPolicy(policy.Name)
+	read, _ := dut.ReadPolicy(context.Background(), policy.Name)
 	if read.Name != policy.Name {
 		t.Error("read back not working")
 	}
 
-	err = dut.DeletePolicy(name)
+	err = dut.DeletePolicy(context.Background(), name)
 	if err != nil {
 		t.Error(err)
 	}

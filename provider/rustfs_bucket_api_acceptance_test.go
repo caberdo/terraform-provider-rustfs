@@ -553,7 +553,7 @@ func testAccBucketNotificationPreCheck(t *testing.T) {
 	testAccEnsureModuleEnabled(t, "notify")
 
 	client := testAccRustClient()
-	if err := client.SetNotificationTarget("notify_webhook", bucketNotificationTargetID, []rustfs.TargetKeyValue{
+	if err := client.SetNotificationTarget(context.Background(), "notify_webhook", bucketNotificationTargetID, []rustfs.TargetKeyValue{
 		{Key: "endpoint", Value: endpoint},
 	}); err != nil {
 		if strings.Contains(err.Error(), "module is disabled") {
@@ -562,7 +562,7 @@ func testAccBucketNotificationPreCheck(t *testing.T) {
 		t.Fatalf("could not register the notification target fixture: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := client.ResetNotificationTarget("notify_webhook", bucketNotificationTargetID); err != nil {
+		if err := client.ResetNotificationTarget(context.Background(), "notify_webhook", bucketNotificationTargetID); err != nil {
 			t.Logf("could not reset notification target fixture %s: %v", bucketNotificationTargetID, err)
 		}
 	})

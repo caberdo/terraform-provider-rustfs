@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -26,7 +27,7 @@ func TestExportIam(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	data, err := client.ExportIam()
+	data, err := client.ExportIam(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +51,7 @@ func TestImportIam(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.ImportIam([]byte("fake-zip-data"))
+	err := client.ImportIam(context.Background(), []byte("fake-zip-data"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -101,7 +101,7 @@ type ReplicationMRF struct {
 // ReplicationDiff computes the object versions of bucket that are still
 // pending or failed, optionally restricted to prefix, through
 // POST /rustfs/admin/v3/replication/diff.
-func (c *RustfsAdmin) ReplicationDiff(bucket, prefix string) (ReplicationDiff, error) {
+func (c *RustfsAdmin) ReplicationDiff(ctx context.Context, bucket, prefix string) (ReplicationDiff, error) {
 	if bucket == "" {
 		return ReplicationDiff{}, errors.New("bucket is required")
 	}
@@ -114,8 +114,6 @@ func (c *RustfsAdmin) ReplicationDiff(bucket, prefix string) (ReplicationDiff, e
 		query.Set("prefix", prefix)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:      "POST",
 		RelPath:     "replication/diff",
@@ -128,7 +126,7 @@ func (c *RustfsAdmin) ReplicationDiff(bucket, prefix string) (ReplicationDiff, e
 				ReplicationConfigured: false,
 			}, nil
 		}
-		return ReplicationDiff{}, c.featureErrorPreservingCode(err, FeatureReplicationDiff)
+		return ReplicationDiff{}, c.featureErrorPreservingCode(ctx, err, FeatureReplicationDiff)
 	}
 	defer drainClose(resp)
 
@@ -148,13 +146,11 @@ func (c *RustfsAdmin) ReplicationDiff(bucket, prefix string) (ReplicationDiff, e
 
 // ReplicationMRF returns the failed-replication backlog counters of bucket
 // from GET /rustfs/admin/v3/replication/mrf?aggregate=true.
-func (c *RustfsAdmin) ReplicationMRF(bucket string) (ReplicationMRF, error) {
+func (c *RustfsAdmin) ReplicationMRF(ctx context.Context, bucket string) (ReplicationMRF, error) {
 	if bucket == "" {
 		return ReplicationMRF{}, errors.New("bucket is required")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, RequestData{
 		Method:  "GET",
 		RelPath: "replication/mrf",
@@ -171,7 +167,7 @@ func (c *RustfsAdmin) ReplicationMRF(bucket string) (ReplicationMRF, error) {
 				ReplicationConfigured: false,
 			}, nil
 		}
-		return ReplicationMRF{}, c.featureErrorPreservingCode(err, FeatureReplicationMRF)
+		return ReplicationMRF{}, c.featureErrorPreservingCode(ctx, err, FeatureReplicationMRF)
 	}
 	defer drainClose(resp)
 

@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -30,7 +31,7 @@ func TestAccTLSCertificate_basic(t *testing.T) {
 	}
 
 	client := testAccTLSCertificateClient(t, endpoint)
-	if _, err := client.GetTLSCertificateState(); err != nil {
+	if _, err := client.GetTLSCertificateState(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("the running RustFS does not implement TLS certificate management, skipping: %v", err)
 		}
@@ -162,7 +163,7 @@ func testAccCheckTLSCertificateDestroy(client *rustfs.RustfsAdmin, published *st
 			return nil
 		}
 
-		certificateState, err := client.GetTLSCertificateState()
+		certificateState, err := client.GetTLSCertificateState(context.Background())
 		if err != nil {
 			return fmt.Errorf("read the served TLS certificate after destroy: %w", err)
 		}
@@ -181,7 +182,7 @@ func testAccWaitTLSCertificateServed(client *rustfs.RustfsAdmin, fingerprint str
 	return func(*terraform.State) error {
 		deadline := time.Now().Add(30 * time.Second)
 		for {
-			certificateState, err := client.GetTLSCertificateState()
+			certificateState, err := client.GetTLSCertificateState(context.Background())
 			if err == nil && certificateState.ObservedCertificateFingerprint != nil &&
 				*certificateState.ObservedCertificateFingerprint == fingerprint {
 				return nil

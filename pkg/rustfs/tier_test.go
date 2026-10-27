@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -33,7 +34,7 @@ func TestAddTier(t *testing.T) {
 	client.accessSecret = "secret"
 
 	config := json.RawMessage(`{"tier_type":"s3","s3":{"name":"MYTIER"}}`)
-	err := client.AddTier(config)
+	err := client.AddTier(context.Background(), config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -54,7 +55,7 @@ func TestRemoveTier(t *testing.T) {
 	})
 	client.accessSecret = "secret"
 
-	err := client.RemoveTier("MYTIER")
+	err := client.RemoveTier(context.Background(), "MYTIER")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestListTiers(t *testing.T) {
 				Endpoint: server.Listener.Addr().String(),
 			})
 
-			got, err := client.ListTiers()
+			got, err := client.ListTiers(context.Background())
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected an error")
@@ -223,7 +224,7 @@ func TestTierExists(t *testing.T) {
 				Endpoint: server.Listener.Addr().String(),
 			})
 
-			exists, err := client.TierExists("MYTIER")
+			exists, err := client.TierExists(context.Background(), "MYTIER")
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected an error")
@@ -249,7 +250,7 @@ func TestListTiersCapabilityError(t *testing.T) {
 
 	client := New(&RustfsAdminConfig{Endpoint: server.Listener.Addr().String()})
 
-	if _, err := client.ListTiers(); !IsUnsupportedFeature(err) {
+	if _, err := client.ListTiers(context.Background()); !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an unsupported-feature error, got %v", err)
 	}
 }

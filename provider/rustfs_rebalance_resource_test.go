@@ -715,7 +715,7 @@ func testAccRebalancePreCheck(t *testing.T) {
 		pools []rustfs.PoolInfo
 		err   error
 	)
-	pools, err = client.ListPools()
+	pools, err = client.ListPools(context.Background())
 	if err != nil {
 		t.Skipf("could not list pools to confirm the deployment can rebalance: %v", err)
 	}

@@ -369,7 +369,7 @@ func (r *IntegrityJobResource) Create(ctx context.Context, req resource.CreateRe
 
 	mode := plan.Mode.ValueString()
 	if mode == rustfs.IntegrityModeMigrate {
-		readiness, err := r.client.RustClient.IntegrityReadiness()
+		readiness, err := r.client.RustClient.IntegrityReadiness(ctx)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error reading data-integrity readiness",
@@ -412,7 +412,7 @@ func (r *IntegrityJobResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	bucket := plan.Bucket.ValueString()
-	job, err := r.client.RustClient.CreateIntegrityJob(bucket, request)
+	job, err := r.client.RustClient.CreateIntegrityJob(ctx, bucket, request)
 	if err != nil {
 		addIntegrityJobError(&resp.Diagnostics, "Error creating integrity job", "create a job for bucket "+bucket, err)
 		return
@@ -429,11 +429,11 @@ func (r *IntegrityJobResource) Create(ctx context.Context, req resource.CreateRe
 	// The server creates the job paused and only runs it after a resume. If the
 	// resume is refused (another worker is active, or the job changed), cancel
 	// the paused job so a failed apply does not leave a stuck record.
-	job, err = r.client.RustClient.ControlIntegrityJob(bucket, job.ID, rustfs.IntegrityControlResume)
+	job, err = r.client.RustClient.ControlIntegrityJob(ctx, bucket, job.ID, rustfs.IntegrityControlResume)
 	if err != nil {
 		resumeErr := err
 		var cancelErr error
-		_, cancelErr = r.client.RustClient.ControlIntegrityJob(bucket, job.ID, rustfs.IntegrityControlCancel)
+		_, cancelErr = r.client.RustClient.ControlIntegrityJob(ctx, bucket, job.ID, rustfs.IntegrityControlCancel)
 		detail := "Created job " + job.ID + " but RustFS refused to resume it: " + resumeErr.Error() + "."
 		if cancelErr == nil {
 			detail += " The paused job was cancelled."
@@ -468,7 +468,7 @@ func (r *IntegrityJobResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	job, err := r.client.RustClient.IntegrityJob(bucket, jobID)
+	job, err := r.client.RustClient.IntegrityJob(ctx, bucket, jobID)
 	if err != nil {
 		// A job the server no longer holds is NoSuchKey on an implemented route;
 		// PreconditionFailed means the bucket generation changed and the record no
@@ -515,17 +515,17 @@ func (r *IntegrityJobResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	_, err := r.client.RustClient.ControlIntegrityJob(bucket, jobID, rustfs.IntegrityControlCancel)
+	_, err := r.client.RustClient.ControlIntegrityJob(ctx, bucket, jobID, rustfs.IntegrityControlCancel)
 	if err != nil {
 		// A stale generation or a concurrent revision change both answer
 		// PreconditionFailed. Re-read once: only the former means this record no
 		// longer names a cancellable job. A concurrent change gets one retry.
 		if rustfs.IsAPIErrorCode(err, "PreconditionFailed") {
-			if _, readErr := r.client.RustClient.IntegrityJob(bucket, jobID); integrityJobStale(readErr) {
+			if _, readErr := r.client.RustClient.IntegrityJob(ctx, bucket, jobID); integrityJobStale(readErr) {
 				tflog.Debug(ctx, "integrity job no longer applies; nothing to cancel", map[string]any{"job_id": jobID})
 				return
 			}
-			if _, err = r.client.RustClient.ControlIntegrityJob(bucket, jobID, rustfs.IntegrityControlCancel); err == nil {
+			if _, err = r.client.RustClient.ControlIntegrityJob(ctx, bucket, jobID, rustfs.IntegrityControlCancel); err == nil {
 				tflog.Trace(ctx, "cancelled a data-integrity job after a concurrent change", map[string]any{"job_id": jobID})
 				return
 			}

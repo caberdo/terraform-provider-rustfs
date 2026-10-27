@@ -228,7 +228,7 @@ data "rustfs_runtime_capabilities" "test" {}
 func testAccV4PreCheck(t *testing.T) {
 	testAccPreCheck(t)
 	client := testAccRustClient()
-	if _, err := client.GetRuntimeCapabilities(); err != nil {
+	if _, err := client.GetRuntimeCapabilities(context.Background()); err != nil {
 		if rustfs.IsUnsupportedFeature(err) {
 			t.Skipf("the v4 admin API is not served by the running RustFS, skipping: %v", err)
 		}

@@ -89,7 +89,7 @@ func readQuotaEventually(t *testing.T, dut rustfs.RustfsAdmin, bucket string) ru
 	var quota rustfs.Quota
 	retryQuotaColdStart(t, func() error {
 		var err error
-		quota, err = dut.ReadQuota(bucket)
+		quota, err = dut.ReadQuota(context.Background(), bucket)
 		return err
 	})
 	return quota
@@ -100,7 +100,7 @@ func setQuotaEventually(t *testing.T, dut rustfs.RustfsAdmin, quota rustfs.Quota
 	var got rustfs.Quota
 	retryQuotaColdStart(t, func() error {
 		var err error
-		got, err = dut.SetQuota(quota)
+		got, err = dut.SetQuota(context.Background(), quota)
 		return err
 	})
 	return got
@@ -135,7 +135,7 @@ func TestCRDQuota(t *testing.T) {
 		t.Error("Readback gave wrong quota")
 	}
 
-	if err := dut.DeletQuota(name); err != nil {
+	if err := dut.DeletQuota(context.Background(), name); err != nil {
 		t.Error("error during quota remove")
 	}
 }

@@ -33,13 +33,11 @@ type auditTargetSetBody struct {
 }
 
 // ListAuditTargets lists all configured audit-log targets.
-func (c *RustfsAdmin) ListAuditTargets() ([]AuditTarget, error) {
+func (c *RustfsAdmin) ListAuditTargets(ctx context.Context) ([]AuditTarget, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "audit/target/list",
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return nil, err
@@ -56,7 +54,7 @@ func (c *RustfsAdmin) ListAuditTargets() ([]AuditTarget, error) {
 // SetAuditTarget adds or edits an audit target, sending keyValues as the
 // target configuration. The server validates the keys against the target type
 // and automatically enables the target.
-func (c *RustfsAdmin) SetAuditTarget(targetType, targetName string, keyValues []TargetKeyValue) error {
+func (c *RustfsAdmin) SetAuditTarget(ctx context.Context, targetType, targetName string, keyValues []TargetKeyValue) error {
 	body := auditTargetSetBody{KeyValues: keyValues}
 	//#nosec G117 — the marshaled body is the target's own configuration and
 	// may contain an auth token, which is expected to be transmitted to the
@@ -70,8 +68,6 @@ func (c *RustfsAdmin) SetAuditTarget(targetType, targetName string, keyValues []
 		RelPath: fmt.Sprintf("audit/target/%s/%s", targetType, targetName),
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err
@@ -82,13 +78,11 @@ func (c *RustfsAdmin) SetAuditTarget(targetType, targetName string, keyValues []
 
 // ResetAuditTarget removes an audit target, reverting it to the server default
 // (the admin API exposes no plain delete for targets).
-func (c *RustfsAdmin) ResetAuditTarget(targetType, targetName string) error {
+func (c *RustfsAdmin) ResetAuditTarget(ctx context.Context, targetType, targetName string) error {
 	reqData := RequestData{
 		Method:  "DELETE",
 		RelPath: fmt.Sprintf("audit/target/%s/%s/reset", targetType, targetName),
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
 		return err

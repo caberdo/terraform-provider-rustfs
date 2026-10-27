@@ -86,7 +86,7 @@ func (r *BucketDurabilityResource) Create(ctx context.Context, req resource.Crea
 		return
 	}
 	d := rustfs.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
-	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
+	read, err := r.client.RustClient.SetBucketDurability(ctx, plan.Bucket.ValueString(), d)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating bucket durability",
@@ -104,7 +104,7 @@ func (r *BucketDurabilityResource) Read(ctx context.Context, req resource.ReadRe
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	read, err := r.client.RustClient.GetBucketDurability(state.Bucket.ValueString())
+	read, err := r.client.RustClient.GetBucketDurability(ctx, state.Bucket.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading bucket durability",
@@ -133,7 +133,7 @@ func (r *BucketDurabilityResource) Update(ctx context.Context, req resource.Upda
 		return
 	}
 	d := rustfs.BucketDurability{Bucket: plan.Bucket.ValueString(), Mode: plan.Mode.ValueString()}
-	read, err := r.client.RustClient.SetBucketDurability(plan.Bucket.ValueString(), d)
+	read, err := r.client.RustClient.SetBucketDurability(ctx, plan.Bucket.ValueString(), d)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating bucket durability",
@@ -151,7 +151,7 @@ func (r *BucketDurabilityResource) Delete(ctx context.Context, req resource.Dele
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	if err := r.client.RustClient.DeleteBucketDurability(data.Bucket.ValueString()); err != nil {
+	if err := r.client.RustClient.DeleteBucketDurability(ctx, data.Bucket.ValueString()); err != nil {
 		// A bucket that no longer exists has no override left to remove:
 		// RustFS answers 500 InternalError "failed to capture bucket
 		// incarnation: Bucket not found: <bucket>" for the delete (probed

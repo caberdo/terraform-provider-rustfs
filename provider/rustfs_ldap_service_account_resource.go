@@ -124,7 +124,7 @@ func (r *LDAPServiceAccountResource) Create(ctx context.Context, req resource.Cr
 		TargetUser:  plan.User.ValueString(),
 		Policy:      plan.Policy.ValueString(),
 	}
-	err := r.client.RustClient.CreateLDAPServiceAccount(account)
+	err := r.client.RustClient.CreateLDAPServiceAccount(ctx, account)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating LDAP service account",
@@ -149,7 +149,7 @@ func (r *LDAPServiceAccountResource) Read(ctx context.Context, req resource.Read
 	// info-service-account endpoint is used. An LDAP service account is a
 	// standard service account, and parentUser carries the LDAP user DN it is
 	// scoped to.
-	actual, err := r.client.RustClient.ReadServiceAccount(state.AccessKey.ValueString())
+	actual, err := r.client.RustClient.ReadServiceAccount(ctx, state.AccessKey.ValueString())
 	if err != nil {
 		// Same missing-account signal as the standard service account resource:
 		// a read answers 404 NoSuchResource, and a server that reports the
@@ -196,7 +196,7 @@ func (r *LDAPServiceAccountResource) Update(ctx context.Context, req resource.Up
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 	}
-	err := r.client.RustClient.UpdateServiceAccount(account)
+	err := r.client.RustClient.UpdateServiceAccount(ctx, account)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error updating LDAP service account",
@@ -225,7 +225,7 @@ func (r *LDAPServiceAccountResource) Delete(ctx context.Context, req resource.De
 	account := rustfs.ServiceAccount{
 		AccessKey: data.AccessKey.ValueString(),
 	}
-	err := r.client.RustClient.DeleteServiceAccount(account)
+	err := r.client.RustClient.DeleteServiceAccount(ctx, account)
 	if err != nil {
 		if isMissingServiceAccount(err) {
 			// Already gone: destroying twice must not fail.

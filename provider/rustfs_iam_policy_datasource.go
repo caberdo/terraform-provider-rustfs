@@ -95,7 +95,7 @@ func (d *IAMPolicyDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	policy, err := d.client.RustClient.ReadPolicy(config.Name.ValueString())
+	policy, err := d.client.RustClient.ReadPolicy(ctx, config.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading policy",

@@ -83,7 +83,7 @@ func (r *ModuleSwitchResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	state, err := r.client.RustClient.SetModuleSwitches(moduleSwitchUpdateFromModel(plan))
+	state, err := r.client.RustClient.SetModuleSwitches(ctx, moduleSwitchUpdateFromModel(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error setting module switches", "Could not set module switches: "+err.Error())
 		return
@@ -102,7 +102,7 @@ func (r *ModuleSwitchResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	switches, err := r.client.RustClient.GetModuleSwitches()
+	switches, err := r.client.RustClient.GetModuleSwitches(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading module switches", "Could not read module switches: "+err.Error())
 		return
@@ -119,7 +119,7 @@ func (r *ModuleSwitchResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	state, err := r.client.RustClient.SetModuleSwitches(moduleSwitchUpdateFromModel(plan))
+	state, err := r.client.RustClient.SetModuleSwitches(ctx, moduleSwitchUpdateFromModel(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error updating module switches", "Could not update module switches: "+err.Error())
 		return

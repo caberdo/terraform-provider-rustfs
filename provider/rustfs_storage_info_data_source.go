@@ -175,7 +175,7 @@ func (d *StorageInfoDataSource) Configure(_ context.Context, req datasource.Conf
 }
 
 func (d *StorageInfoDataSource) Read(ctx context.Context, _ datasource.ReadRequest, resp *datasource.ReadResponse) {
-	info, err := d.client.RustClient.StorageInfo()
+	info, err := d.client.RustClient.StorageInfo(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading storage info",

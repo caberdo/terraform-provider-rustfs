@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"errors"
 	"strings"
 )
@@ -16,12 +17,12 @@ import (
 // such as NoSuchBucket would be reported as "upgrade RustFS" instead of the
 // real cause. This mirrors odmError in on_demand_migration.go and is shared by
 // the batch-job and replication-diagnostic routes.
-func (c *RustfsAdmin) featureErrorPreservingCode(err error, feature Feature) error {
+func (c *RustfsAdmin) featureErrorPreservingCode(ctx context.Context, err error, feature Feature) error {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {
 		if apiErr.Code != "" && !strings.EqualFold(apiErr.Code, "NotImplemented") {
 			return err
 		}
 	}
-	return c.featureError(err, feature)
+	return c.featureError(ctx, err, feature)
 }

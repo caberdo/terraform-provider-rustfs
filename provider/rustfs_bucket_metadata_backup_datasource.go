@@ -63,7 +63,7 @@ func (d *BucketMetadataBackupDataSource) Read(ctx context.Context, req datasourc
 		return
 	}
 
-	data, err := d.client.RustClient.ExportBucketMetadata()
+	data, err := d.client.RustClient.ExportBucketMetadata(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError("Error exporting bucket metadata", "Could not export: "+err.Error())
 		return

@@ -78,7 +78,7 @@ func (r *IamBackupImportResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	if err := r.client.RustClient.ImportIam(data); err != nil {
+	if err := r.client.RustClient.ImportIam(ctx, data); err != nil {
 		resp.Diagnostics.AddError(
 			"Error importing IAM data",
 			"Could not import IAM data: "+err.Error(),
@@ -111,7 +111,7 @@ func (r *IamBackupImportResource) Update(ctx context.Context, req resource.Updat
 		return
 	}
 
-	if err := r.client.RustClient.ImportIam(data); err != nil {
+	if err := r.client.RustClient.ImportIam(ctx, data); err != nil {
 		resp.Diagnostics.AddError(
 			"Error importing IAM data",
 			"Could not import IAM data: "+err.Error(),

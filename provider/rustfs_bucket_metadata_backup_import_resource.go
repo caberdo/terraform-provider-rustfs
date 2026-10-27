@@ -72,7 +72,7 @@ func (r *BucketMetadataBackupImportResource) Create(ctx context.Context, req res
 		return
 	}
 
-	if err := r.client.RustClient.ImportBucketMetadata(data); err != nil {
+	if err := r.client.RustClient.ImportBucketMetadata(ctx, data); err != nil {
 		resp.Diagnostics.AddError("Error importing bucket metadata", "Could not import: "+err.Error())
 		return
 	}
@@ -99,7 +99,7 @@ func (r *BucketMetadataBackupImportResource) Update(ctx context.Context, req res
 		return
 	}
 
-	if err := r.client.RustClient.ImportBucketMetadata(data); err != nil {
+	if err := r.client.RustClient.ImportBucketMetadata(ctx, data); err != nil {
 		resp.Diagnostics.AddError("Error importing bucket metadata", "Could not import: "+err.Error())
 		return
 	}

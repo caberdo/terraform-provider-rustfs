@@ -63,8 +63,8 @@ type serviceAccountListEnvelope struct {
 // SecretKey is cleared on every returned account regardless of the payload: a
 // conforming server never sends one, and a server regression must not be able
 // to push key material into Terraform state.
-func (c *RustfsAdmin) ListServiceAccounts() ([]ServiceAccount, error) {
-	return c.ListServiceAccountsFor("")
+func (c *RustfsAdmin) ListServiceAccounts(ctx context.Context) ([]ServiceAccount, error) {
+	return c.ListServiceAccountsFor(ctx, "")
 }
 
 // ListServiceAccountsFor lists the IAM service accounts of one user. An empty
@@ -78,7 +78,7 @@ func (c *RustfsAdmin) ListServiceAccounts() ([]ServiceAccount, error) {
 // SecretKey is cleared on every returned account regardless of the payload: a
 // conforming server never sends one, and a server regression must not be able
 // to push key material into Terraform state.
-func (c *RustfsAdmin) ListServiceAccountsFor(user string) ([]ServiceAccount, error) {
+func (c *RustfsAdmin) ListServiceAccountsFor(ctx context.Context, user string) ([]ServiceAccount, error) {
 	reqData := RequestData{
 		Method:  "GET",
 		RelPath: "list-service-accounts",
@@ -86,11 +86,9 @@ func (c *RustfsAdmin) ListServiceAccountsFor(user string) ([]ServiceAccount, err
 	if user != "" {
 		reqData.QueryValues = map[string][]string{"user": {user}}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return nil, c.featureError(err, FeatureServiceAccountList)
+		return nil, c.featureError(ctx, err, FeatureServiceAccountList)
 	}
 	defer drainClose(resp)
 
@@ -110,7 +108,7 @@ func init() {
 	})
 }
 
-func (c *RustfsAdmin) CreateServiceAccount(account ServiceAccount) error {
+func (c *RustfsAdmin) CreateServiceAccount(ctx context.Context, account ServiceAccount) error {
 	normalizeServiceAccount(&account)
 	//#nosec G117 — AccessKey is a public identifier, not a secret
 	bytes, err := json.Marshal(account)
@@ -122,8 +120,6 @@ func (c *RustfsAdmin) CreateServiceAccount(account ServiceAccount) error {
 		RelPath: "add-service-accounts",
 		Content: bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -134,13 +130,9 @@ func (c *RustfsAdmin) CreateServiceAccount(account ServiceAccount) error {
 	return err
 }
 
-func (c *RustfsAdmin) ReadServiceAccount(name string) (ServiceAccount, error) {
-	return c.ReadServiceAccountContext(context.Background(), name)
-}
-
-// ReadServiceAccountContext is ReadServiceAccount with a caller context, so a
-// cancelled refresh stops the request.
-func (c *RustfsAdmin) ReadServiceAccountContext(ctx context.Context, name string) (ServiceAccount, error) {
+// ReadServiceAccount reads one service account. A cancelled refresh stops the
+// request.
+func (c *RustfsAdmin) ReadServiceAccount(ctx context.Context, name string) (ServiceAccount, error) {
 	var instance ServiceAccount
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", name)
@@ -158,7 +150,7 @@ func (c *RustfsAdmin) ReadServiceAccountContext(ctx context.Context, name string
 	return instance, err
 }
 
-func (c *RustfsAdmin) UpdateServiceAccount(account ServiceAccount) error {
+func (c *RustfsAdmin) UpdateServiceAccount(ctx context.Context, account ServiceAccount) error {
 	normalizeServiceAccount(&account)
 	updateRequest := createUpdate(account)
 	urlValues := make(url.Values)
@@ -173,8 +165,6 @@ func (c *RustfsAdmin) UpdateServiceAccount(account ServiceAccount) error {
 		QueryValues: urlValues,
 		Content:     bytes,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err
@@ -183,7 +173,7 @@ func (c *RustfsAdmin) UpdateServiceAccount(account ServiceAccount) error {
 	return nil
 }
 
-func (c *RustfsAdmin) DeleteServiceAccount(account ServiceAccount) error {
+func (c *RustfsAdmin) DeleteServiceAccount(ctx context.Context, account ServiceAccount) error {
 	normalizeServiceAccount(&account)
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", account.AccessKey)
@@ -192,8 +182,6 @@ func (c *RustfsAdmin) DeleteServiceAccount(account ServiceAccount) error {
 		RelPath:     "delete-service-accounts",
 		QueryValues: urlValues,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, req_data)
 	if err != nil {
 		return err

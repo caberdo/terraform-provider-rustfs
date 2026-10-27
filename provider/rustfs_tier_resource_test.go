@@ -558,7 +558,7 @@ func testAccCheckTierRegistered(t *testing.T, name string) resource.TestCheckFun
 
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		stats, err := client.TierStats()
+		stats, err := client.TierStats(context.Background())
 		if err != nil {
 			return fmt.Errorf("listing tiers: %w", err)
 		}
@@ -578,7 +578,7 @@ func testAccCheckTierAbsent(t *testing.T, name string) resource.TestCheckFunc {
 		client := testAccRustClient()
 		deadline := time.Now().Add(tierMutationAttempts * tierMutationInterval)
 		for {
-			stats, err := client.TierStats()
+			stats, err := client.TierStats(context.Background())
 			if err != nil {
 				return fmt.Errorf("listing tiers: %w", err)
 			}
@@ -627,7 +627,7 @@ func testAccMutateTierOutOfBand(t *testing.T, tierEndpoint, name, bucket string)
 
 		var editErr error
 		for range tierMutationAttempts {
-			if editErr = client.EditTier(name, config); editErr == nil {
+			if editErr = client.EditTier(context.Background(), name, config); editErr == nil {
 				t.Logf("edited tier %s out of band", name)
 				return nil
 			}

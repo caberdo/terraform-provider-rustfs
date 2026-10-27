@@ -200,7 +200,7 @@ func (r *notificationTargetResource) Create(ctx context.Context, req resource.Cr
 	}
 
 	if err := r.client.RustClient.SetNotificationTarget(
-		plan.TargetType.ValueString(),
+		ctx, plan.TargetType.ValueString(),
 		plan.TargetName.ValueString(),
 		kvs,
 	); err != nil {
@@ -211,7 +211,7 @@ func (r *notificationTargetResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 	tflog.Trace(ctx, "created a notification target")
-	if err := r.refreshHealth(&plan); err != nil {
+	if err := r.refreshHealth(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading notification target",
 			"Could not read notification target after create, unexpected error: "+err.Error(),
@@ -223,8 +223,8 @@ func (r *notificationTargetResource) Create(ctx context.Context, req resource.Cr
 
 // refreshHealth lists the notification targets and populates the computed
 // health metadata on the model when the target is present.
-func (r *notificationTargetResource) refreshHealth(model *notificationTargetResourceModel) error {
-	targets, err := r.client.RustClient.ListNotificationTargets()
+func (r *notificationTargetResource) refreshHealth(ctx context.Context, model *notificationTargetResourceModel) error {
+	targets, err := r.client.RustClient.ListNotificationTargets(ctx)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (r *notificationTargetResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	targets, err := r.client.RustClient.ListNotificationTargets()
+	targets, err := r.client.RustClient.ListNotificationTargets(ctx)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error listing notification targets",
@@ -306,7 +306,7 @@ func (r *notificationTargetResource) Update(ctx context.Context, req resource.Up
 	}
 
 	if err := r.client.RustClient.SetNotificationTarget(
-		plan.TargetType.ValueString(),
+		ctx, plan.TargetType.ValueString(),
 		plan.TargetName.ValueString(),
 		kvs,
 	); err != nil {
@@ -317,7 +317,7 @@ func (r *notificationTargetResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 	tflog.Trace(ctx, "updated a notification target")
-	if err := r.refreshHealth(&plan); err != nil {
+	if err := r.refreshHealth(ctx, &plan); err != nil {
 		resp.Diagnostics.AddError(
 			"Error reading notification target",
 			"Could not read notification target after update, unexpected error: "+err.Error(),
@@ -345,7 +345,7 @@ func (r *notificationTargetResource) Delete(ctx context.Context, req resource.De
 	// text; 400 InvalidArgument for an unsupported target type and every other
 	// failure is a real error the user must see.
 	if err := r.client.RustClient.ResetNotificationTarget(
-		state.TargetType.ValueString(),
+		ctx, state.TargetType.ValueString(),
 		state.TargetName.ValueString(),
 	); err != nil {
 		resp.Diagnostics.AddError(

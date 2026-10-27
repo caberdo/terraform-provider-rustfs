@@ -156,11 +156,11 @@ func (r *kmsRekeyResource) Create(ctx context.Context, req resource.CreateReques
 		}
 	}
 
-	status, err := r.client.RustClient.StartKmsRekey(buckets, plan.Prefix.ValueString())
+	status, err := r.client.RustClient.StartKmsRekey(ctx, buckets, plan.Prefix.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error starting KMS rekey",
-			r.startFailureDetail(err),
+			r.startFailureDetail(ctx, err),
 		)
 		return
 	}
@@ -177,7 +177,7 @@ func (r *kmsRekeyResource) Read(ctx context.Context, req resource.ReadRequest, r
 		return
 	}
 
-	status, err := r.client.RustClient.GetKmsRekeyStatus()
+	status, err := r.client.RustClient.GetKmsRekeyStatus(ctx)
 	if err != nil {
 		if errors.Is(err, rustfs.ErrKmsRekeyNotRun) {
 			tflog.Trace(ctx, "KMS rekey sweep no longer exists")
@@ -221,7 +221,7 @@ func (r *kmsRekeyResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	status, err := r.client.RustClient.GetKmsRekeyStatus()
+	status, err := r.client.RustClient.GetKmsRekeyStatus(ctx)
 	if err != nil {
 		if errors.Is(err, rustfs.ErrKmsRekeyNotRun) {
 			return
@@ -237,7 +237,7 @@ func (r *kmsRekeyResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
-	if _, err := r.client.RustClient.CancelKmsRekey(); err != nil {
+	if _, err := r.client.RustClient.CancelKmsRekey(ctx); err != nil {
 		if errors.Is(err, rustfs.ErrKmsRekeyNotRun) {
 			return
 		}
@@ -267,21 +267,21 @@ const kmsRekeyRoute = "POST /rustfs/admin/v3/kms/keys/rekey"
 // the route exists and the configured KMS backend cannot re-wrap envelopes, so
 // the detail names the route, the backend and the server version instead of
 // echoing the raw capability answer. Every other error keeps the server text.
-func (r *kmsRekeyResource) startFailureDetail(err error) string {
+func (r *kmsRekeyResource) startFailureDetail(ctx context.Context, err error) string {
 	var apiErr *rustfs.APIError
 	if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusNotImplemented {
 		return "Could not start KMS rekey sweep: " + err.Error()
 	}
 
 	backend := "the configured KMS backend"
-	if config, configErr := r.client.RustClient.GetKmsConfig(); configErr == nil && config.Backend != "" {
+	if config, configErr := r.client.RustClient.GetKmsConfig(ctx); configErr == nil && config.Backend != "" {
 		backend = "the " + config.Backend + " KMS backend"
 	}
 
 	detail := "Could not start KMS rekey sweep: " + kmsRekeyRoute + " is served, but " + backend +
 		" does not support rewrapping data-key envelopes. Local, Static and AWS cannot; " +
 		"Vault KV2 and Vault Transit can."
-	version, raw, versionErr := r.client.RustClient.ServerVersion()
+	version, raw, versionErr := r.client.RustClient.ServerVersion(ctx)
 	switch {
 	case versionErr == nil:
 		detail += " RustFS server version: " + version.String() + "."

@@ -138,7 +138,7 @@ func TestListTemporaryAccountsAttributesEveryProvider(t *testing.T) {
 		"list-access-keys-bulk":            genericBulkPayload,
 	})
 
-	accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{})
+	accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestListTemporaryAccountsFiltersOneProvider(t *testing.T) {
 			"idp/ldap/list-access-keys-bulk": ldapBulkPayload,
 		})
 
-		accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
+		accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -225,7 +225,7 @@ func TestListTemporaryAccountsFiltersOneProvider(t *testing.T) {
 			"idp/openid/list-access-keys-bulk": openIDBulkPayload,
 		})
 
-		accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderOpenID})
+		accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderOpenID})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -244,7 +244,7 @@ func TestListTemporaryAccountsFiltersOneProvider(t *testing.T) {
 			"list-access-keys-bulk":            genericBulkPayload,
 		})
 
-		accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
+		accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -273,7 +273,7 @@ func TestListTemporaryAccountsIncludesServiceAccounts(t *testing.T) {
 		"list-access-keys-bulk":            payload,
 	})
 
-	accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{IncludeServiceAccounts: true})
+	accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{IncludeServiceAccounts: true})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestListTemporaryAccountsFiltersParentUser(t *testing.T) {
 		"idp/ldap/list-access-keys-bulk": ldapBulkPayload,
 	})
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{
 		UserProvider: UserProviderLDAP,
 		ParentUser:   "  alice  ",
 	})
@@ -326,7 +326,7 @@ func TestListTemporaryAccountsFiltersParentUser(t *testing.T) {
 func TestListTemporaryAccountsRejectsUnknownProvider(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: "oidc"})
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: "oidc"})
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -345,7 +345,7 @@ func TestListTemporaryAccountsEmptyAnswer(t *testing.T) {
 		"list-access-keys-bulk":            `{}`,
 	})
 
-	accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{})
+	accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,7 +360,7 @@ func TestListTemporaryAccountsUnsupported(t *testing.T) {
 	// generic one) answers 501.
 	client = withStatusForPaths(client, "list-access-keys-bulk", http.StatusNotImplemented)
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -386,7 +386,7 @@ func TestListTemporaryAccountsGenericRouteUnsupported(t *testing.T) {
 	})
 	client = withStatusForPaths(client, "/rustfs/admin/v3/list-access-keys-bulk", http.StatusNotImplemented)
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderBuiltin})
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -397,7 +397,7 @@ func TestListTemporaryAccountsRejectsMalformedPayload(t *testing.T) {
 		"idp/ldap/list-access-keys-bulk": `{"alice":`,
 	})
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
 	if err == nil {
 		t.Fatal("expected a decode error")
 	}
@@ -411,7 +411,7 @@ func TestGetTemporaryAccountInfo(t *testing.T) {
 		"temporary-account-info": temporaryAccountInfoResponse,
 	})
 
-	account, err := client.GetTemporaryAccountInfo("builtin-key-1")
+	account, err := client.GetTemporaryAccountInfo(context.Background(), "builtin-key-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestGetTemporaryAccountInfoNullPolicy(t *testing.T) {
 		"temporary-account-info": `{"parentUser":"carol","accountStatus":"enabled","impliedPolicy":true}`,
 	})
 
-	account, err := client.GetTemporaryAccountInfo("builtin-key-1")
+	account, err := client.GetTemporaryAccountInfo(context.Background(), "builtin-key-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -453,7 +453,7 @@ func TestGetTemporaryAccountInfoNullPolicy(t *testing.T) {
 func TestGetTemporaryAccountInfoRequiresAccessKey(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 
-	_, err := client.GetTemporaryAccountInfo("")
+	_, err := client.GetTemporaryAccountInfo(context.Background(), "")
 	if err == nil || !strings.Contains(err.Error(), "access key is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestGetTemporaryAccountInfoUnsupported(t *testing.T) {
 	client, _ := newTemporaryAccountsTestClient(t, nil)
 	client = withStatusForPaths(client, "/rustfs/admin/v3/temporary-account-info", http.StatusNotImplemented)
 
-	_, err := client.GetTemporaryAccountInfo("builtin-key-1")
+	_, err := client.GetTemporaryAccountInfo(context.Background(), "builtin-key-1")
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -480,7 +480,7 @@ func TestGetTemporaryAccountInfoRejectsMalformedPayload(t *testing.T) {
 		"temporary-account-info": `{"parentUser":`,
 	})
 
-	_, err := client.GetTemporaryAccountInfo("builtin-key-1")
+	_, err := client.GetTemporaryAccountInfo(context.Background(), "builtin-key-1")
 	if err == nil || !strings.Contains(err.Error(), "decode temporary account information") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -491,7 +491,7 @@ func TestRevokeTokens(t *testing.T) {
 		"revoke-tokens": revokeTokensPayload,
 	})
 
-	result, err := client.RevokeTokens(UserProviderOpenID, "  bob  ")
+	result, err := client.RevokeTokens(context.Background(), UserProviderOpenID, "  bob  ")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -513,7 +513,7 @@ func TestRevokeTokens(t *testing.T) {
 func TestRevokeTokensRejectsUnknownProvider(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 
-	_, err := client.RevokeTokens("oidc", "bob")
+	_, err := client.RevokeTokens(context.Background(), "oidc", "bob")
 	if err == nil || !strings.Contains(err.Error(), `unsupported user provider "oidc"`) {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -525,7 +525,7 @@ func TestRevokeTokensRejectsUnknownProvider(t *testing.T) {
 func TestRevokeTokensRequiresUser(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 
-	_, err := client.RevokeTokens(UserProviderBuiltin, "   ")
+	_, err := client.RevokeTokens(context.Background(), UserProviderBuiltin, "   ")
 	if err == nil || !strings.Contains(err.Error(), "user is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestRevokeTokensUnsupported(t *testing.T) {
 	client, _ := newTemporaryAccountsTestClient(t, nil)
 	client = withStatusForPaths(client, "/rustfs/admin/v3/revoke-tokens/openid", http.StatusNotImplemented)
 
-	_, err := client.RevokeTokens(UserProviderOpenID, "bob")
+	_, err := client.RevokeTokens(context.Background(), UserProviderOpenID, "bob")
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -552,7 +552,7 @@ func TestRevokeTokensRejectsMalformedPayload(t *testing.T) {
 		"revoke-tokens": `{"revoked":`,
 	})
 
-	_, err := client.RevokeTokens(UserProviderOpenID, "bob")
+	_, err := client.RevokeTokens(context.Background(), UserProviderOpenID, "bob")
 	if err == nil || !strings.Contains(err.Error(), "decode token revocation") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -585,7 +585,7 @@ func TestListTemporaryAccountsFallsBackToTheMapKey(t *testing.T) {
 			`{"accessKey":"key-a","expiration":null}]}}`,
 	})
 
-	accounts, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
+	accounts, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -609,7 +609,7 @@ func TestListTemporaryAccountsPropagatesAProviderError(t *testing.T) {
 	})
 	client = withStatusForPaths(client, "idp/openid/list-access-keys-bulk", http.StatusNotImplemented)
 
-	_, err := client.ListTemporaryAccounts(TemporaryAccountListOptions{})
+	_, err := client.ListTemporaryAccounts(context.Background(), TemporaryAccountListOptions{})
 	if !IsUnsupportedFeature(err) {
 		t.Fatalf("expected an UnsupportedFeatureError, got %T: %v", err, err)
 	}
@@ -627,12 +627,12 @@ func recorderSawPath(paths map[string]bool, suffix string) bool {
 	return false
 }
 
-func TestListTemporaryAccountsContextCancelled(t *testing.T) {
+func TestListTemporaryAccountsCancelled(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := client.ListTemporaryAccountsContext(ctx, TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
+	_, err := client.ListTemporaryAccounts(ctx, TemporaryAccountListOptions{UserProvider: UserProviderLDAP})
 	if err == nil || !strings.Contains(err.Error(), "context canceled") {
 		t.Fatalf("expected a cancellation error, got %v", err)
 	}
@@ -641,12 +641,12 @@ func TestListTemporaryAccountsContextCancelled(t *testing.T) {
 	}
 }
 
-func TestGetTemporaryAccountInfoContextCancelled(t *testing.T) {
+func TestGetTemporaryAccountInfoCancelled(t *testing.T) {
 	client, server := newTemporaryAccountsTestClient(t, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := client.GetTemporaryAccountInfoContext(ctx, "ldap-key-1")
+	_, err := client.GetTemporaryAccountInfo(ctx, "ldap-key-1")
 	if err == nil || !strings.Contains(err.Error(), "context canceled") {
 		t.Fatalf("expected a cancellation error, got %v", err)
 	}

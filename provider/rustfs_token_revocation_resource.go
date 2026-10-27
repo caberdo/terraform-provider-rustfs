@@ -180,7 +180,7 @@ func (r *TokenRevocationResource) revoke(
 	model *TokenRevocationResourceModel,
 	diagnostics *diag.Diagnostics,
 ) {
-	result, err := r.client.RustClient.RevokeTokens(model.UserProvider.ValueString(), model.User.ValueString())
+	result, err := r.client.RustClient.RevokeTokens(ctx, model.UserProvider.ValueString(), model.User.ValueString())
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

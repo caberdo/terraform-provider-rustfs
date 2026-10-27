@@ -217,7 +217,7 @@ func TestAccConfigHistoryDataSource(t *testing.T) {
 		AccessSecret: os.Getenv("RUSTFS_SECRET"),
 		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
 	})
-	_ = client.DeleteConfig(scope)
+	_ = client.DeleteConfig(context.Background(), scope)
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

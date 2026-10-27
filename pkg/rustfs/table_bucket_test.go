@@ -79,7 +79,7 @@ func TestTableBucketEnableAndGet(t *testing.T) {
 		_, _ = io.WriteString(w, tableBucketPayload)
 	})
 
-	enabled, err := client.EnableTableBucket("probe")
+	enabled, err := client.EnableTableBucket(context.Background(), "probe")
 	if err != nil {
 		t.Fatalf("enable: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestTableBucketEnableAndGet(t *testing.T) {
 		t.Errorf("unexpected enable payload: %+v", enabled)
 	}
 
-	read, err := client.GetTableBucket("probe")
+	read, err := client.GetTableBucket(context.Background(), "probe")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestDisableTableBucketSuccess(t *testing.T) {
 			`"warehouse":"probe","catalog-entry-present":true,"catalog-uri":"/iceberg/v1/probe"}`)
 	})
 
-	disabled, err := client.DisableTableBucket("probe")
+	disabled, err := client.DisableTableBucket(context.Background(), "probe")
 	if err != nil {
 		t.Fatalf("disable: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestDisableTableBucketNotImplementedOn101(t *testing.T) {
 		}
 	})
 
-	_, err := client.DisableTableBucket("probe")
+	_, err := client.DisableTableBucket(context.Background(), "probe")
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
 		t.Fatalf("expected *UnsupportedFeatureError, got %T: %v", err, err)
@@ -168,7 +168,7 @@ func TestDisableTableBucketMissingBucketStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, `{"error":{"message":"failed to disable table bucket: Bucket not found: probe","type":"RESTException","code":500}}`)
 	})
 
-	_, err := client.DisableTableBucket("probe")
+	_, err := client.DisableTableBucket(context.Background(), "probe")
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -187,7 +187,7 @@ func TestTableBucketNoContentAndMalformedBody(t *testing.T) {
 	empty := newTableBucketClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-	state, err := empty.GetTableBucket("probe")
+	state, err := empty.GetTableBucket(context.Background(), "probe")
 	if err != nil {
 		t.Fatalf("204 response: %v", err)
 	}
@@ -198,7 +198,7 @@ func TestTableBucketNoContentAndMalformedBody(t *testing.T) {
 	malformed := newTableBucketClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `{`)
 	})
-	if _, err := malformed.GetTableBucket("probe"); err == nil {
+	if _, err := malformed.GetTableBucket(context.Background(), "probe"); err == nil {
 		t.Fatal("expected a decode error for a malformed body")
 	}
 }

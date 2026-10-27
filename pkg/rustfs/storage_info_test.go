@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -85,7 +86,7 @@ func newStorageInfoTestServer(t *testing.T, body string, status int) *RustfsAdmi
 func TestStorageInfo(t *testing.T) {
 	client := newStorageInfoTestServer(t, sampleStorageInfoPayload, http.StatusOK)
 
-	info, err := client.StorageInfo()
+	info, err := client.StorageInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -122,7 +123,7 @@ func TestStorageInfo(t *testing.T) {
 func TestStorageInfoRejectsNonSuccess(t *testing.T) {
 	client := newStorageInfoTestServer(t, `{"error":"boom"}`, http.StatusInternalServerError)
 
-	_, err := client.StorageInfo()
+	_, err := client.StorageInfo(context.Background())
 	if err == nil {
 		t.Fatal("expected error for non-2xx response, got nil")
 	}

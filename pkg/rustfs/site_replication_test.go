@@ -4,6 +4,7 @@
 package rustfs
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -29,7 +30,7 @@ func TestSiteReplicationAdd(t *testing.T) {
 		SecretKey:     "peersecret",
 		SkipTLSVerify: false,
 	}
-	if err := c.SiteReplicationAdd(site); err != nil {
+	if err := c.SiteReplicationAdd(context.Background(), site); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/site-replication/add") {
@@ -69,7 +70,7 @@ func TestEditPeer(t *testing.T) {
 		Endpoint:      "http://localhost:9003",
 		SkipTLSVerify: true,
 	}
-	if err := c.EditPeer(site); err != nil {
+	if err := c.EditPeer(context.Background(), site); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/site-replication/edit") {
@@ -107,7 +108,7 @@ func TestRemovePeer(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	if err := c.RemovePeer([]string{"peer"}); err != nil {
+	if err := c.RemovePeer(context.Background(), []string{"peer"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(gotPath, "/site-replication/remove") {
@@ -138,7 +139,7 @@ func TestSiteReplicationInfo(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	info, err := c.SiteReplicationInfo()
+	info, err := c.SiteReplicationInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -157,7 +158,7 @@ func TestSiteReplicationResyncOp(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	resync, err := c.SiteReplicationResyncOp("start", SiteReplicationPeer{Name: "peer", DeploymentID: "dep1"})
+	resync, err := c.SiteReplicationResyncOp(context.Background(), "start", SiteReplicationPeer{Name: "peer", DeploymentID: "dep1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestSiteReplicationRepairPreflight(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	preflight, err := c.SiteReplicationRepairPreflight()
+	preflight, err := c.SiteReplicationRepairPreflight(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -226,7 +227,7 @@ func TestSiteReplicationRepairExecute(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	operation, err := c.SiteReplicationRepairExecute("preflight-token", "op-1")
+	operation, err := c.SiteReplicationRepairExecute(context.Background(), "preflight-token", "op-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,7 +266,7 @@ func TestSiteReplicationRepairStatus(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	operation, err := c.SiteReplicationRepairStatus("op-1")
+	operation, err := c.SiteReplicationRepairStatus(context.Background(), "op-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -321,7 +322,7 @@ func TestSiteReplicationRepairErrors(t *testing.T) {
 			defer server.Close()
 			c := testSiteReplicationClient(server)
 
-			_, err := c.SiteReplicationRepairExecute("token", "op-1")
+			_, err := c.SiteReplicationRepairExecute(context.Background(), "token", "op-1")
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -335,44 +336,6 @@ func TestSiteReplicationRepairErrors(t *testing.T) {
 	}
 }
 
-// TestSiteReplicationDeprecatedPeerWrappers keeps the deprecated client
-// methods working for callers that have not moved to EditPeer and RemovePeer.
-func TestSiteReplicationDeprecatedPeerWrappers(t *testing.T) {
-	var paths, bodies []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		paths = append(paths, r.URL.Path)
-		bodies = append(bodies, readRequestBody(r))
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-	c := testSiteReplicationClient(server)
-
-	err := c.SiteReplicationEdit(SiteReplicationSite{
-		Name:      "peer",
-		Endpoint:  "http://localhost:9002",
-		AccessKey: "peeradmin",
-		SecretKey: "peersecret",
-	})
-	if err != nil {
-		t.Fatalf("deprecated edit: %v", err)
-	}
-	if err := c.SiteReplicationRemove([]string{"peer"}); err != nil {
-		t.Fatalf("deprecated remove: %v", err)
-	}
-
-	if len(paths) != 2 ||
-		!strings.Contains(paths[0], "/site-replication/edit") ||
-		!strings.Contains(paths[1], "/site-replication/remove") {
-		t.Errorf("paths = %v, want edit then remove", paths)
-	}
-	if !strings.Contains(bodies[0], `"endpoint":"http://localhost:9002"`) {
-		t.Errorf("edit body = %s, want the singular endpoint field", bodies[0])
-	}
-	if !strings.Contains(bodies[1], `"sites":["peer"]`) {
-		t.Errorf("remove body = %s, want the sites array", bodies[1])
-	}
-}
-
 // TestSiteReplicationRepairRequestErrors covers the transport failures of the
 // preflight and status calls, which the provider reports as read/create errors.
 func TestSiteReplicationRepairRequestErrors(t *testing.T) {
@@ -383,10 +346,10 @@ func TestSiteReplicationRepairRequestErrors(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	if _, err := c.SiteReplicationRepairPreflight(); err == nil || !strings.Contains(err.Error(), "repair is busy") {
+	if _, err := c.SiteReplicationRepairPreflight(context.Background()); err == nil || !strings.Contains(err.Error(), "repair is busy") {
 		t.Errorf("preflight error = %v, want the server message", err)
 	}
-	if _, err := c.SiteReplicationRepairStatus("op-1"); err == nil || !strings.Contains(err.Error(), "repair is busy") {
+	if _, err := c.SiteReplicationRepairStatus(context.Background(), "op-1"); err == nil || !strings.Contains(err.Error(), "repair is busy") {
 		t.Errorf("status error = %v, want the server message", err)
 	}
 }
@@ -429,7 +392,7 @@ func TestSiteReplicationStatus(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	status, err := c.SiteReplicationStatus()
+	status, err := c.SiteReplicationStatus(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -494,7 +457,7 @@ func TestSiteReplicationStatusUnsupported(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	_, err := c.SiteReplicationStatus()
+	_, err := c.SiteReplicationStatus(context.Background())
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -527,7 +490,7 @@ func TestSiteReplicationMetaInfo(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	info, err := c.SiteReplicationMetaInfo()
+	info, err := c.SiteReplicationMetaInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -565,7 +528,7 @@ func TestSiteReplicationMetaInfoArrayILMExpiryRules(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	info, err := c.SiteReplicationMetaInfo()
+	info, err := c.SiteReplicationMetaInfo(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -582,7 +545,7 @@ func TestSiteReplicationMetaInfoError(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	_, err := c.SiteReplicationMetaInfo()
+	_, err := c.SiteReplicationMetaInfo(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "access denied") {
 		t.Fatalf("error = %v, want the server message", err)
 	}
@@ -596,7 +559,7 @@ func TestSiteReplicationResyncOpError(t *testing.T) {
 	defer server.Close()
 	c := testSiteReplicationClient(server)
 
-	_, err := c.SiteReplicationResyncOp("start", SiteReplicationPeer{DeploymentID: "dep-a"})
+	_, err := c.SiteReplicationResyncOp(context.Background(), "start", SiteReplicationPeer{DeploymentID: "dep-a"})
 	if err == nil || !strings.Contains(err.Error(), "invalid deployment id") {
 		t.Fatalf("error = %v, want the server message", err)
 	}

@@ -168,11 +168,11 @@ func (r *ObjectDataCacheFlushResource) Delete(_ context.Context, _ resource.Dele
 }
 
 func (r *ObjectDataCacheFlushResource) runFlush(
-	_ context.Context,
+	ctx context.Context,
 	model *ObjectDataCacheFlushResourceModel,
 	diagnostics *diag.Diagnostics,
 ) {
-	result, err := r.client.RustClient.FlushObjectDataCache(model.Bucket.ValueString(), model.Object.ValueString())
+	result, err := r.client.RustClient.FlushObjectDataCache(ctx, model.Bucket.ValueString(), model.Object.ValueString())
 	if err != nil {
 		var unsupported *rustfs.UnsupportedFeatureError
 		if errors.As(err, &unsupported) {

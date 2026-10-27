@@ -4,6 +4,7 @@
 package rustfs_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -45,7 +46,7 @@ func TestRecoverOrphanedBucketRequestAndResponse(t *testing.T) {
 		_, _ = io.WriteString(w, `{"bucket":"orphaned-data","retiredIncarnationId":"`+recoveryIncarnation+`"}`)
 	})
 
-	result, err := client.RecoverOrphanedBucket("orphaned-data", recoveryIncarnation)
+	result, err := client.RecoverOrphanedBucket(context.Background(), "orphaned-data", recoveryIncarnation)
 	if err != nil {
 		t.Fatalf("recover: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestRecoverOrphanedBucketMalformedResponse(t *testing.T) {
 		_, _ = io.WriteString(w, `<html>proxy error</html>`)
 	})
 
-	_, err := client.RecoverOrphanedBucket("orphaned-data", recoveryIncarnation)
+	_, err := client.RecoverOrphanedBucket(context.Background(), "orphaned-data", recoveryIncarnation)
 
 	if err == nil {
 		t.Fatal("expected a decode error, got none")
@@ -111,7 +112,7 @@ func TestRecoverOrphanedBucketRouteMissingOn101(t *testing.T) {
 		}
 	})
 
-	_, err := client.RecoverOrphanedBucket("orphaned-data", recoveryIncarnation)
+	_, err := client.RecoverOrphanedBucket(context.Background(), "orphaned-data", recoveryIncarnation)
 
 	var unsupported *rustfs.UnsupportedFeatureError
 	if !errors.As(err, &unsupported) {
@@ -143,7 +144,7 @@ func TestRecoverOrphanedBucketRefusalStaysAnAPIError(t *testing.T) {
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>PreconditionFailed</Code><Message>At least one of the pre-conditions you specified did not hold</Message></Error>`)
 	})
 
-	_, err := client.RecoverOrphanedBucket("orphaned-data", recoveryIncarnation)
+	_, err := client.RecoverOrphanedBucket(context.Background(), "orphaned-data", recoveryIncarnation)
 
 	if rustfs.IsUnsupportedFeature(err) {
 		t.Fatalf("a 412 must not be reported as an unsupported feature: %v", err)

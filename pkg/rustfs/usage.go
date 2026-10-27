@@ -81,7 +81,7 @@ type bucketUsageEnvelope struct {
 // clamps to 1..10000). A bucket that does not exist is not reported by this
 // route: it answers zeroed counters, so the caller has to confirm existence
 // itself.
-func (c *RustfsAdmin) GetBucketUsage(bucket, prefix string, maxEntries int) (BucketUsage, error) {
+func (c *RustfsAdmin) GetBucketUsage(ctx context.Context, bucket, prefix string, maxEntries int) (BucketUsage, error) {
 	if bucket == "" {
 		return BucketUsage{}, errors.New("bucket is required")
 	}
@@ -102,11 +102,9 @@ func (c *RustfsAdmin) GetBucketUsage(bucket, prefix string, maxEntries int) (Buc
 		RelPath:     "usage/" + url.PathEscape(bucket),
 		QueryValues: query,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
-		return BucketUsage{}, c.featureError(err, FeatureBucketUsage)
+		return BucketUsage{}, c.featureError(ctx, err, FeatureBucketUsage)
 	}
 	defer drainClose(resp)
 

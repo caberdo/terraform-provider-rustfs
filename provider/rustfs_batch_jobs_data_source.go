@@ -120,7 +120,7 @@ func (d *BatchJobsDataSource) Read(ctx context.Context, req datasource.ReadReque
 	}
 
 	jobType := config.JobType.ValueString()
-	listed, err := d.client.RustClient.ListBatchJobs(jobType)
+	listed, err := d.client.RustClient.ListBatchJobs(ctx, jobType)
 	if err != nil {
 		d.addCapabilityOrReadError(resp, err, "Error reading batch jobs")
 		return
@@ -150,7 +150,7 @@ func (d *BatchJobsDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	job, err := d.client.RustClient.DescribeBatchJob(jobID)
+	job, err := d.client.RustClient.DescribeBatchJob(ctx, jobID)
 	if err != nil {
 		if rustfs.IsNoSuchBatchJob(err) {
 			config.Job = types.StringNull()
@@ -163,7 +163,7 @@ func (d *BatchJobsDataSource) Read(ctx context.Context, req datasource.ReadReque
 		return
 	}
 
-	status, err := d.client.RustClient.StatusBatchJob(jobID)
+	status, err := d.client.RustClient.StatusBatchJob(ctx, jobID)
 	if err != nil {
 		if rustfs.IsNoSuchBatchJob(err) {
 			// describe-job returned the job, so keep that document instead of

@@ -296,7 +296,7 @@ func testAccCheckUserPolicies(user string, want ...string) resource.TestCheckFun
 func testAccCheckUserGone(user string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		_, err := client.ReadUserAccount(user)
+		_, err := client.ReadUserAccount(context.Background(), user)
 		if err == nil {
 			// user is the access key: report the fact, not the value.
 			return fmt.Errorf("the user that should have been destroyed still exists")
@@ -319,7 +319,7 @@ func testAccDetachUserPolicyOutOfBand(resourceName string) resource.TestCheckFun
 		user := rs.Primary.Attributes["user"]
 		policy := rs.Primary.Attributes["policy"]
 		client := testAccRustClient()
-		if err := client.DetachUserPolicy(user, policy); err != nil {
+		if err := client.DetachUserPolicy(context.Background(), user, policy); err != nil {
 			return fmt.Errorf("failed to detach policy %s from user %s: %w", policy, user, err)
 		}
 		return nil
@@ -331,10 +331,10 @@ func testAccDetachUserPolicyOutOfBand(resourceName string) resource.TestCheckFun
 func testAccRemoveUserOutOfBand(user, policy string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
-		if err := client.DetachUserPolicy(user, policy); err != nil {
+		if err := client.DetachUserPolicy(context.Background(), user, policy); err != nil {
 			return fmt.Errorf("failed to detach policy %s from user %s: %w", policy, user, err)
 		}
-		if err := client.DeleteUserAccount(rustfs.UserAccount{AccessKey: user}); err != nil {
+		if err := client.DeleteUserAccount(context.Background(), rustfs.UserAccount{AccessKey: user}); err != nil {
 			return fmt.Errorf("failed to delete user %s: %w", user, err)
 		}
 		return nil
@@ -345,7 +345,7 @@ func testAccRemoveUserOutOfBand(user, policy string) resource.TestCheckFunc {
 // admin API. RustFS stores it as one comma-separated string.
 func testAccUserPoliciesFromServer(user string) ([]string, error) {
 	client := testAccRustClient()
-	info, err := client.ReadUserAccount(user)
+	info, err := client.ReadUserAccount(context.Background(), user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read user %s: %w", user, err)
 	}
@@ -376,7 +376,7 @@ func TestAccUserPolicyAttachmentResource_updateReattaches(t *testing.T) {
 	policyName := fmt.Sprintf("accpolicy-update-%d", suffix)
 
 	client := testAccRustClient()
-	if err := client.CreatePolicy(rustfs.Policy{
+	if err := client.CreatePolicy(ctx, rustfs.Policy{
 		Name: policyName,
 		Statement: []rustfs.PolicyStatement{{
 			Effect:   "Allow",
@@ -388,20 +388,20 @@ func TestAccUserPolicyAttachmentResource_updateReattaches(t *testing.T) {
 	}
 	// The user is created without a policy, so the attachment only exists once
 	// Update has run.
-	if err := client.CreateUserAccount(rustfs.UserAccount{
+	if err := client.CreateUserAccount(ctx, rustfs.UserAccount{
 		AccessKey: userName,
 		SecretKey: "superSecret123!",
 	}); err != nil {
 		t.Fatalf("failed to create user %s: %v", userName, err)
 	}
 	t.Cleanup(func() {
-		if err := client.DetachUserPolicy(userName, policyName); err != nil {
+		if err := client.DetachUserPolicy(ctx, userName, policyName); err != nil {
 			t.Errorf("failed to detach %s from %s: %v", policyName, userName, err)
 		}
-		if err := client.DeleteUserAccount(rustfs.UserAccount{AccessKey: userName}); err != nil {
+		if err := client.DeleteUserAccount(ctx, rustfs.UserAccount{AccessKey: userName}); err != nil {
 			t.Errorf("failed to delete user %s: %v", userName, err)
 		}
-		if err := client.DeletePolicy(policyName); err != nil {
+		if err := client.DeletePolicy(ctx, policyName); err != nil {
 			t.Errorf("failed to delete policy %s: %v", policyName, err)
 		}
 	})
@@ -461,7 +461,7 @@ func testAccCheckUserPolicyAttachmentDestroy(s *terraform.State) error {
 		if user == "" {
 			continue
 		}
-		if _, err := client.ReadUserAccount(user); err == nil {
+		if _, err := client.ReadUserAccount(context.Background(), user); err == nil {
 			return fmt.Errorf("user %s still exists", user)
 		}
 	}
