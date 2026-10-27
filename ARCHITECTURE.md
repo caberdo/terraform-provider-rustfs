@@ -27,6 +27,113 @@ Terraform CLI ──plugin protocol 6.0──► terraform-provider-rustfs (one 
                       tags, CORS, …)          (+ a few non-v3 routes)
 ```
 
+## Design decisions
+
+Design decisions that define what the provider deliberately does not model are recorded here. The
+user-facing short form is the non-goals table in `README.md` and `templates/index.md.tmpl`; this
+section is the authority when the two disagree.
+
+### Objects — out of scope ([#157](https://github.com/caberdo/terraform-provider-rustfs/issues/157))
+
+The provider does not manage S3 object bodies or per-object metadata. There is no `rustfs_object`
+resource and no object data source, now or in the current roadmap. (`rustfs_object_data_cache_stats`
+and `rustfs_object_data_cache_flush` control the server's object cache; they do not manage
+objects.)
+
+RustFS objects are application data, not infrastructure. The provider's job is the control plane:
+buckets and their configuration, IAM, KMS, replication, tiers, targets, server configuration, and
+the observability of jobs that run on the server. `rustfs_bucket` still lists and deletes objects
+when `force_destroy = true`; that is bucket lifecycle, and the resource models the bucket, not its
+contents.
+
+**Rejected alternatives.** A `rustfs_object` resource would exist to compare hashes and overwrite
+when they differ, but state holds metadata, not bytes: a wrong `source_hash`, a multipart ETag or
+a server that recomputes the ETag after encryption turns that comparison into silent data loss or
+a permanent diff. Large objects make plan/apply slow and state large, `content` puts secrets in
+state (marking it `Sensitive` hides it from output, not from the state file), and `destroy`
+becomes a delete request. Object presence is also not a stable local fact: on-demand migration
+pulls lazily, an integrity migrate job writes a verified copy, and a versioned object has an
+identity rather than a single "current" body. The full S3 object surface (multipart, checksums,
+storage classes, encryption, tags, ACLs, retention, copy, versioning) is larger than any resource
+shipped so far. A read-only object data source returning metadata and a presigned URL was rejected
+for the same reason the lifecycle is unrepresentable: the URL is time-limited and the metadata is
+already available with `mc stat` or the S3 API.
+
+The questions a future proposal must answer are recorded so the decision can be reopened rather
+than extended one attribute at a time:
+
+| Question | Why it has no safe answer for a Terraform resource |
+|---|---|
+| Conflict policy when the object exists | The resource cannot tell "created by Terraform" from "created out of band" without storing a marker; a refresh that cannot find the marker reports drift or deletes data. |
+| Drift detection (`ETag` vs `Last-Modified`) | `ETag` is not a content hash for multipart or encrypted objects, and `Last-Modified` changes on metadata updates. Neither proves the body is the one the configuration describes. |
+| Versioning | Addressing the current version silently overwrites a versioned object; addressing a `version_id` requires the version to exist before apply. |
+| Secrets in `content` | State is plaintext JSON; `Sensitive` does not remove the value from the state file or its backups. |
+| On-demand and integrity migration | The object is present but not local, or is being copied to a verified key; a plan that treats either as drift pulls or overwrites data as a side effect. |
+
+**Consequences.** No `rustfs_object*` type is added to the registry; no implementation issue is
+opened. The shared Markdown changes are handed to lane A in
+[#178](https://github.com/caberdo/terraform-provider-rustfs/issues/178): replace the opener "The
+provider models objects with a Terraform lifecycle" with "The provider models RustFS control-plane
+and configuration state with Terraform resources; it does not manage S3 object bodies", and append
+this non-goals row:
+
+| Area | Not modeled | Why it is out of scope |
+|---|---|---|
+| Object data plane | S3 object bodies and per-object metadata; a `rustfs_object` resource or object data source | RustFS objects are application data, not infrastructure. Terraform state would hold metadata and hashes, not bodies, so an object resource would exist to track drift: a wrong `source_hash` or `etag` can silently overwrite data, large objects make plan/apply slow and state large, and `content` puts secrets in state. Object presence is also not a stable local fact: on-demand migration pulls lazily, an integrity migrate job writes a verified copy, and versioning means "the current object" is not necessarily the object a previous apply wrote. Use `mc`, the AWS provider pointed at RustFS, or the application's own upload path. `rustfs_bucket` still deletes objects as part of `force_destroy`, which is bucket lifecycle, not object management. |
+
+### Heal — status observed, runs out of scope ([#158](https://github.com/caberdo/terraform-provider-rustfs/issues/158))
+
+Two halves, decided separately:
+
+1. **Heal runs are declined.** Starting, querying and cancelling a heal
+   (`POST /rustfs/admin/v3/heal/*`, including the `clientToken` status query and `forceStop`
+   cancel) is an operator repair action, not desired state. The v4 MRF responsibility actions
+   (`POST /rustfs/admin/v4/heal/mrf/responsibilities/actions`) are declined for the same reason.
+2. **Heal status is observed.** Three read-only data sources are in scope, in follow-up
+   [#177](https://github.com/caberdo/terraform-provider-rustfs/issues/177):
+   `rustfs_background_heal_status` over `POST /rustfs/admin/v3/background-heal/status`, and
+   `rustfs_heal_mrf_responsibilities` / `rustfs_heal_replacement_recovery` over the two v4 `GET`
+   routes. They join `rustfs_scanner_status`, `rustfs_ilm_expiry_status` and
+   `rustfs_replication_mrf` as observability, not lifecycle.
+
+The probe (2026-10-27; `rustfs/rustfs:1.0.1`, `:1.0.2`, `:1.0.3` and `:latest`, which reported
+`refs/tags/1.0.4`, one single-node container each, SigV4 admin credentials):
+
+| Route | Method | 1.0.1 | 1.0.2 | 1.0.3 | 1.0.4 | Observed |
+|---|---|:--:|:--:|:--:|:--:|---|
+| `/rustfs/admin/v3/heal/` | POST | 200 | 200 | 200 | 200 | Returns `clientToken` immediately. Root heal needs `recursive = true` (400 otherwise); an empty body is 400 "err request body parse". |
+| `/rustfs/admin/v3/heal/{bucket}` | POST | 200 | 200 | 200 | 200 | Start, then `?clientToken=…` reports progress and `&forceStop=true` cancels. |
+| `/rustfs/admin/v3/heal/{bucket}/{prefix}` | POST | 200 | 200 | 200 | 200 | Same start/status/cancel, scoped to the prefix. |
+| `/rustfs/admin/v3/background-heal/status` | POST | 200 | 200 | 200 | 200 | Healer state, queue/admission counters and coverage. Two consecutive calls were byte-identical and changed nothing: read-only. |
+| `/rustfs/admin/v4/heal/mrf/responsibilities` | GET | 200 | 200 | 200 | 200 | `contractVersion: 1`, `nodeLocal: true`, empty list. Read-only. |
+| `/rustfs/admin/v4/heal/mrf/responsibilities/actions` | POST | 400 | 400 | 400 | 400 | Empty and nil-UUID bodies are rejected before mutation; the `Refresh`/`Recheck`/`AcceptUnverifiedRisk` branches mutate queue state in `heal.rs`, and the single-node probe had no legacy responsibility to exercise them. |
+| `/rustfs/admin/v4/heal/replacement-recovery` | GET | 200 | 200 | 200 | 200 | `contractVersion: 2`, definitive local and cluster status, empty records. Read-only. |
+
+`dry_run` is not side-effect free: a dry-run root start raised
+`healOperations.admission.accepted` from 6 to 7. The run is asynchronous, has no list route and no
+server-owned job id independent of the caller's token. A wrong method answers `426 Upgrade
+Required`, not `405`; clients must use the exact method above.
+
+**Rejected alternatives.** A one-shot `rustfs_heal` resource (option B) has no honest lifecycle:
+the provider's job resources wrap a server-returned durable job with an id, status route and
+terminal state, while heal returns a caller token, has no list route, and its result is repaired
+object data Terraform cannot read back. `destroy` would either cancel a repair from an unrelated
+lifecycle event or only forget the run; `dry_run` still admits work; and `Read` could only ask the
+token for its current status. Declining the whole surface (option C) was rejected because the
+background status route is a POST in name only: it is idempotent, has no body and changes nothing,
+and it belongs next to the existing status data sources. The v4 read routes are read-only
+snapshots with contract versions, so they join the same follow-up rather than being misclassified
+as operator actions.
+
+**Consequences.** No run control is exposed, and `terraform destroy` can never start or cancel a
+heal. No `rustfs_heal*` type is added before follow-up #177. The shared Markdown changes are in
+[#178](https://github.com/caberdo/terraform-provider-rustfs/issues/178): replace the existing v4
+heal/MRF non-goal row with one that names only the actions route, and add this row:
+
+| Area | Not modeled | Why it is out of scope |
+|---|---|---|
+| Heal runs | `POST /rustfs/admin/v3/heal/`, `POST /rustfs/admin/v3/heal/{bucket}`, `POST /rustfs/admin/v3/heal/{bucket}/{*prefix}`, and their `clientToken` status and `forceStop` queries | Starting, querying or cancelling a heal is an operator repair action over object data, not desired state. A run has no server-listable durable record, and `terraform destroy` must not be able to cancel a repair by accident. `dry_run` still admits a task: on 1.0.1–1.0.4 a dry-run start raised the admission counter. The read-only background healer status is tracked for a data source in #177. Use `mc admin heal`, the console or the deployment tooling to start or cancel a run. |
+
 ## Entry point and wiring
 
 | Stage | Code | What happens |
