@@ -1,5 +1,110 @@
 ## Unreleased
 
+## 0.8.0 (2026-10-27)
+
+FEATURES:
+- `rustfs_bucket` gains `force_destroy` (default `false`). With `force_destroy = true` a destroy
+  aborts every incomplete multipart upload, deletes the objects, then deletes the object versions and
+  delete markers of a versioned bucket, and only then removes the bucket — so a bucket an application
+  filled can be destroyed in one `terraform destroy`. The attribute deletes data and is never enabled
+  implicitly; without it RustFS still refuses with `BucketNotEmpty`, and destroy stays idempotent when
+  the bucket disappeared out of band.
+- `rustfs_bucket` now also exists as a read-only data source, and `rustfs_buckets` lists every bucket. The
+  single-bucket data source reports `exists` (a missing bucket is `false` without an error, so it can
+  drive `count`/`for_each`), `creation_date` from `ListBuckets` and `region` from `GetBucketLocation`.
+  `rustfs_buckets` returns one `ListBuckets` result sorted by name instead of issuing a request per
+  bucket, and both fail with a diagnostic naming `s3:ListAllMyBuckets`/`s3:ListBucket` when the
+  credentials lack the permission rather than returning an empty list.
+- New read-only data sources for the admin read surfaces: `rustfs_tiers` lists the configured storage tiers with the backend type and the backend configuration (every credential value is redacted to `REDACTED`, by the server and again by the provider), `rustfs_kms_keys` lists KMS master keys (metadata only, no key material), and `rustfs_service_accounts` lists the IAM service accounts through the new `GET /rustfs/admin/v3/list-service-accounts` route. The service-account listing differs from `rustfs_temporary_accounts`: that data source reports STS temporary keys, this one reports the persisted IAM accounts, and it never exposes a secret key.
+- Four bucket sub-resources are now modelled: `rustfs_bucket_website` (index/error documents, redirect-all
+  and routing rules), `rustfs_bucket_logging` (target bucket and prefix, and the target grants), and
+  `rustfs_bucket_accelerate` and `rustfs_bucket_request_payment`. All four round-trip on RustFS 1.0.1
+  through 1.0.3, so a plan after apply is empty; `rustfs_bucket_accelerate` models only `status`,
+  because that is the only field the S3 accelerate document carries. Destroying them removes the configuration (logging is
+  disabled; acceleration is set to `Suspended`; request payment returns to `BucketOwner`) and never
+  deletes the bucket. `rustfs_bucket_logging` refuses a target bucket that does not exist instead of
+  silently logging into nowhere.
+- `rustfs_bucket` now applies a change to `acl` or `grant_read`/`grant_write`/`grant_read_acp`/
+  `grant_write_acp`/`grant_full_control` in place with `PutBucketAcl` instead of replacing the bucket,
+  which used to delete every object for a setting. RustFS 1.0.x accepts canned ACLs and grants but
+  `GetBucketAcl` always reports only the owner's `FULL_CONTROL` grant, so the provider keeps the
+  configured value in state; an out-of-band ACL change therefore produces no plan, and the attribute
+  descriptions say so. The new `rustfs_bucket_policy_status` data source reads
+  `GetBucketPolicyStatus`; RustFS reports a bucket public only for a statement granting `s3:*` on the
+  bucket to an explicit `{"AWS": ["*"]}` principal, and the data source documents that rule.
+- `rustfs_site_replication_status` reads the whole site-replication group
+  (`GET /rustfs/admin/v3/site-replication/info`,
+  `GET /rustfs/admin/v3/site-replication/status` and
+  `GET /rustfs/admin/v3/site-replication/metainfo`): which peers exist, each
+  peer's `deployment_id`, sync state and TLS/ILM settings, per-site replicated and
+  total counters for every replicated family, unreachable peers with their error,
+  the resync retry queue, and the topology counts from the metainfo route. The
+  metainfo payload itself stays out of state; only counts and identity are
+  reported. A server that answers the status route as unimplemented still yields
+  the info and metainfo result with `status_available = false`; any other status
+  error fails the read.
+
+  `rustfs_site_replication_resync` drives
+  `PUT /rustfs/admin/v3/site-replication/resync/op` with `operation = "start"`,
+  `"cancel"` or `"status"`. A resync re-copies the replicated buckets between
+  sites, so it can move a large amount of data; every operation names the peer by
+  `deployment_id`, which `rustfs_site_replication_status` reports. Every
+  configurable attribute carries RequiresReplace, so a change runs a new operation
+  instead of editing the recorded one. Destroying the resource does nothing on the
+  server: cancelling is an explicit `operation = "cancel"` apply, never a side
+  effect of `terraform destroy`.
+- `rustfs_config_history_clear` deletes every stored server-config snapshot
+  through `DELETE /rustfs/admin/v3/clear-config-history-kv`. This removes all
+  rollback points, so `rustfs_config_restore` can no longer reach a snapshot and
+  an earlier configuration mistake can no longer be undone through the provider.
+  The route returns an empty 200 with no count, so the resource records only
+  `cleared_at`; `dry_run` and `entries_cleared` do not exist. The resource is an
+  action: Read echoes the recorded result, Delete is a no-op, and `confirm` must
+  be the literal `clear-config-history`.
+- `rustfs_quota_stats` reads what the quota subsystem sees for a bucket
+  (`GET /rustfs/admin/v3/quota-stats/{bucket}`): the configured hard quota, its
+  current usage, the remaining headroom and the usage percentage. Unlike
+  `rustfs_bucket_usage`, which reports the scanner's eventually-consistent
+  accounting, this is the view quota admission uses and may be reservation/ledger
+  based. A field the server cannot report is null, never zero, and a missing
+  bucket fails the read instead of reporting zeros.
+
+  `rustfs_quota_check` evaluates whether an operation would be admitted
+  (`POST /rustfs/admin/v3/quota-check/{bucket}`) for `PUT`, `POST`, `COPY` or
+  `DELETE` at a given size. The check is read-only: it changes no quota, object or
+  usage. Unknown operation types are reported by RustFS as PUT; the provider only
+  accepts the four documented values.
+- The admin client now retries transient server answers instead of failing the
+  apply on the first `429`, `500`, `502`, `503`/`ServiceUnavailable`, `504`,
+  `SlowDown` or `RequestTimeout`, with three bounded, jittered backoffs and a
+  `Retry-After` header honoured. Retries are limited to reads and the routes
+  RustFS defines as idempotent (the scanner resets, a rebalance stop, a quota
+  set and a config set), so no job, credential or delete is replayed. A cancelled Terraform run stops the retry loop immediately.
+
+  Both API clients now send `terraform-provider-rustfs/<version>` in their
+  `User-Agent`, so server logs and bug reports can be tied to a provider build.
+
+IMPROVEMENTS:
+- `rustfs_kms_rekey` now explains a refused start instead of quoting the server:
+  when RustFS answers `501` because the configured KMS backend cannot re-wrap
+  envelopes, the diagnostic names the `POST /rustfs/admin/v3/kms/keys/rekey`
+  route, the backend and the server version, and says which backends can
+  (`Vault KV2` and `Vault Transit`). `rustfs_kms_backup` checks
+  `GET /rustfs/admin/v3/kms/backup` before writing: a server that reports
+  `export_supported = false` now fails the apply with a diagnostic naming
+  `RUSTFS_KMS_BACKUP_DIR`, `RUSTFS_KMS_BACKUP_KEK` and `RUSTFS_KMS_BACKUP_KEK_ID`
+  instead of attempting the `POST` and echoing its raw payload.
+
+BUG FIXES:
+- `endpoint` accepts `host`, `host:port` and `scheme://host[:port]`, and both API clients are now
+  built from one normalized reading of it. Before this change an endpoint that carried its own
+  scheme, for example `RUSTFS_ENDPOINT=https://rustfs.example.com`, produced a working S3 client and
+  an admin client that dialled `http://https://rustfs.example.com`. An explicit `http`/`https`
+  scheme now selects the transport; when `ssl` is also set and contradicts the scheme the plan fails
+  with a diagnostic naming both values, and an endpoint with a path, query or inline credentials is
+  rejected instead of being pasted into a URL. Configurations that set `ssl` and omit the scheme are
+  unchanged.
+
 ## 0.7.0 (2026-10-22)
 
 BUG FIXES:
