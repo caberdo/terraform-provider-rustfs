@@ -968,3 +968,14 @@ func TestKmsKeyMetadataMutationMarshalError(t *testing.T) {
 		t.Fatal("expected a marshal error")
 	}
 }
+
+func TestListKmsKeysCapabilityError(t *testing.T) {
+	client := newKmsTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotImplemented)
+		_, _ = w.Write([]byte(`{"error":"not implemented"}`))
+	})
+
+	if _, err := client.ListKmsKeys(); !IsUnsupportedFeature(err) {
+		t.Fatalf("expected an unsupported-feature error, got %v", err)
+	}
+}
