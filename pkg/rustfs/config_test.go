@@ -5,7 +5,6 @@ package rustfs_test
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -133,34 +132,6 @@ func TestDeleteConfig(t *testing.T) {
 	}
 	if string(gotBody) != "notify_webhook:primary" {
 		t.Errorf("unexpected body: %q", string(gotBody))
-	}
-}
-
-func TestHelpConfig(t *testing.T) {
-	client := newTestConfigAdminServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rustfs/admin/v3/help-config-kv" {
-			t.Errorf("wrong path: %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"subSys":          "notify_webhook",
-			"description":     "publish bucket notifications to webhook endpoints",
-			"multipleTargets": true,
-			"keysHelp": []map[string]interface{}{
-				{"key": "endpoint", "type": "url", "description": "webhook server endpoint", "optional": false, "multipleTargets": false},
-				{"key": "enable", "type": "on|off", "description": "enable target", "optional": false, "multipleTargets": false},
-			},
-		})
-	})
-	kvs, err := client.HelpConfig(context.Background(), "notify_webhook")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(kvs) != 2 || kvs[0].Key != "endpoint" || kvs[0].Value != "url" {
-		t.Errorf("unexpected kvs: %+v", kvs)
-	}
-	if kvs[1].Key != "enable" || kvs[1].Value != "on|off" {
-		t.Errorf("unexpected kvs: %+v", kvs)
 	}
 }
 

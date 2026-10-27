@@ -68,26 +68,6 @@ func (c *RustfsAdmin) ReadUserAccount(ctx context.Context, name string) (UserAcc
 
 }
 
-func (c *RustfsAdmin) UpdateUserAccount(ctx context.Context, account UserAccount) error {
-	urlValues := make(url.Values)
-	urlValues.Set("accessKey", account.AccessKey)
-	urlValues.Set("status", account.Status)
-	req_data := RequestData{
-		Method:      "PUT",
-		RelPath:     "user-info",
-		QueryValues: urlValues,
-	}
-	resp, err := c.doRequest(ctx, req_data)
-	if err != nil {
-		return err
-	}
-	drainClose(resp)
-	if account.Policy != "" {
-		return c.AttachPolicyToUser(ctx, account.AccessKey, account.Policy)
-	}
-	return nil
-}
-
 func (c *RustfsAdmin) DeleteUserAccount(ctx context.Context, account UserAccount) error {
 	urlValues := make(url.Values)
 	urlValues.Set("accessKey", account.AccessKey)
@@ -104,7 +84,9 @@ func (c *RustfsAdmin) DeleteUserAccount(ctx context.Context, account UserAccount
 	return nil
 }
 
-// AttachPolicyToUser attaches a policy to an existing user.
+// AttachPolicyToUser attaches a policy to an existing user. It is the policy
+// follow-up of CreateUserAccount; no Terraform resource calls it directly
+// (rustfs_user_policy_attachment owns its own attach/detach pair).
 func (c *RustfsAdmin) AttachPolicyToUser(ctx context.Context, user string, policy string) error {
 	urlValues := make(url.Values)
 	urlValues.Set("userOrGroup", user)

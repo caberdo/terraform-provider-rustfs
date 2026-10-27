@@ -217,22 +217,6 @@ func (c *RustfsAdmin) ILMTransitionJob(ctx context.Context, jobID string) (*ILMT
 	return &body, nil
 }
 
-// CancelILMTransitionJob asks the server to cancel a durable transition job.
-// Cancelling is not a rollback: objects already enqueued or moved stay where
-// they are. The provider never calls this on destroy.
-func (c *RustfsAdmin) CancelILMTransitionJob(ctx context.Context, jobID string) error {
-	reqData := RequestData{
-		Method:  "DELETE",
-		RelPath: "ilm/transition/jobs/" + url.PathEscape(jobID),
-	}
-	resp, err := c.doRequest(ctx, reqData)
-	if err != nil {
-		return err
-	}
-	defer drainClose(resp)
-	return nil
-}
-
 // ILMFreshness is the scanner freshness block shared by the expiry status.
 type ILMFreshness struct {
 	State                 string `json:"state"`
@@ -418,76 +402,6 @@ func (c *RustfsAdmin) ListILMRecoveryRecords(ctx context.Context, query ILMRecov
 	}
 	body.Raw = raw
 	return &body, nil
-}
-
-// InspectILMRecoveryRecord returns one recovery control, including the
-// observation receipts the server only issues through this route. The payload
-// is returned as raw JSON because it carries short-lived, action-specific
-// receipts rather than a stable read model.
-func (c *RustfsAdmin) InspectILMRecoveryRecord(ctx context.Context, controlID string) (json.RawMessage, error) {
-	return c.ilmRawRequest(ctx, "GET", "ilm/recovery/records/"+url.PathEscape(controlID), nil, nil)
-}
-
-// InspectILMTransitionReconcile reads one transition transaction for operator
-// reconciliation (GET /rustfs/admin/v3/ilm/transition/reconcile/{id}). It never
-// mutates object state.
-func (c *RustfsAdmin) InspectILMTransitionReconcile(ctx context.Context, transactionID string) (json.RawMessage, error) {
-	return c.ilmRawRequest(ctx, "GET", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, nil)
-}
-
-// ApplyILMTransitionReconcile runs one operator reconciliation
-// (POST /rustfs/admin/v3/ilm/transition/reconcile/{id}). It mutates object
-// state on the remote backend, so it is deliberately not part of any Terraform
-// read path. action is "delete_candidate" (with a non-empty remoteVersionID)
-// or "finalize_missing".
-func (c *RustfsAdmin) ApplyILMTransitionReconcile(ctx context.Context, transactionID, action, remoteVersionID string) (json.RawMessage, error) {
-	body, err := json.Marshal(struct {
-		Action          string `json:"action"`
-		Confirm         bool   `json:"confirm"`
-		RemoteVersionID string `json:"remote_version_id,omitempty"`
-	}{
-		Action:          action,
-		Confirm:         true,
-		RemoteVersionID: remoteVersionID,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return c.ilmRawRequest(ctx, "POST", "ilm/transition/reconcile/"+url.PathEscape(transactionID), nil, body)
-}
-
-// InspectILMLegacyTransitionState reads the legacy transition-state record of
-// one object version (GET /rustfs/admin/v3/ilm/transition/state/reconcile).
-// versionID must be the local version id, or the literal "null" for an
-// unversioned object.
-func (c *RustfsAdmin) InspectILMLegacyTransitionState(ctx context.Context, bucket, object, versionID string) (json.RawMessage, error) {
-	values := url.Values{}
-	values.Set("bucket", bucket)
-	values.Set("object", object)
-	values.Set("versionId", versionID)
-	return c.ilmRawRequest(ctx, "GET", "ilm/transition/state/reconcile", values, nil)
-}
-
-// ilmRawRequest issues an ILM admin request and returns the response body
-// unchanged, for routes whose payload is owned by the server.
-func (c *RustfsAdmin) ilmRawRequest(ctx context.Context, method, relPath string, query url.Values, body []byte) (json.RawMessage, error) {
-	reqData := RequestData{
-		Method:      method,
-		RelPath:     relPath,
-		QueryValues: query,
-		Content:     body,
-	}
-	resp, err := c.doRequest(ctx, reqData)
-	if err != nil {
-		return nil, err
-	}
-	defer drainClose(resp)
-
-	raw, err := readAll(resp)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(raw), nil
 }
 
 // readAll reads a response body, tolerating a nil body so an empty 200 from an

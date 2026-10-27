@@ -46,20 +46,6 @@ type ConfigKV struct {
 	Value string
 }
 
-// configHelpResponse is the JSON envelope returned by help-config-kv.
-type configHelpResponse struct {
-	SubSys          string `json:"subSys"`
-	Description     string `json:"description"`
-	MultipleTargets bool   `json:"multipleTargets"`
-	KeysHelp        []struct {
-		Key             string `json:"key"`
-		Type            string `json:"type"`
-		Description     string `json:"description"`
-		Optional        bool   `json:"optional"`
-		MultipleTargets bool   `json:"multipleTargets"`
-	} `json:"keysHelp"`
-}
-
 // GetConfig returns the current KV settings of a config scope from GET get-config-kv.
 //
 // subSystem is a config scope: either a bare sub-system (e.g. "scanner") or a
@@ -218,32 +204,6 @@ func (c *RustfsAdmin) ClearConfigHistory(ctx context.Context) error {
 	}
 	drainClose(resp)
 	return nil
-}
-
-// HelpConfig returns the documented keys of a sub-system via GET help-config-kv.
-// The returned ConfigKV pairs map each key to its value type hint.
-func (c *RustfsAdmin) HelpConfig(ctx context.Context, subSystem string) ([]ConfigKV, error) {
-	query := make(url.Values)
-	query.Set("subSys", subSystem)
-	reqData := RequestData{
-		Method:      "GET",
-		RelPath:     "help-config-kv",
-		QueryValues: query,
-	}
-	resp, err := c.doRequest(ctx, reqData)
-	if err != nil {
-		return nil, err
-	}
-	defer drainClose(resp)
-	var out configHelpResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nil, err
-	}
-	kvs := make([]ConfigKV, 0, len(out.KeysHelp))
-	for _, entry := range out.KeysHelp {
-		kvs = append(kvs, ConfigKV{Key: entry.Key, Value: entry.Type})
-	}
-	return kvs, nil
 }
 
 // buildConfigDirective renders a config scope and its key/value pairs in the

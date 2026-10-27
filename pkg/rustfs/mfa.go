@@ -34,20 +34,3 @@ func (c *RustfsAdmin) ReadUserMFA(ctx context.Context, accessKey string) (UserMF
 	err = json.NewDecoder(resp.Body).Decode(&status)
 	return status, err
 }
-
-// ClearUserMFA clears the second factor of a user.
-func (c *RustfsAdmin) ClearUserMFA(ctx context.Context, accessKey string) error {
-	urlValues := make(url.Values)
-	urlValues.Set("accessKey", accessKey)
-	req_data := RequestData{
-		Method:      "DELETE",
-		RelPath:     "user/mfa",
-		QueryValues: urlValues,
-	}
-	resp, err := c.doRequest(ctx, req_data)
-	if err != nil {
-		return err
-	}
-	drainClose(resp)
-	return nil
-}

@@ -114,27 +114,6 @@ func (c *RustfsAdmin) RemovePeer(ctx context.Context, names []string) error {
 	return c.siteReplicationWrite(ctx, "site-replication/remove", body)
 }
 
-// SiteReplicationEdit edits one peer in the group.
-//
-// Deprecated: use EditPeer, which takes SiteReplicationPeerEdit.
-func (c *RustfsAdmin) SiteReplicationEdit(ctx context.Context, site SiteReplicationSite) error {
-	return c.EditPeer(ctx, SiteReplicationPeerEdit{
-		Name:          site.Name,
-		Endpoint:      site.Endpoint,
-		AccessKey:     site.AccessKey,
-		SecretKey:     site.SecretKey,
-		SkipTLSVerify: site.SkipTLSVerify,
-		CACertPEM:     site.CACertPEM,
-	})
-}
-
-// SiteReplicationRemove removes peers from the group.
-//
-// Deprecated: use RemovePeer.
-func (c *RustfsAdmin) SiteReplicationRemove(ctx context.Context, names []string) error {
-	return c.RemovePeer(ctx, names)
-}
-
 func (c *RustfsAdmin) SiteReplicationInfo(ctx context.Context) (SiteReplicationInfo, error) {
 	reqData := RequestData{
 		Method:  "GET",

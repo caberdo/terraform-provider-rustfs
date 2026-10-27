@@ -70,22 +70,3 @@ func TestReadUserMFAWhenDisabled(t *testing.T) {
 		t.Errorf("expected empty activated_at, got %s", status.ActivatedAt)
 	}
 }
-
-func TestClearUserMFA(t *testing.T) {
-	var gotMethod, gotPath string
-	client := newTestMfaServer(t, func(w http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path + "?" + r.URL.RawQuery
-		w.WriteHeader(http.StatusOK)
-	})
-
-	if err := client.ClearUserMFA(context.Background(), "alice"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotMethod != http.MethodDelete {
-		t.Errorf("expected DELETE, got %s", gotMethod)
-	}
-	if !strings.Contains(gotPath, "/user/mfa") || !strings.Contains(gotPath, "accessKey=alice") {
-		t.Errorf("wrong request: %s", gotPath)
-	}
-}

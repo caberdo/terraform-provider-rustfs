@@ -62,7 +62,6 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 			return client.AttachLDAPPolicy(context.Background(), LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
 		}},
 		{"AttachPolicyToUser", func() error { return client.AttachPolicyToUser(context.Background(), "alice", "readwrite") }},
-		{"ClearUserMFA", func() error { return client.ClearUserMFA(context.Background(), "alice") }},
 		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey(context.Background(), "k1"); return err }},
 		{"CreatePolicy", func() error { return client.CreatePolicy(context.Background(), Policy{Name: "p"}) }},
 		{"CreateServiceAccount", func() error {
@@ -93,7 +92,6 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 		{"GetHealthInfo", func() error { _, err := client.GetHealthInfo(context.Background()); return err }},
 		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(context.Background()); return err }},
 		{"GetObdInfo", func() error { _, err := client.GetObdInfo(context.Background()); return err }},
-		{"HelpConfig", func() error { _, err := client.HelpConfig(context.Background(), "scanner"); return err }},
 		{"ImportBucketMetadata", func() error { return client.ImportBucketMetadata(context.Background(), []byte("zip")) }},
 		{"ImportIam", func() error { return client.ImportIam(context.Background(), []byte("zip")) }},
 		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(context.Background()); return err }},
@@ -151,7 +149,6 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 		{"UpdateServiceAccount", func() error {
 			return client.UpdateServiceAccount(context.Background(), ServiceAccount{AccessKey: "sa1"})
 		}},
-		{"UpdateUserAccount", func() error { return client.UpdateUserAccount(context.Background(), UserAccount{AccessKey: "alice"}) }},
 		{"AddRemoteTarget", func() error {
 			_, err := client.AddRemoteTarget(context.Background(), "b", RemoteTarget{Type: "replication"})
 			return err
@@ -194,7 +191,6 @@ func TestAdminClientDecodeErrorBranches(t *testing.T) {
 		{"GetKmsStatus", func() error { _, err := client.GetKmsStatus(context.Background()); return err }},
 		{"GetModuleSwitches", func() error { _, err := client.GetModuleSwitches(context.Background()); return err }},
 		{"GetObdInfo", func() error { _, err := client.GetObdInfo(context.Background()); return err }},
-		{"HelpConfig", func() error { _, err := client.HelpConfig(context.Background(), "scanner"); return err }},
 		{"ListAuditTargets", func() error { _, err := client.ListAuditTargets(context.Background()); return err }},
 		{"ListKmsKeys", func() error { _, err := client.ListKmsKeys(context.Background()); return err }},
 		{"ListNotificationTargets", func() error { _, err := client.ListNotificationTargets(context.Background()); return err }},

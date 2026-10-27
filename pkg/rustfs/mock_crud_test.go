@@ -114,8 +114,8 @@ func TestMockReadQuotaDecodeError(t *testing.T) {
 	}
 }
 
-// TestMockUserAccountLifecycle covers CreateUserAccount, ReadUserAccount,
-// UpdateUserAccount and DeleteUserAccount against a stubbed admin API.
+// TestMockUserAccountLifecycle covers CreateUserAccount, ReadUserAccount and
+// DeleteUserAccount against a stubbed admin API.
 func TestMockUserAccountLifecycle(t *testing.T) {
 	client := newMockCRUDAdminClient(t)
 
@@ -134,17 +134,13 @@ func TestMockUserAccountLifecycle(t *testing.T) {
 		t.Errorf("unexpected groups: %v", read.Groups)
 	}
 
-	if err := client.UpdateUserAccount(context.Background(), UserAccount{AccessKey: "alice", Status: "disabled"}); err != nil {
-		t.Fatalf("update: %v", err)
-	}
-
 	if err := client.DeleteUserAccount(context.Background(), UserAccount{AccessKey: "alice"}); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 }
 
 // TestMockUserAccountCreatesWithPolicy covers the AttachPolicyToUser follow-up
-// of CreateUserAccount and of UpdateUserAccount.
+// of CreateUserAccount.
 func TestMockUserAccountCreatesWithPolicy(t *testing.T) {
 	var attached []string
 	client := newHandlerAdminClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -164,11 +160,7 @@ func TestMockUserAccountCreatesWithPolicy(t *testing.T) {
 	if err := client.CreateUserAccount(context.Background(), UserAccount{AccessKey: "alice", Policy: "readwrite"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if err := client.UpdateUserAccount(context.Background(), UserAccount{AccessKey: "alice", Policy: "readonly"}); err != nil {
-		t.Fatalf("update: %v", err)
-	}
-
-	if len(attached) != 2 || attached[0] != "readwrite" || attached[1] != "readonly" {
+	if len(attached) != 1 || attached[0] != "readwrite" {
 		t.Errorf("unexpected policy attachments: %v", attached)
 	}
 }
