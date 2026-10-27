@@ -395,6 +395,23 @@ func TestILMResponsesThatAreNotJSONFail(t *testing.T) {
 	}
 }
 
+// TestILMReadRequestErrorsKeepServerAnswer covers the request-error branch of
+// the two ILM read routes: a denied call keeps the server's code instead of
+// being reported as a missing route.
+func TestILMReadRequestErrorsKeepServerAnswer(t *testing.T) {
+	client := newILMClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code><Message>no</Message></Error>`)
+	})
+
+	if _, err := client.ILMExpiryStatus(context.Background()); !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+		t.Fatalf("expiry status error = %v, want AccessDenied", err)
+	}
+	if _, err := client.ListILMRecoveryRecords(context.Background(), rustfs.ILMRecoveryRecordQuery{}); !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+		t.Fatalf("recovery records error = %v, want AccessDenied", err)
+	}
+}
+
 func TestILMReadsPropagateTruncatedBodies(t *testing.T) {
 	client := newILMClient(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", "100")

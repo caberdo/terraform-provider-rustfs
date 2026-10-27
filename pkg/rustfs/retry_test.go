@@ -354,3 +354,94 @@ func TestDoDirectRequestRetriesTransientAnswer(t *testing.T) {
 		t.Fatalf("server calls = %d, want 2", got)
 	}
 }
+
+func TestDoRequestRetriesTransportError(t *testing.T) {
+	var calls int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Errorf("hijack: %v", err)
+				return
+			}
+			_ = conn.Close()
+			return
+		}
+		_, _ = w.Write([]byte(`{"backend":"local"}`))
+	}))
+	defer server.Close()
+
+	client := testRetryClient(t, server.URL)
+	status, err := client.GetKmsStatus(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error after a broken connection: %v", err)
+	}
+	if status == nil || atomic.LoadInt32(&calls) != 2 {
+		t.Fatalf("status = %v, calls = %d; want a retried request", status, atomic.LoadInt32(&calls))
+	}
+}
+
+func TestSleepRetryStopsOnCancellationDuringWait(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	if err := sleepRetry(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("sleepRetry = %v, want context.Canceled during the wait", err)
+	}
+}
+
+func TestDoRequestCancellationStopsRetryBackoff(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	go func() {
+		// Cancel once the first answer has certainly been processed: the
+		// client is then sleeping in the backoff, not blocked on the request.
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	client := testRetryClient(t, server.URL)
+	client.retryBaseDelay = time.Hour
+	_, err := client.GetKmsStatus(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}
+
+func TestDoRequestCancellationStopsTransportBackoff(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			t.Errorf("hijack: %v", err)
+			return
+		}
+		_ = conn.Close()
+	}))
+	defer server.Close()
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	client := testRetryClient(t, server.URL)
+	client.retryBaseDelay = time.Hour
+	_, err := client.GetKmsStatus(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}

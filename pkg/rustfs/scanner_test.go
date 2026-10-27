@@ -382,6 +382,43 @@ func TestResetScannerUsageState(t *testing.T) {
 	}
 }
 
+// TestScannerResetsPropagateServerErrors covers the request-error branch of
+// both reset routes: a denied or failed call keeps the server's error so the
+// resource can report it, instead of looking like an unsupported route.
+func TestScannerResetsPropagateServerErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(rustfs.RustfsAdmin) error
+	}{
+		{
+			name: "cycle-state reset",
+			call: func(client rustfs.RustfsAdmin) error {
+				_, err := client.ResetScannerCycleState(context.Background())
+				return err
+			},
+		},
+		{
+			name: "usage-state reset",
+			call: func(client rustfs.RustfsAdmin) error {
+				_, err := client.ResetScannerUsageState(context.Background())
+				return err
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newScannerTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = io.WriteString(w, `<Error><Code>AccessDenied</Code><Message>denied</Message></Error>`)
+			})
+			err := tc.call(client)
+			if !rustfs.IsAPIErrorCode(err, "AccessDenied") {
+				t.Fatalf("error = %v, want the server's AccessDenied", err)
+			}
+		})
+	}
+}
+
 func TestScannerResetNotImplementedBecomesUnsupportedFeature(t *testing.T) {
 	tests := []struct {
 		name    string
