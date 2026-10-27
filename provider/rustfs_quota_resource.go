@@ -23,6 +23,11 @@ const (
 	// read tolerates RustFS returning ServiceUnavailable while the scanner is
 	// still computing the bucket's authoritative usage on a freshly started
 	// server (usually available within tens of seconds).
+	//
+	// This loop stays beside the resource instead of using the client's retry
+	// policy: it waits for cluster readiness for up to ~90s and matches only the
+	// readiness wording, while the shared policy retries request-level glitches
+	// for about a second. The quota routes are on that policy's allow-list too.
 	quotaReadMaxAttempts   = 30
 	quotaReadRetryInterval = 3 * time.Second
 )
