@@ -2,12 +2,15 @@
 page_title: "rustfs_remote_target Resource - rustfs"
 subcategory: ""
 description: |-
-  Manage remote targets used as replication destinations or notification ARNs in rustfs
+  Manage remote targets used as replication destinations or notification ARNs in rustfs.
+  RustFS refuses to change the endpoint, credentials or TLS settings of a target that belongs to a site-replication peer: such a target records the peer's deployment id and follows the site topology. Those settings are edited through rustfs_site_replication instead; this resource keeps managing ordinary targets. A peer-owned target can still be read, but an in-place update of it fails with a diagnostic naming the peer deployment id (or the peer segment of its ARN) before any request is sent.
 ---
 
 # rustfs_remote_target Resource
 
-Manage remote targets used as replication destinations or notification ARNs in rustfs
+Manage remote targets used as replication destinations or notification ARNs in rustfs.
+
+RustFS refuses to change the endpoint, credentials or TLS settings of a target that belongs to a site-replication peer: such a target records the peer's deployment id and follows the site topology. Those settings are edited through `rustfs_site_replication` instead; this resource keeps managing ordinary targets. A peer-owned target can still be read, but an in-place update of it fails with a diagnostic naming the peer deployment id (or the peer segment of its ARN) before any request is sent.
 
 ## Example Usage
 
@@ -21,6 +24,10 @@ resource "rustfs_bucket_versioning" "source" {
   status = "Enabled"
 }
 
+# A target that RustFS derives from a site-replication peer belongs to that
+# peer: its endpoint, credentials and TLS settings follow the site topology, and
+# updating them here fails with a diagnostic naming the peer deployment id.
+# Change such a target through rustfs_site_replication instead.
 resource "rustfs_remote_target" "peer" {
   type          = "replication"
   endpoint      = "https://peer.example.com"

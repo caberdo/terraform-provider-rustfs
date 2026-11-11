@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
@@ -54,8 +56,13 @@ func (r *RemoteTargetResource) Metadata(_ context.Context, req resource.Metadata
 
 func (r *RemoteTargetResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Manage remote targets used as replication destinations or notification ARNs in rustfs",
-		MarkdownDescription: "Manage remote targets used as replication destinations or notification ARNs in rustfs",
+		Description: "Manage remote targets used as replication destinations or notification ARNs in rustfs",
+		MarkdownDescription: "Manage remote targets used as replication destinations or notification ARNs in rustfs.\n\n" +
+			"RustFS refuses to change the endpoint, credentials or TLS settings of a target that belongs to a " +
+			"site-replication peer: such a target records the peer's deployment id and follows the site topology. " +
+			"Those settings are edited through `rustfs_site_replication` instead; this resource keeps managing " +
+			"ordinary targets. A peer-owned target can still be read, but an in-place update of it fails with a " +
+			"diagnostic naming the peer deployment id (or the peer segment of its ARN) before any request is sent.",
 		Attributes: map[string]schema.Attribute{
 			"arn": schema.StringAttribute{
 				Computed:    true,
@@ -152,6 +159,17 @@ func (r *RemoteTargetResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
+	// arn is Computed, so a normal create carries none and the server assigns
+	// one. A plan that already holds an ARN can only come from a create-after-
+	// import path; such a plan must not try to rewrite a peer-owned target
+	// either.
+	if arn := plan.Arn.ValueString(); arn != "" {
+		if peer := r.peerDeploymentID(ctx, plan.Bucket.ValueString(), arn); peer != "" {
+			addPeerOwnedTargetDiagnostic(&resp.Diagnostics, plan.Bucket.ValueString(), arn, peer)
+			return
+		}
+	}
+
 	arn, err := r.client.RustClient.AddRemoteTarget(ctx, plan.Bucket.ValueString(), r.targetFromModel(plan))
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating remote target", err.Error())
@@ -223,12 +241,67 @@ func (r *RemoteTargetResource) Update(ctx context.Context, req resource.UpdateRe
 
 	target := r.targetFromModel(plan)
 	target.Arn = state.Arn.ValueString()
+
+	// RustFS 1.0.5 rejects a connection-settings update on a target that
+	// belongs to a site-replication peer, and its 400 says the target records a
+	// peer deployment id (rustfs/rustfs#8814). Detect that from the listing
+	// before sending, so the apply fails with an actionable diagnostic that
+	// names the peer and the resource that can edit it. When the listing cannot
+	// prove peer ownership (no target record, or the list call failed) the
+	// update proceeds and the server's own error remains the fallback.
+	if peer := r.peerDeploymentID(ctx, plan.Bucket.ValueString(), target.Arn); peer != "" {
+		addPeerOwnedTargetDiagnostic(&resp.Diagnostics, plan.Bucket.ValueString(), target.Arn, peer)
+		return
+	}
+
 	if _, err := r.client.RustClient.AddRemoteTarget(ctx, plan.Bucket.ValueString(), target); err != nil {
 		resp.Diagnostics.AddError("Error updating remote target", err.Error())
 		return
 	}
 	plan.Arn = state.Arn
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// peerDeploymentID returns the site-replication peer deployment id the server
+// records for arn on bucket, or "" when the target is not peer-owned. It is
+// also empty when the target is not in the listing or the listing itself
+// failed, which keeps the server authoritative for the update instead of
+// inventing ownership evidence.
+func (r *RemoteTargetResource) peerDeploymentID(ctx context.Context, bucket, arn string) string {
+	if bucket == "" || arn == "" {
+		return ""
+	}
+	targets, err := r.client.RustClient.ListRemoteTargets(ctx, bucket)
+	if err != nil {
+		tflog.Debug(ctx, "could not inspect remote target ownership; leaving the decision to the server", map[string]any{
+			"bucket": bucket,
+			"arn":    arn,
+			"error":  err.Error(),
+		})
+		return ""
+	}
+	for i := range targets {
+		if targets[i].Arn == arn {
+			return targets[i].PeerDeploymentID()
+		}
+	}
+	return ""
+}
+
+// addPeerOwnedTargetDiagnostic explains why a peer-owned target cannot be
+// changed through rustfs_remote_target.
+func addPeerOwnedTargetDiagnostic(diags *diag.Diagnostics, bucket, arn, peer string) {
+	diags.AddError(
+		"Remote target is owned by site replication",
+		fmt.Sprintf(
+			"The target %s on bucket %s belongs to site-replication peer %q (the deployment id the target "+
+				"records, or the peer segment of its ARN), so its endpoint, credentials and TLS settings follow "+
+				"the site topology. RustFS refuses to change them through the remote-target route, and Terraform "+
+				"did not send this update. Edit the peer with rustfs_site_replication (endpoint, access_key, "+
+				"secret_key, skip_tls_verify, ca_cert_pem) instead.",
+			arn, bucket, peer,
+		),
+	)
 }
 
 func (r *RemoteTargetResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -273,6 +346,27 @@ func (r *RemoteTargetResource) ImportState(ctx context.Context, req resource.Imp
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("bucket"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("arn"), parts[1])...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// An imported target may belong to a site-replication peer. Import itself is
+	// read-only, so it succeeds, but the user has to know that endpoint,
+	// credential and TLS changes will be refused and that rustfs_site_replication
+	// owns that configuration. A listing failure is not an error here: Read runs
+	// next and reports the real problem.
+	if peer := r.peerDeploymentID(ctx, parts[0], parts[1]); peer != "" {
+		resp.Diagnostics.AddWarning(
+			"Imported remote target is owned by site replication",
+			fmt.Sprintf(
+				"The target %s on bucket %s belongs to site-replication peer %q (the deployment id the target "+
+					"records, or the peer segment of its ARN). Its endpoint, credentials and TLS settings follow "+
+					"the site topology, so rustfs_remote_target cannot change them: edit the peer with "+
+					"rustfs_site_replication instead.",
+				parts[1], parts[0], peer,
+			),
+		)
+	}
 }
 
 func (r *RemoteTargetResource) targetFromModel(plan RemoteTargetResourceModel) rustfs.RemoteTarget {

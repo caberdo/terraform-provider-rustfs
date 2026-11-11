@@ -253,6 +253,13 @@ func TestIsRemoteTargetNotFound(t *testing.T) {
 	}
 }
 
+// TestAccRemoteTargetResource exercises an ordinary (non-peer) remote target
+// against a second RustFS instance: create, import, an in-place credential
+// update and a planned replacement. The peer-owned path is not exercised here:
+// a peer-owned target only exists once site replication has derived one from a
+// two-site topology, and that setup is what TestAccSiteReplicationResource
+// owns. TestRemoteTargetResourceLifecyclePaths covers the guard, and this test
+// keeps proving the ordinary target still updates in place.
 func TestAccRemoteTargetResource(t *testing.T) {
 	peer, err := remoteTargetPeerConfig(t)
 	if err != nil {
@@ -642,6 +649,188 @@ func TestRemoteTargetResourceLifecyclePaths(t *testing.T) {
 			rec.assertNoRequest(t, "list-remote-targets")
 		})
 	}
+
+	// A peer-owned target is derived from the site topology. RustFS 1.0.5
+	// answers 400 InvalidRequest when its connection settings are changed
+	// through set-remote-target (rustfs/rustfs#8814), so the resource refuses
+	// the update before sending anything and names the evidence it used.
+	peerOwnedARN := "arn:minio:replication::peer-id:dst-bucket"
+
+	peerUpdateCases := []struct {
+		name     string
+		arn      string
+		listBody string
+		wantPeer string
+	}{
+		{
+			name:     "deployment id from the listing",
+			arn:      peerOwnedARN,
+			listBody: `[{"arn":"` + peerOwnedARN + `","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket","deployment_id":"peer-id"}]`,
+			wantPeer: `peer "peer-id"`,
+		},
+		{
+			name:     "deploymentID alias from the listing",
+			arn:      peerOwnedARN,
+			listBody: `[{"arn":"` + peerOwnedARN + `","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket","deploymentID":"peer-from-alias"}]`,
+			wantPeer: `peer "peer-from-alias"`,
+		},
+		{
+			name:     "topology-derived ARN when no deployment id is stored",
+			arn:      "arn:rustfs:replication::peer-from-arn:dst-bucket",
+			listBody: `[{"arn":"arn:rustfs:replication::peer-from-arn:dst-bucket","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket"}]`,
+			wantPeer: `peer "peer-from-arn"`,
+		},
+	}
+
+	for _, tc := range peerUpdateCases {
+		t.Run("update: peer-owned target ("+tc.name+") fails before sending", func(t *testing.T) {
+			client, rec := routedClient(t,
+				requestRoute{method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusOK, body: tc.listBody},
+				requestRoute{method: http.MethodPut, pathContains: "set-remote-target", status: http.StatusOK},
+			)
+			h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+
+			plan := remoteTargetPlan("tf-test", "replication")
+			plan.AccessKey = types.StringValue("rotated-access-key")
+			state := remoteTargetPlan("tf-test", "replication")
+			state.Arn = types.StringValue(tc.arn)
+
+			resp := h.update(plan, state)
+
+			assertErrorDiagnostic(t, resp.Diagnostics, "Remote target is owned by site replication", tc.wantPeer)
+			if !strings.Contains(resp.Diagnostics[0].Detail(), "rustfs_site_replication") {
+				t.Errorf("diagnostic detail does not point at rustfs_site_replication: %q", resp.Diagnostics[0].Detail())
+			}
+			rec.assertRequest(t, "list-remote-targets")
+			rec.assertNoRequest(t, "set-remote-target")
+		})
+	}
+
+	t.Run("update: ordinary target is still sent", func(t *testing.T) {
+		client, rec := routedClient(t,
+			requestRoute{
+				method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusOK,
+				body: `[{"arn":"arn:minio:replication::target-id:dst-bucket","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket"}]`,
+			},
+			requestRoute{
+				method: http.MethodPut, pathContains: "set-remote-target", status: http.StatusOK,
+				body: `"arn:minio:replication::target-id:dst-bucket"`,
+			},
+		)
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+
+		plan := remoteTargetPlan("tf-test", "replication")
+		plan.AccessKey = types.StringValue("rotated-access-key")
+		state := remoteTargetPlan("tf-test", "replication")
+		state.Arn = types.StringValue("arn:minio:replication::target-id:dst-bucket")
+
+		resp := h.update(plan, state)
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		rec.assertRequest(t, "set-remote-target")
+		assertStateString(t, resp.State, path.Root("arn"), "arn:minio:replication::target-id:dst-bucket")
+	})
+
+	t.Run("update: unreadable listing leaves the server error as the fallback", func(t *testing.T) {
+		client, rec := routedClient(t,
+			requestRoute{method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusForbidden, body: s3ErrorXML("AccessDenied", "nope")},
+			requestRoute{
+				method: http.MethodPut, pathContains: "set-remote-target", status: http.StatusBadRequest,
+				body: s3ErrorXML("InvalidRequest", "cannot change the connection settings of remote target arn:minio:replication::peer-id:dst-bucket: it records site-replication peer deployment id peer-id"),
+			},
+		)
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+
+		plan := remoteTargetPlan("tf-test", "replication")
+		plan.AccessKey = types.StringValue("rotated-access-key")
+		state := remoteTargetPlan("tf-test", "replication")
+		state.Arn = types.StringValue("arn:minio:replication::peer-id:dst-bucket")
+
+		resp := h.update(plan, state)
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Error updating remote target", "it records site-replication peer deployment id peer-id")
+		rec.assertRequest(t, "set-remote-target")
+	})
+
+	t.Run("create: an explicit peer-owned arn fails before sending", func(t *testing.T) {
+		client, rec := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusOK,
+			body: `[{"arn":"` + peerOwnedARN + `","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket","deployment_id":"peer-id"}]`,
+		})
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+
+		plan := remoteTargetPlan("tf-test", "replication")
+		plan.Arn = types.StringValue(peerOwnedARN)
+
+		resp := h.create(plan)
+
+		assertErrorDiagnostic(t, resp.Diagnostics, "Remote target is owned by site replication", `peer "peer-id"`)
+		h.assertNoPartialState(resp, plan)
+		rec.assertNoRequest(t, "set-remote-target")
+	})
+
+	t.Run("import: peer-owned target warns instead of failing", func(t *testing.T) {
+		client, _ := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusOK,
+			body: `[{"arn":"` + peerOwnedARN + `","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket","deployment_id":"peer-id"}]`,
+		})
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+		importer, ok := h.res.(fwresource.ResourceWithImportState)
+		if !ok {
+			t.Fatal("remote target resource does not implement ResourceWithImportState")
+		}
+
+		resp := &fwresource.ImportStateResponse{State: h.state(remoteTargetPlan("tf-test", "replication"))}
+		importer.ImportState(context.Background(), fwresource.ImportStateRequest{ID: "tf-test:" + peerOwnedARN}, resp)
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		if got := resp.Diagnostics.WarningsCount(); got != 1 {
+			t.Fatalf("expected one warning, got %d: %v", got, resp.Diagnostics)
+		}
+		warning := resp.Diagnostics.Warnings()[0]
+		if got := warning.Summary(); got != "Imported remote target is owned by site replication" {
+			t.Errorf("warning summary = %q", got)
+		}
+		for _, want := range []string{`peer "peer-id"`, "rustfs_site_replication"} {
+			if !strings.Contains(warning.Detail(), want) {
+				t.Errorf("warning detail = %q, want it to contain %q", warning.Detail(), want)
+			}
+		}
+	})
+
+	t.Run("import: ordinary target imports without a warning", func(t *testing.T) {
+		client, _ := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusOK,
+			body: `[{"arn":"` + peerOwnedARN + `","type":"replication","endpoint":"http://peer:9000","targetbucket":"dst-bucket"}]`,
+		})
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+		importer, ok := h.res.(fwresource.ResourceWithImportState)
+		if !ok {
+			t.Fatal("remote target resource does not implement ResourceWithImportState")
+		}
+
+		resp := &fwresource.ImportStateResponse{State: h.state(remoteTargetPlan("tf-test", "replication"))}
+		importer.ImportState(context.Background(), fwresource.ImportStateRequest{ID: "tf-test:" + peerOwnedARN}, resp)
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+	})
+
+	t.Run("import: an unreadable listing does not fail the import", func(t *testing.T) {
+		client, _ := routedClient(t, requestRoute{
+			method: http.MethodGet, pathContains: "list-remote-targets", status: http.StatusForbidden,
+			body: s3ErrorXML("AccessDenied", "nope"),
+		})
+		h := newCRUDHarness(t, NewRemoteTargetResource(), client)
+		importer, ok := h.res.(fwresource.ResourceWithImportState)
+		if !ok {
+			t.Fatal("remote target resource does not implement ResourceWithImportState")
+		}
+
+		resp := &fwresource.ImportStateResponse{State: h.state(remoteTargetPlan("tf-test", "replication"))}
+		importer.ImportState(context.Background(), fwresource.ImportStateRequest{ID: "tf-test:" + peerOwnedARN}, resp)
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+	})
 
 	t.Run("configure: rejects foreign provider data", func(t *testing.T) {
 		h := newCRUDHarness(t, NewRemoteTargetResource(), cannedClient(t, http.StatusOK, ""))
