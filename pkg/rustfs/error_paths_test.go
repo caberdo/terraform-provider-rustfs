@@ -62,6 +62,7 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 			return client.AttachLDAPPolicy(context.Background(), LDAPPolicyAttachment{UserOrGroup: "cn=alice", PolicyName: "readwrite"})
 		}},
 		{"AttachPolicyToUser", func() error { return client.AttachPolicyToUser(context.Background(), "alice", "readwrite") }},
+		{"CheckTierDeletion", func() error { _, err := client.CheckTierDeletion(context.Background(), "COLD"); return err }},
 		{"CreateKmsKey", func() error { _, err := client.CreateKmsKey(context.Background(), "k1"); return err }},
 		{"CreatePolicy", func() error { return client.CreatePolicy(context.Background(), Policy{Name: "p"}) }},
 		{"CreateServiceAccount", func() error {
@@ -107,9 +108,10 @@ func TestAdminClientErrorBranchesOnServerFailure(t *testing.T) {
 		{"ReadServiceAccount", func() error { _, err := client.ReadServiceAccount(context.Background(), "sa1"); return err }},
 		{"ReadUserAccount", func() error { _, err := client.ReadUserAccount(context.Background(), "alice"); return err }},
 		{"ReadUserMFA", func() error { _, err := client.ReadUserMFA(context.Background(), "alice"); return err }},
-		{"RemoveTier", func() error { return client.RemoveTier(context.Background(), "COLD") }},
+		{"RemoveTier", func() error { return client.RemoveTier(context.Background(), "COLD", false) }},
 		{"ResetAuditTarget", func() error { return client.ResetAuditTarget(context.Background(), "webhook", "primary") }},
 		{"ResetNotificationTarget", func() error { return client.ResetNotificationTarget(context.Background(), "amqp", "primary") }},
+		{"RetryTierCleanup", func() error { _, err := client.RetryTierCleanup(context.Background(), "COLD"); return err }},
 		{"RotateKmsKey", func() error { _, err := client.RotateKmsKey(context.Background(), "k1"); return err }},
 		{"ServerInfo", func() error { _, err := client.ServerInfo(context.Background()); return err }},
 		{"SetAuditTarget", func() error { return client.SetAuditTarget(context.Background(), "webhook", "primary", nil) }},

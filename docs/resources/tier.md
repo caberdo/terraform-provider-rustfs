@@ -2,12 +2,15 @@
 page_title: "rustfs_tier Resource - rustfs"
 subcategory: ""
 description: |-
-  Manage RustFS storage tiers for data transition to external backends
+  Manage RustFS storage tiers for data transition to external backends.
+  force_destroy only changes how destroy behaves: it removes the tier record even when RustFS reports the backend as non-empty or still in use, and it never deletes remote data. When RustFS refuses a destroy, the diagnostic includes the server's deletion-check verdict (scan_status and the blocker kinds) on RustFS 1.0.5 or later; older servers report the plain refusal. Durable cleanup for a tier blocked on CLEANUP_PENDING can be requested with the admin route POST /rustfs/admin/v3/tier/{tier}/cleanup-retry, which this provider does not call because it starts work.
 ---
 
 # rustfs_tier Resource
 
-Manage RustFS storage tiers for data transition to external backends
+Manage RustFS storage tiers for data transition to external backends.
+
+`force_destroy` only changes how destroy behaves: it removes the tier record even when RustFS reports the backend as non-empty or still in use, and it never deletes remote data. When RustFS refuses a destroy, the diagnostic includes the server's `deletion-check` verdict (`scan_status` and the blocker kinds) on RustFS 1.0.5 or later; older servers report the plain refusal. Durable cleanup for a tier blocked on `CLEANUP_PENDING` can be requested with the admin route `POST /rustfs/admin/v3/tier/{tier}/cleanup-retry`, which this provider does not call because it starts work.
 
 ## Example Usage
 
@@ -29,6 +32,12 @@ resource "rustfs_tier" "s3_cold" {
       bucket     = "cold-storage-backup"
     }
   })
+
+  // force_destroy only changes what destroy does: it removes the tier record
+  // even when RustFS reports the backend as non-empty or still in use, and
+  // RustFS 1.0.5 can then skip the backend probe. Remote objects are never
+  // deleted. Leave it false and let destroy explain the blockers first.
+  force_destroy = false
 }
 ```
 
@@ -40,3 +49,7 @@ resource "rustfs_tier" "s3_cold" {
 - `config_json` (String, Sensitive) Backend-specific configuration as a JSON string. See RustFS tier documentation for the expected format per backend type.
 - `name` (String) Tier name (must be uppercase). Changing this forces recreation.
 - `tier_type` (String) Tier type: s3, minio, azure, gcs, aliyun, tencent, huaweicloud, r2, or rustfs.
+
+### Optional
+
+- `force_destroy` (Boolean) Remove the tier record on destroy even when RustFS refuses because the backend is not empty or is still in use. RustFS 1.0.5 and later can also skip the backend probe, so a tier with an unroutable endpoint can be removed. This only deletes the tier record: objects already transitioned to the backend are never deleted. Defaults to false.

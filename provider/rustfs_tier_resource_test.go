@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	frameworkresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/defaults"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -37,8 +38,8 @@ func TestTierResourceSchema(t *testing.T) {
 	sch := resourceSchemaOf(t, r)
 
 	attrs := sch.GetAttributes()
-	if len(attrs) != 3 {
-		t.Errorf("expected 3 attributes, got %d: %v", len(attrs), attrs)
+	if len(attrs) != 4 {
+		t.Errorf("expected 4 attributes, got %d: %v", len(attrs), attrs)
 	}
 
 	name, ok := attrs["name"].(schema.StringAttribute)
@@ -75,6 +76,25 @@ func TestTierResourceSchema(t *testing.T) {
 	}
 	if hasRequiresReplace(configJSON.PlanModifiers) {
 		t.Error("config_json is editable through EditTier and must not force recreation")
+	}
+
+	forceDestroy, ok := attrs["force_destroy"].(schema.BoolAttribute)
+	if !ok {
+		t.Fatalf("force_destroy is not a BoolAttribute")
+	}
+	if !forceDestroy.Optional || !forceDestroy.Computed {
+		t.Errorf("force_destroy must be Optional and Computed: %+v", forceDestroy)
+	}
+	if len(forceDestroy.PlanModifiers) != 0 {
+		t.Error("force_destroy only affects Delete and must not carry a replacement modifier")
+	}
+	if forceDestroy.Default == nil {
+		t.Fatal("force_destroy must have a default so an unset value is a known false")
+	}
+	forceDefault := &defaults.BoolResponse{}
+	forceDestroy.Default.DefaultBool(context.Background(), defaults.BoolRequest{}, forceDefault)
+	if forceDefault.PlanValue.IsUnknown() || forceDefault.PlanValue.IsNull() || forceDefault.PlanValue.ValueBool() {
+		t.Errorf("force_destroy must default to false, got %v", forceDefault.PlanValue)
 	}
 
 	for name, attr := range attrs {
@@ -267,6 +287,45 @@ func TestTierResourceUpdate(t *testing.T) {
 		}
 	})
 
+	t.Run("force_destroy alone does not edit the tier", func(t *testing.T) {
+		// A user sets force_destroy to remove a tier whose backend cannot be
+		// reached. Editing the tier would make the server probe that backend
+		// again, so the value has to be recorded without an API call.
+		srv, recorder := newRecorderServer(t, http.StatusInternalServerError, s3ErrorXML("InternalError", "should not be called"))
+		r := NewTierResource().(*TierResource)
+		r.client = newUnitAllClient(srv)
+		sch := resourceSchemaOf(t, r)
+
+		state := tierResourceModel{
+			Name:         types.StringValue("S3COLD"),
+			TierType:     types.StringValue("s3"),
+			ConfigJson:   types.StringValue(`{"name":"S3COLD"}`),
+			ForceDestroy: types.BoolValue(false),
+		}
+		plan := state
+		plan.ForceDestroy = types.BoolValue(true)
+
+		resp := &frameworkresource.UpdateResponse{State: resourceState(t, sch, state)}
+		r.Update(context.Background(), frameworkresource.UpdateRequest{
+			Plan:  resourcePlan(t, sch, plan),
+			State: resourceState(t, sch, state),
+		}, resp)
+
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+		}
+		if got := recorder.count(); got != 0 {
+			t.Errorf("expected no admin API request, got %d", got)
+		}
+		var got types.Bool
+		if diags := resp.State.GetAttribute(context.Background(), path.Root("force_destroy"), &got); diags.HasError() {
+			t.Fatalf("reading force_destroy from state: %v", diags)
+		}
+		if !got.ValueBool() {
+			t.Error("force_destroy was not recorded in state")
+		}
+	})
+
 	t.Run("reports a server failure", func(t *testing.T) {
 		srv, _ := newRecorderServer(t, http.StatusInternalServerError, "<Error><Code>TierEditFailed</Code></Error>")
 		r := NewTierResource().(*TierResource)
@@ -305,6 +364,28 @@ func TestTierResourceDelete(t *testing.T) {
 		request := recorder.only(t)
 		if request.Method != http.MethodDelete || request.Path != "/rustfs/admin/v3/tier/S3COLD" {
 			t.Errorf("unexpected request %s %s", request.Method, request.Path)
+		}
+		if request.Query != "" {
+			t.Errorf("the default destroy must not send a query, got %q", request.Query)
+		}
+	})
+
+	t.Run("force_destroy sends force=true", func(t *testing.T) {
+		srv, recorder := newRecorderServer(t, http.StatusOK, "")
+		r := NewTierResource().(*TierResource)
+		r.client = newUnitAllClient(srv)
+		sch := resourceSchemaOf(t, r)
+
+		state := tierResourceModel{Name: types.StringValue("S3COLD"), ForceDestroy: types.BoolValue(true)}
+		resp := &frameworkresource.DeleteResponse{}
+		r.Delete(context.Background(), frameworkresource.DeleteRequest{State: resourceState(t, sch, state)}, resp)
+
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+		}
+		request := recorder.only(t)
+		if request.Query != "force=true" {
+			t.Errorf("force_destroy did not reach the wire: query = %q", request.Query)
 		}
 	})
 
@@ -639,6 +720,28 @@ func testAccMutateTierOutOfBand(t *testing.T, tierEndpoint, name, bucket string)
 	}
 }
 
+// TestTierDeletionRefusal pins which refusals trigger the deletion-check
+// explanation: only the two codes RustFS uses to say the tier is still in use,
+// never an unrelated failure.
+func TestTierDeletionRefusal(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil},
+		{name: "unrelated", err: errors.New("AccessDenied")},
+		{name: "backend not empty", err: &rustfs.APIError{Code: "XMinioAdminTierBackendNotEmpty", StatusCode: http.StatusBadRequest}, want: true},
+		{name: "backend in use", err: &rustfs.APIError{Code: "XMinioAdminTierBackendInUse", StatusCode: http.StatusConflict}, want: true},
+		{name: "code only in the payload", err: errors.New("<Error><Code>XMinioAdminTierBackendNotEmpty</Code></Error>")},
+	}
+	for _, tc := range cases {
+		if got := isTierDeletionRefusal(tc.err); got != tc.want {
+			t.Errorf("%s: isTierDeletionRefusal = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestTierTransientMutationErrors pins which refusals the resource retries: the
 // two the server answers while a previous tier mutation has not finished
 // reconciling, and nothing else.
@@ -955,11 +1058,41 @@ func TestTierResourceLifecyclePaths(t *testing.T) {
 		})
 	}
 
+	t.Run("read: import records the force_destroy default", func(t *testing.T) {
+		// An import seeds only name, so force_destroy is null. The default is
+		// recorded on read, otherwise the next plan would show an in-place
+		// update for a value the user never set.
+		client, _ := routedClient(t, requestRoute{
+			method:       http.MethodGet,
+			pathContains: "/v3/tier/COLD",
+			status:       http.StatusOK,
+		})
+		h := newCRUDHarness(t, NewTierResource(), client)
+
+		resp := h.read(&tierResourceModel{
+			Name:       types.StringValue("COLD"),
+			TierType:   types.StringValue("s3"),
+			ConfigJson: types.StringValue(`{"name":"COLD"}`),
+		})
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		var force types.Bool
+		if diags := resp.State.GetAttribute(context.Background(), path.Root("force_destroy"), &force); diags.HasError() {
+			t.Fatalf("reading force_destroy from state: %v", diags)
+		}
+		if force.IsNull() || force.IsUnknown() || force.ValueBool() {
+			t.Errorf("force_destroy = %v, want a known false", force)
+		}
+	})
+
 	deleteCases := []struct {
-		name        string
-		routes      []requestRoute
-		wantSummary string
-		wantDetail  string
+		name         string
+		routes       []requestRoute
+		forceDestroy bool
+		wantSummary  string
+		wantDetail   string
+		wantDetails  []string
+		wantNoDetail string
 	}{
 		{
 			// Probed against RustFS latest: DELETE tier/<unknown> answers 200
@@ -974,6 +1107,67 @@ func TestTierResourceLifecyclePaths(t *testing.T) {
 			wantSummary: "Error removing tier",
 			wantDetail:  "Could not remove tier: ",
 		},
+		{
+			// RustFS 1.0.5 answers the deletion check with the blockers, so a
+			// refused destroy explains itself instead of only quoting the XML.
+			name: "refused removal explains the blockers",
+			routes: []requestRoute{
+				{method: http.MethodDelete, pathContains: "/v3/tier/COLD", status: http.StatusBadRequest, body: s3ErrorXML("XMinioAdminTierBackendNotEmpty", "remote tier is not empty")},
+				{method: http.MethodGet, pathContains: "/v3/tier/COLD/deletion-check", status: http.StatusOK, body: `{"tier_name":"COLD","proof_complete":true,"scan_status":"complete","reasons":[{"kind":"LIFECYCLE_REFERENCE"},{"kind":"CLEANUP_PENDING"}],"remote":{"reachable":true}}`},
+			},
+			wantSummary: "Error removing tier",
+			wantDetail:  "Could not remove tier: ",
+			wantDetails: []string{
+				`scan_status "complete"`,
+				"LIFECYCLE_REFERENCE",
+				"CLEANUP_PENDING",
+				"set force_destroy = true",
+			},
+		},
+		{
+			// force_destroy is already set, so suggesting it again would be
+			// wrong advice.
+			name: "refused removal with force_destroy reports the same refusal",
+			routes: []requestRoute{
+				{method: http.MethodDelete, pathContains: "/v3/tier/COLD", status: http.StatusBadRequest, body: s3ErrorXML("XMinioAdminTierBackendNotEmpty", "remote tier is not empty")},
+				{method: http.MethodGet, pathContains: "/v3/tier/COLD/deletion-check", status: http.StatusOK, body: `{"tier_name":"COLD","proof_complete":false,"scan_status":"incomplete","reasons":[{"kind":"TRANSITION_PENDING"}],"remote":{}}`},
+			},
+			forceDestroy: true,
+			wantSummary:  "Error removing tier",
+			wantDetail:   "Could not remove tier: ",
+			wantDetails: []string{
+				`scan_status "incomplete"`,
+				"lower bound",
+				"TRANSITION_PENDING",
+				"force_destroy is already set",
+			},
+		},
+		{
+			// A server older than 1.0.5 has no deletion check. The refusal is
+			// still reported, unchanged, instead of replacing it with an
+			// upgrade diagnostic the user cannot act on during destroy.
+			name: "unsupported deletion check keeps the original refusal",
+			routes: []requestRoute{
+				{method: http.MethodDelete, pathContains: "/v3/tier/COLD", status: http.StatusBadRequest, body: s3ErrorXML("XMinioAdminTierBackendNotEmpty", "remote tier is not empty")},
+				{method: http.MethodGet, pathContains: "/v3/tier/COLD/deletion-check", status: http.StatusNotImplemented, body: s3ErrorXML("NotImplemented", "not implemented")},
+				{method: http.MethodGet, pathContains: "/v3/healthinfo", status: http.StatusOK, body: `{"version":"1.0.4"}`},
+			},
+			wantSummary:  "Error removing tier",
+			wantDetail:   "Could not remove tier: ",
+			wantNoDetail: "scan_status",
+		},
+		{
+			// The check is only an explanation: its own failure must not mask
+			// the refusal the user has to act on.
+			name: "failing deletion check keeps the original refusal",
+			routes: []requestRoute{
+				{method: http.MethodDelete, pathContains: "/v3/tier/COLD", status: http.StatusBadRequest, body: s3ErrorXML("XMinioAdminTierBackendNotEmpty", "remote tier is not empty")},
+				{method: http.MethodGet, pathContains: "/v3/tier/COLD/deletion-check", status: http.StatusForbidden, body: s3ErrorXML("AccessDenied", "nope")},
+			},
+			wantSummary:  "Error removing tier",
+			wantDetail:   "Could not remove tier: ",
+			wantNoDetail: "scan_status",
+		},
 	}
 
 	for _, tc := range deleteCases {
@@ -982,9 +1176,10 @@ func TestTierResourceLifecyclePaths(t *testing.T) {
 			h := newCRUDHarness(t, NewTierResource(), client)
 
 			resp := h.delete(&tierResourceModel{
-				Name:       types.StringValue("COLD"),
-				TierType:   types.StringValue("s3"),
-				ConfigJson: types.StringValue(`{"name":"COLD"}`),
+				Name:         types.StringValue("COLD"),
+				TierType:     types.StringValue("s3"),
+				ConfigJson:   types.StringValue(`{"name":"COLD"}`),
+				ForceDestroy: types.BoolValue(tc.forceDestroy),
 			})
 
 			if tc.wantSummary == "" {
@@ -992,6 +1187,12 @@ func TestTierResourceLifecyclePaths(t *testing.T) {
 				return
 			}
 			assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail)
+			for _, detail := range tc.wantDetails {
+				assertDiagnosticDetail(t, resp.Diagnostics, detail)
+			}
+			if tc.wantNoDetail != "" && strings.Contains(resp.Diagnostics[0].Detail(), tc.wantNoDetail) {
+				t.Errorf("diagnostic detail %q must not contain %q", resp.Diagnostics[0].Detail(), tc.wantNoDetail)
+			}
 		})
 	}
 
@@ -1072,8 +1273,15 @@ func TestTierResourceLifecyclePaths(t *testing.T) {
 				TierType:   types.StringValue("s3"),
 				ConfigJson: types.StringValue(tc.configJSON),
 			}
+			// The stored configuration differs from the plan, so this is a real
+			// edit and not a force_destroy-only update.
+			state := &tierResourceModel{
+				Name:       types.StringValue("COLD"),
+				TierType:   types.StringValue("s3"),
+				ConfigJson: types.StringValue(`{"name":"COLD","type":"s3","stored":true}`),
+			}
 
-			resp := h.update(plan, plan)
+			resp := h.update(plan, state)
 
 			assertErrorDiagnostic(t, resp.Diagnostics, tc.wantSummary, tc.wantDetail)
 		})

@@ -15,4 +15,10 @@ resource "rustfs_tier" "s3_cold" {
       bucket     = "cold-storage-backup"
     }
   })
+
+  // force_destroy only changes what destroy does: it removes the tier record
+  // even when RustFS reports the backend as non-empty or still in use, and
+  // RustFS 1.0.5 can then skip the backend probe. Remote objects are never
+  // deleted. Leave it false and let destroy explain the blockers first.
+  force_destroy = false
 }
