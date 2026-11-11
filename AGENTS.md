@@ -3,7 +3,7 @@
 ## Project: terraform-provider-rustfs
 
 A Terraform provider for [RustFS](https://github.com/rustfs/rustfs), an S3-compatible object
-storage system, built with the Plugin Framework (v1.19.0) and Go 1.27.3. The provider serves
+storage system, built with the Plugin Framework (v1.19.0) and Go 1.27.4. The provider serves
 both the S3 API (through the AWS SDK for Go v2) and the RustFS admin API (`/rustfs/admin/v3`).
 
 Registry address: `registry.terraform.io/caberdo/rustfs`.
@@ -385,7 +385,7 @@ them live before claiming a CRUD change works.
 
 ### Dependencies
 
-- Go 1.27.3
+- Go 1.27.4
 - `terraform-plugin-docs` v0.25.0 (docs generation, via `//go:generate` in `main.go`)
 - `terraform-plugin-framework` v1.19.0, `terraform-plugin-framework-validators` v0.19.0
 - `terraform-plugin-testing` v1.16.0
