@@ -7,6 +7,10 @@ resource "rustfs_bucket_versioning" "source" {
   status = "Enabled"
 }
 
+# A target that RustFS derives from a site-replication peer belongs to that
+# peer: its endpoint, credentials and TLS settings follow the site topology, and
+# updating them here fails with a diagnostic naming the peer deployment id.
+# Change such a target through rustfs_site_replication instead.
 resource "rustfs_remote_target" "peer" {
   type          = "replication"
   endpoint      = "https://peer.example.com"
