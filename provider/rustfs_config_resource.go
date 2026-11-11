@@ -56,7 +56,7 @@ func (r *ConfigResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"settings": schema.MapAttribute{
 				Required:    true,
 				ElementType: types.StringType,
-				Description: "Key/value settings applied to the sub-system scope.",
+				Description: "Key/value settings applied to the sub-system scope. Only these keys are refreshed once the resource is applied: keys the server retains in the scope but the configuration does not declare (RustFS keeps unsupported, legacy and alias keys) are ignored until they are added here. On import the whole scope is read, including those keys.",
 			},
 			"id": schema.StringAttribute{
 				Computed:    true,
@@ -99,6 +99,30 @@ func settingsFromConfigKVs(ctx context.Context, kvs []rustfs.ConfigKV) types.Map
 	for _, kv := range kvs {
 		settings[kv.Key] = kv.Value
 	}
+	return settingsMapFromStrings(ctx, settings)
+}
+
+// managedSettingsFromConfigKVs maps the server's KV answer onto the keys the
+// prior state manages. RustFS 1.0.5 retains unsupported keys, legacy shapes and
+// alias branches at their original paths (rustfs/rustfs#8803), so
+// get-config-kv can return keys the configuration never declared; those are
+// ignored. A managed key the server no longer reports is dropped, so the plan
+// proposes it again.
+func managedSettingsFromConfigKVs(ctx context.Context, kvs []rustfs.ConfigKV, managed types.Map) types.Map {
+	keys := make(map[string]struct{}, len(managed.Elements()))
+	for key := range managed.Elements() {
+		keys[key] = struct{}{}
+	}
+	settings := make(map[string]string, len(kvs))
+	for _, kv := range kvs {
+		if _, ok := keys[kv.Key]; ok {
+			settings[kv.Key] = kv.Value
+		}
+	}
+	return settingsMapFromStrings(ctx, settings)
+}
+
+func settingsMapFromStrings(ctx context.Context, settings map[string]string) types.Map {
 	value, diags := types.MapValueFrom(ctx, types.StringType, settings)
 	if diags.HasError() {
 		return types.MapNull(types.StringType)
@@ -182,7 +206,20 @@ func (r *ConfigResource) Read(ctx context.Context, req resource.ReadRequest, res
 	// on 1.0.1 and latest: an unset subsystem returns eight default keys, and a
 	// scope that does not exist at all answers 400 InvalidRequest instead). Only
 	// that structured answer removes the resource; an empty body keeps state.
-	state.Settings = settingsFromConfigKVs(ctx, kvs)
+	//
+	// A refresh keeps only the keys the prior state manages. RustFS 1.0.5
+	// retains unsupported keys, legacy shapes and alias branches at their
+	// original paths (rustfs/rustfs#8803), so the scope can return keys the
+	// configuration never declared. Adopting them would make the next plan
+	// remove them, the update send only the configured keys, and the read after
+	// that adopt them again: a perpetual diff. A null settings map is an
+	// import (ImportState sets only sub_system), which has no managed set yet;
+	// adopting the whole scope there keeps import useful.
+	if state.Settings.IsNull() {
+		state.Settings = settingsFromConfigKVs(ctx, kvs)
+	} else {
+		state.Settings = managedSettingsFromConfigKVs(ctx, kvs, state.Settings)
+	}
 	state.ID = state.SubSystem
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
