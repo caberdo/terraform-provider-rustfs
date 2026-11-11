@@ -160,8 +160,13 @@ func (r *bucketResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				},
 				Attributes: map[string]schema.Attribute{
 					"location_constraint": schema.StringAttribute{
-						Optional:    true,
-						Description: "Region in which the bucket is created (for example eu-west-1).",
+						Optional: true,
+						Description: "Region in which the bucket is created (for example eu-west-1). RustFS 1.0.5 " +
+							"and later reject a constraint that does not match the server's configured region: use the " +
+							"region the server reports (the rustfs_server_info data source exposes it), EU when that " +
+							"region is eu-west-1, or omit create_bucket_configuration on the default region. The " +
+							"provider reads the server region once per constrained create and fails before CreateBucket " +
+							"is sent when the value cannot match.",
 						Validators: []validator.String{
 							stringvalidator.OneOf(enumStrings(s3types.BucketLocationConstraint("").Values())...),
 						},
@@ -222,6 +227,11 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	resp.Diagnostics.Append(r.checkLocationConstraint(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(plan.Name.ValueString()),
 	}
@@ -272,6 +282,81 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 	tflog.Trace(ctx, "created a resource")
 	resp.Diagnostics.Append(r.applyServerState(ctx, &plan, false)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// bucketLocationConstraintAccepted reports whether a configured
+// location_constraint is one RustFS accepts for the region the server reports.
+// RustFS 1.0.5 accepts the configured region itself and, for eu-west-1, the EU
+// alias; every other value is refused with InvalidLocationConstraint.
+func bucketLocationConstraintAccepted(constraint, region string) bool {
+	if constraint == region {
+		return true
+	}
+	return region == "eu-west-1" && constraint == "EU"
+}
+
+// serverRegion returns the region the RustFS deployment reports, or "" when it
+// reports none (the default region). The info route is the primary source and
+// healthinfo the fallback. The value is never guessed: an absent region stays
+// absent so callers can skip a check they cannot make.
+func (r *bucketResource) serverRegion(ctx context.Context) (string, error) {
+	info, err := r.client.RustClient.ServerInfo(ctx)
+	if err == nil {
+		if info.Info.Region == nil {
+			return "", nil
+		}
+		return *info.Info.Region, nil
+	}
+	health, healthErr := r.client.RustClient.GetHealthInfo(ctx)
+	if healthErr != nil {
+		return "", err
+	}
+	return health.Region, nil
+}
+
+// checkLocationConstraint refuses a location_constraint the server would reject
+// before CreateBucket is sent, naming the server's region and the accepted
+// values. RustFS 1.0.5 validates the constraint itself, so this only improves
+// the diagnostic. The check is skipped when the server reports no region — there
+// is nothing to compare against — and a failed region read is a warning rather
+// than an error, because the create may still be accepted and the constraint is
+// the server's decision.
+func (r *bucketResource) checkLocationConstraint(ctx context.Context, plan *bucketResourceModel) diag.Diagnostics {
+	if plan.CreateBucketConfiguration == nil {
+		return nil
+	}
+	constraint := plan.CreateBucketConfiguration.LocationConstraint.ValueString()
+	if constraint == "" {
+		return nil
+	}
+
+	region, err := r.serverRegion(ctx)
+	if err != nil {
+		var diags diag.Diagnostics
+		diags.AddWarning(
+			"Could not read the RustFS region",
+			fmt.Sprintf("The provider could not read the region RustFS serves, so location_constraint %q "+
+				"was not checked before the bucket was created: %s. RustFS validates the constraint itself "+
+				"and the create fails when it does not match.", constraint, err),
+		)
+		return diags
+	}
+	if region == "" || bucketLocationConstraintAccepted(constraint, region) {
+		return nil
+	}
+
+	var diags diag.Diagnostics
+	accepted := fmt.Sprintf("%q", region)
+	if region == "eu-west-1" {
+		accepted += " or EU"
+	}
+	diags.AddError(
+		fmt.Sprintf("Invalid location_constraint for bucket %s", plan.Name.ValueString()),
+		fmt.Sprintf("RustFS serves region %q, so create_bucket_configuration.location_constraint = %q is "+
+			"rejected. Use %s, or omit create_bucket_configuration on the default region.",
+			region, constraint, accepted),
+	)
+	return diags
 }
 
 func buildCreateBucketConfiguration(ctx context.Context, cfg *createBucketConfigurationModel) (*s3types.CreateBucketConfiguration, diag.Diagnostics) {
