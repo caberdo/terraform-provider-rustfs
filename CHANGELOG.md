@@ -1,5 +1,52 @@
 ## Unreleased
 
+## 0.9.0 (2026-11-11)
+
+FEATURES:
+- `rustfs_tier` gains `force_destroy`. Destroying a tier with `force_destroy = true`
+  removes the tier record even when RustFS reports the backend as not empty or still in use, and
+  RustFS 1.0.5 and later can skip the backend probe, so a tier with an unroutable endpoint can be
+  removed at all. Remote objects are never deleted. A refused destroy now includes the server's
+  `deletion-check` verdict (`scan_status` and the blocker kinds) on RustFS 1.0.5 or later, and older
+  servers keep reporting the plain refusal.
+- `rustfs_pools` now exposes a computed `pools` list with per-pool `status`, `availability`,
+  `capacity_status`, `pool_metadata_status`, `rebalance_metadata_status` and `observed_at` from the
+  RustFS 1.0.5 `pools/list` diagnostics. `names` is unchanged. Servers before 1.0.5 do not send the
+  diagnostics, so those attributes are null there instead of failing the read.
+- `rustfs_scanner_status` now exposes the RustFS 1.0.5 usage-publication and heal-observation blocks. `usage_publication_class`, `usage_publication_outcome`, `usage_publication_pending_bucket_count` and the snapshot/observation timestamps say whether the last publication converged or still had pending buckets, alongside the older `usage_publication_state`. `heal_retained_pending_tasks`, `heal_terminal_candidate_count`, `heal_unknown_candidate_count`, `heal_integrity_state` and `heal_candidates_json` report this node's bounded heal observations; no heal control is added. On RustFS 1.0.1 through 1.0.4 the reads still succeed and the new attributes are null.
+
+IMPROVEMENTS:
+- RustFS 1.0.5 tightened the admin permissions behind `rustfs_table_bucket`,
+  `rustfs_group`, `rustfs_serviceaccount`, `rustfs_user` and the
+  `rustfs_bucket_usage` data source. The generated docs now name the grant each
+  one needs (`admin:ClaimTableLocation`, `admin:RemoveUserFromGroup`, the
+  service-account parent scope, the access-key collision rule and the
+  bucket-scoped `s3:ListBucket` check) and the failure mode a scoped credential
+  sees.
+
+BUG FIXES:
+- `rustfs_remote_target` now explains peer-owned site-replication targets. When a
+  target records a site-replication peer deployment id (or carries an ARN derived
+  from the topology), an in-place endpoint, credential or TLS change fails with a
+  diagnostic naming the peer and pointing at `rustfs_site_replication`, instead of
+  surfacing the raw RustFS 1.0.5 `400 InvalidRequest`. Importing such a target
+  emits the same explanation as a warning. Ordinary remote targets keep updating
+  in place.
+- `rustfs_bucket` checks `create_bucket_configuration.location_constraint` against the region the
+  server reports before it calls `CreateBucket`, so a mismatch now fails with a diagnostic naming the
+  server's region and the accepted values instead of RustFS 1.0.5's `InvalidLocationConstraint`. A
+  constraint that matches the region, the `EU` alias for `eu-west-1`, and a deployment that reports
+  no region all keep working; the default-region path (no `create_bucket_configuration`) is
+  unchanged. The `location_constraint` description in `docs/resources/bucket.md` states the rule.
+- `rustfs_config` no longer produces a perpetual diff on a scope that holds keys its configuration does not declare. RustFS 1.0.5 retains unsupported, legacy and alias keys at their original paths, so `get-config-kv` can return keys the configuration never set; a refresh now keeps only the keys the previous state managed and ignores the rest. Drift in a managed key, and a managed key the server no longer reports, are still planned as an update. An imported resource still reads the whole scope, so the first plan after an import removes the keys the configuration does not declare; after that apply the scope converges.
+
+CHORES:
+- The acceptance matrix now pins RustFS `1.0.4` and `1.0.5` next to `1.0.1`–`1.0.3` and `latest`,
+  and the README, generated provider docs and roadmap list the full tested range. The capability
+  matrix gains `1.0.4`/`1.0.5` columns: both releases keep every capability `1.0.3` had, and the
+  admin metrics stream still answers `501 NotImplemented` on `1.0.5`.
+- The module now requires Go 1.27.4 instead of 1.27.3. Go 1.27.3's standard library is affected by GO-2026-6859 (`net/http` HTTP/1 server crash due to a `MaxBytesReader` header race), which `govulncheck` reports on every build. Building from source now needs Go 1.27.4; `GOTOOLCHAIN=auto` fetches it automatically.
+
 ## 0.8.0 (2026-10-27)
 
 FEATURES:
