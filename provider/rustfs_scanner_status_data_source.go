@@ -5,6 +5,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -47,6 +48,29 @@ type ScannerStatusDataSourceModel struct {
 	CycleRecoveryReason             types.String  `tfsdk:"cycle_recovery_reason"`
 	DataMovementPaused              types.Bool    `tfsdk:"data_movement_paused"`
 	PauseBacklogPhase               types.String  `tfsdk:"pause_backlog_phase"`
+
+	UsagePublicationScannerEpoch              types.Int64  `tfsdk:"usage_publication_scanner_epoch"`
+	UsagePublicationCycle                     types.Int64  `tfsdk:"usage_publication_cycle"`
+	UsagePublicationClass                     types.String `tfsdk:"usage_publication_class"`
+	UsagePublicationOutcome                   types.String `tfsdk:"usage_publication_outcome"`
+	UsagePublicationPendingBucketCount        types.Int64  `tfsdk:"usage_publication_pending_bucket_count"`
+	UsagePublicationSnapshotUpdatedAtUnixSecs types.Int64  `tfsdk:"usage_publication_snapshot_updated_at_unix_secs"`
+	UsagePublicationObservedAtUnixSecs        types.Int64  `tfsdk:"usage_publication_observed_at_unix_secs"`
+
+	HealRetainedPendingTasks   types.Int64  `tfsdk:"heal_retained_pending_tasks"`
+	HealTerminalCandidateCount types.Int64  `tfsdk:"heal_terminal_candidate_count"`
+	HealUnknownCandidateCount  types.Int64  `tfsdk:"heal_unknown_candidate_count"`
+	HealIntegrityState         types.String `tfsdk:"heal_integrity_state"`
+	HealCandidatesJSON         types.String `tfsdk:"heal_candidates_json"`
+}
+
+// scannerHealCandidatesJSON is the compact JSON form of the heal candidate
+// arrays. It keeps the server's grouping so a future execution, disposition,
+// scope or reason value needs no schema change; status_json remains the full,
+// unmodified escape hatch.
+type scannerHealCandidatesJSON struct {
+	Terminal []rustfs.ScannerHealTerminalCandidate `json:"terminal_candidates"`
+	Unknown  []rustfs.ScannerHealUnknownCandidate  `json:"unknown_candidates"`
 }
 
 func NewScannerStatusDataSource() datasource.DataSource {
@@ -59,9 +83,12 @@ func (d *ScannerStatusDataSource) Metadata(_ context.Context, req datasource.Met
 
 func (d *ScannerStatusDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	description := "Runtime status of the RustFS object scanner (GET /rustfs/admin/v3/scanner/status): " +
-		"cycle state, the last completed cycle and its counters, usage publication state, and " +
-		"data-movement pause state. The scanner's tuning knobs stay in the `scanner` subsystem of " +
-		"`rustfs_config` or in the server environment; this data source only observes them."
+		"cycle state, the last completed cycle and its counters, usage publication and heal observation, " +
+		"and data-movement pause state. The scanner's tuning knobs stay in the `scanner` subsystem of " +
+		"`rustfs_config` or in the server environment; this data source only observes them. RustFS 1.0.5 " +
+		"adds the usage-publication and heal-observation blocks; on 1.0.1 through 1.0.4 their attributes " +
+		"are null and the read still succeeds. Heal observation is read-only: this data source never " +
+		"starts, pauses or cancels a heal."
 	resp.Schema = schema.Schema{
 		Description:         description,
 		MarkdownDescription: description,
@@ -71,8 +98,10 @@ func (d *ScannerStatusDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Description: "Data source identifier.",
 			},
 			"status_json": schema.StringAttribute{
-				Computed:    true,
-				Description: "Raw JSON response as returned by the RustFS admin API.",
+				Computed: true,
+				Description: "Raw JSON response as returned by the RustFS admin API. It always carries the full " +
+					"body, including any block or field this data source does not model, so it is the escape " +
+					"hatch when a newer server adds scanner telemetry.",
 			},
 			"enabled": schema.BoolAttribute{
 				Computed:    true,
@@ -139,8 +168,50 @@ func (d *ScannerStatusDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Description: "Whether a usage-state full rebuild is still pending after a reset.",
 			},
 			"usage_publication_state": schema.StringAttribute{
-				Computed:    true,
-				Description: "State of the last scanner usage publication.",
+				Computed: true,
+				Description: "State of the last scanner usage publication " +
+					"(`metrics.usage_freshness.last_publication_state`). This is the older field: it reports " +
+					"the retained publication state, while the `usage_publication_*` attributes describe the " +
+					"most recent publication attempt, including whether it converged " +
+					"(`usage_publication_class`) and how many buckets it left pending.",
+			},
+			"usage_publication_scanner_epoch": schema.Int64Attribute{
+				Computed: true,
+				Description: "Scanner epoch of the most recent usage publication attempt. Null on RustFS 1.0.1 " +
+					"through 1.0.4, which do not report the block.",
+			},
+			"usage_publication_cycle": schema.Int64Attribute{
+				Computed: true,
+				Description: "Scanner cycle of the most recent usage publication attempt. It is the cycle the " +
+					"attempt observed and can differ from `current_cycle`. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"usage_publication_class": schema.StringAttribute{
+				Computed: true,
+				Description: "Class of the most recent publication attempt, for example `complete_converged`, " +
+					"`complete_pending`, `progress_only`, `observational` or `unknown`. The server defines these " +
+					"values, so this stays a string rather than a fixed enum. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"usage_publication_outcome": schema.StringAttribute{
+				Computed: true,
+				Description: "Persistence outcome of the most recent publication attempt, for example `saved`. " +
+					"Server-defined, so this stays a string. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"usage_publication_pending_bucket_count": schema.Int64Attribute{
+				Computed: true,
+				Description: "Buckets still pending in the authoritative usage snapshot the attempt published. " +
+					"Null when the server could not confirm the snapshot (progress-only, observational, failed " +
+					"or unverified); zero only for a confirmed converged snapshot. The live " +
+					"`usage_dirty_pending_buckets` count can change independently after publication.",
+			},
+			"usage_publication_snapshot_updated_at_unix_secs": schema.Int64Attribute{
+				Computed: true,
+				Description: "Unix time at which the published usage snapshot was last updated. Null when the " +
+					"server did not report it, including on RustFS 1.0.1 through 1.0.4.",
+			},
+			"usage_publication_observed_at_unix_secs": schema.Int64Attribute{
+				Computed: true,
+				Description: "Unix time at which this node recorded the publication observation. Null when the " +
+					"server did not report it, including on RustFS 1.0.1 through 1.0.4.",
 			},
 			"usage_last_durable_success_unix_secs": schema.Int64Attribute{
 				Computed:    true,
@@ -169,6 +240,37 @@ func (d *ScannerStatusDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"pause_backlog_phase": schema.StringAttribute{
 				Computed:    true,
 				Description: "Catch-up phase of the pause ledger: `idle`, `paused`, `catching_up` or `retry_exhausted`.",
+			},
+			"heal_retained_pending_tasks": schema.Int64Attribute{
+				Computed: true,
+				Description: "Heal tasks this node still retains as pending, from `heal_observation`. Null when " +
+					"the local observer is not running or the server does not report the block (RustFS 1.0.1 " +
+					"through 1.0.4).",
+			},
+			"heal_terminal_candidate_count": schema.Int64Attribute{
+				Computed: true,
+				Description: "Sum of the retained terminal heal observation groups, from " +
+					"`heal_observation.terminal_candidates[].count`. It covers the local observation window, " +
+					"not a lifetime total. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"heal_unknown_candidate_count": schema.Int64Attribute{
+				Computed: true,
+				Description: "Sum of the retained unknown heal observation groups, from " +
+					"`heal_observation.unknown_candidates[].count`: admission rejections, overflow, loss, expiry " +
+					"and missing terminal proof. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"heal_integrity_state": schema.StringAttribute{
+				Computed: true,
+				Description: "Integrity verdict of the heal observation window, for example `unknown`. It stays " +
+					"`unknown` while any candidate lacks terminal proof, including when " +
+					"`heal_retained_pending_tasks` is zero. Null on RustFS 1.0.1 through 1.0.4.",
+			},
+			"heal_candidates_json": schema.StringAttribute{
+				Computed: true,
+				Description: "Compact JSON object holding the server's `terminal_candidates` and " +
+					"`unknown_candidates` arrays. The entries keep their execution, disposition, scope, scan mode " +
+					"and reason grouping, so a value this provider does not name needs no schema change. Null on " +
+					"RustFS 1.0.1 through 1.0.4; `status_json` carries the whole response.",
 			},
 		},
 	}
@@ -236,6 +338,40 @@ func (d *ScannerStatusDataSource) Read(ctx context.Context, _ datasource.ReadReq
 		DataMovementPaused:              types.BoolValue(status.DataMovementPaused),
 		PauseBacklogPhase:               types.StringValue(status.PauseBacklogPhase),
 	}
+
+	// The two observation blocks ship in RustFS 1.0.5. The model fields keep
+	// their zero value (null) on an older server, so every attribute stays null
+	// instead of being reported as zero.
+	if publication := status.UsagePublication; publication != nil {
+		state.UsagePublicationScannerEpoch = uint64NullInt64(publication.ScannerEpoch)
+		state.UsagePublicationCycle = uint64NullInt64(publication.Cycle)
+		state.UsagePublicationClass = types.StringValue(publication.Class)
+		state.UsagePublicationOutcome = types.StringValue(publication.Outcome)
+		state.UsagePublicationPendingBucketCount = uint64NullInt64(publication.PendingBucketCount)
+		state.UsagePublicationSnapshotUpdatedAtUnixSecs = uint64NullInt64(publication.SnapshotUpdatedAtUnixSecs)
+		state.UsagePublicationObservedAtUnixSecs = uint64NullInt64(publication.ObservedAtUnixSecs)
+	}
+
+	if observation := status.HealObservation; observation != nil {
+		state.HealRetainedPendingTasks = uint64NullInt64(observation.RetainedPendingTasks)
+		state.HealTerminalCandidateCount = types.Int64Value(int64(observation.TerminalCandidateCount))
+		state.HealUnknownCandidateCount = types.Int64Value(int64(observation.UnknownCandidateCount))
+		state.HealIntegrityState = types.StringValue(observation.IntegrityState)
+
+		candidates, err := json.Marshal(scannerHealCandidatesJSON{
+			Terminal: observation.TerminalCandidates,
+			Unknown:  observation.UnknownCandidates,
+		})
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error encoding scanner heal candidates",
+				"Could not encode the heal observation candidates: "+err.Error(),
+			)
+			return
+		}
+		state.HealCandidatesJSON = types.StringValue(string(candidates))
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

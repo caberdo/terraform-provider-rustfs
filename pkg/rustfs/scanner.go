@@ -57,6 +57,64 @@ type ScannerStatus struct {
 	CycleRecoveryReason             *string
 	DataMovementPaused              bool
 	PauseBacklogPhase               string
+
+	// UsagePublication and HealObservation are the observation blocks RustFS
+	// 1.0.5 added to the status payload. Both stay nil on 1.0.1 through 1.0.4,
+	// which do not send them.
+	UsagePublication *ScannerUsagePublication
+	HealObservation  *ScannerHealObservation
+}
+
+// ScannerUsagePublication is the metrics.usage_publication block: one local
+// usage-snapshot publication attempt, with its own scanner epoch and cycle even
+// after metrics.current_cycle returns to zero.
+//
+// class and outcome stay strings because the server defines and extends them
+// (`progress_only`, `observational`, `complete_pending`, `complete_converged`
+// and `unknown` are the classes RustFS 1.0.5 documents). Fields the attempt
+// could not confirm are nil, not zero: pending_bucket_count comes from a
+// confirmed authoritative snapshot and is only zero for a confirmed converged
+// one.
+type ScannerUsagePublication struct {
+	ScannerEpoch              *uint64
+	Cycle                     *uint64
+	Class                     string
+	Outcome                   string
+	PendingBucketCount        *uint64
+	SnapshotUpdatedAtUnixSecs *uint64
+	ObservedAtUnixSecs        *uint64
+}
+
+// ScannerHealTerminalCandidate is one retained terminal heal observation group.
+type ScannerHealTerminalCandidate struct {
+	Execution   string `json:"execution"`
+	Disposition string `json:"disposition"`
+	Scope       string `json:"scope"`
+	ScanMode    string `json:"scan_mode"`
+	Count       uint64 `json:"count"`
+}
+
+// ScannerHealUnknownCandidate is one retained unknown heal observation group.
+type ScannerHealUnknownCandidate struct {
+	Reason string `json:"reason"`
+	Count  uint64 `json:"count"`
+}
+
+// ScannerHealObservation is the top-level heal_observation block: this node's
+// bounded heal observations. It is observation only; nothing here starts,
+// pauses or cancels a heal.
+//
+// The server groups candidates by their execution/disposition or unknown
+// reason, so the two counts are the sum of the groups' count fields. They cover
+// the local observation window, not a lifetime total and not a cluster
+// backlog.
+type ScannerHealObservation struct {
+	RetainedPendingTasks   *uint64
+	IntegrityState         string
+	TerminalCandidates     []ScannerHealTerminalCandidate
+	UnknownCandidates      []ScannerHealUnknownCandidate
+	TerminalCandidateCount uint64
+	UnknownCandidateCount  uint64
 }
 
 // ScannerUsageStateResetResult is the synchronous usage-state reset answer.
@@ -77,6 +135,36 @@ type ScannerCycleStateResetResult struct {
 	Status  string `json:"status"`
 	Mode    string `json:"mode"`
 	RawJSON string `json:"-"`
+}
+
+// scannerUsagePublicationBlock is the wire shape of metrics.usage_publication.
+// Unknown keys are ignored, so a server that adds a field still decodes.
+type scannerUsagePublicationBlock struct {
+	ScannerEpoch              *uint64 `json:"scanner_epoch"`
+	Cycle                     *uint64 `json:"cycle"`
+	Class                     string  `json:"class"`
+	Outcome                   string  `json:"outcome"`
+	PendingBucketCount        *uint64 `json:"pending_bucket_count"`
+	SnapshotUpdatedAtUnixSecs *uint64 `json:"snapshot_updated_at_unix_secs"`
+	ObservedAtUnixSecs        *uint64 `json:"observed_at_unix_secs"`
+}
+
+// scannerHealObservationBlock is the wire shape of heal_observation. Unknown
+// keys, including a future candidate field, are ignored.
+type scannerHealObservationBlock struct {
+	RetainedPendingTasks *uint64 `json:"retained_pending_tasks"`
+	TerminalCandidates   []struct {
+		Execution   string `json:"execution"`
+		Disposition string `json:"disposition"`
+		Scope       string `json:"scope"`
+		ScanMode    string `json:"scan_mode"`
+		Count       uint64 `json:"count"`
+	} `json:"terminal_candidates"`
+	UnknownCandidates []struct {
+		Reason string `json:"reason"`
+		Count  uint64 `json:"count"`
+	} `json:"unknown_candidates"`
+	IntegrityState string `json:"integrity_state"`
 }
 
 type scannerStatusEnvelope struct {
@@ -105,8 +193,15 @@ type scannerStatusEnvelope struct {
 		MaintenanceControl struct {
 			PrimaryControl string `json:"primary_control"`
 		} `json:"maintenance_control"`
+
+		// UsagePublication is a pointer so a 1.0.1 through 1.0.4 payload, which
+		// omits the block, decodes to nil instead of a zero attempt.
+		UsagePublication *scannerUsagePublicationBlock `json:"usage_publication"`
 	} `json:"metrics"`
-	CycleSchedule struct {
+	// HealObservation is a pointer for the same reason: pre-1.0.5 servers omit
+	// the block.
+	HealObservation *scannerHealObservationBlock `json:"heal_observation"`
+	CycleSchedule   struct {
 		EffectiveIntervalSeconds     uint64 `json:"effective_interval_seconds"`
 		UsageBootstrapRebuildPending bool   `json:"usage_bootstrap_rebuild_pending"`
 	} `json:"cycle_schedule"`
@@ -148,7 +243,7 @@ func (c *RustfsAdmin) GetScannerStatus(ctx context.Context) (ScannerStatus, erro
 		return ScannerStatus{}, fmt.Errorf("decode scanner status: %w", err)
 	}
 
-	return ScannerStatus{
+	status := ScannerStatus{
 		RawJSON:                         string(raw),
 		Enabled:                         envelope.Enabled,
 		DisabledReason:                  envelope.DisabledReason,
@@ -174,7 +269,48 @@ func (c *RustfsAdmin) GetScannerStatus(ctx context.Context) (ScannerStatus, erro
 		CycleRecoveryReason:             envelope.CycleRecovery.Reason,
 		DataMovementPaused:              envelope.DataMovementPause.Paused,
 		PauseBacklogPhase:               envelope.PauseBacklog.Phase,
-	}, nil
+	}
+
+	if block := envelope.Metrics.UsagePublication; block != nil {
+		status.UsagePublication = &ScannerUsagePublication{
+			ScannerEpoch:              block.ScannerEpoch,
+			Cycle:                     block.Cycle,
+			Class:                     block.Class,
+			Outcome:                   block.Outcome,
+			PendingBucketCount:        block.PendingBucketCount,
+			SnapshotUpdatedAtUnixSecs: block.SnapshotUpdatedAtUnixSecs,
+			ObservedAtUnixSecs:        block.ObservedAtUnixSecs,
+		}
+	}
+
+	if block := envelope.HealObservation; block != nil {
+		observation := &ScannerHealObservation{
+			RetainedPendingTasks: block.RetainedPendingTasks,
+			IntegrityState:       block.IntegrityState,
+			TerminalCandidates:   make([]ScannerHealTerminalCandidate, 0, len(block.TerminalCandidates)),
+			UnknownCandidates:    make([]ScannerHealUnknownCandidate, 0, len(block.UnknownCandidates)),
+		}
+		for _, candidate := range block.TerminalCandidates {
+			observation.TerminalCandidates = append(observation.TerminalCandidates, ScannerHealTerminalCandidate{
+				Execution:   candidate.Execution,
+				Disposition: candidate.Disposition,
+				Scope:       candidate.Scope,
+				ScanMode:    candidate.ScanMode,
+				Count:       candidate.Count,
+			})
+			observation.TerminalCandidateCount += candidate.Count
+		}
+		for _, candidate := range block.UnknownCandidates {
+			observation.UnknownCandidates = append(observation.UnknownCandidates, ScannerHealUnknownCandidate{
+				Reason: candidate.Reason,
+				Count:  candidate.Count,
+			})
+			observation.UnknownCandidateCount += candidate.Count
+		}
+		status.HealObservation = observation
+	}
+
+	return status, nil
 }
 
 // ResetScannerCycleState runs POST /v3/scanner/cycle-state/reset with the only
