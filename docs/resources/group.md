@@ -2,12 +2,12 @@
 page_title: "rustfs_group Resource - rustfs"
 subcategory: ""
 description: |-
-  Manage RustFS IAM groups and their members
+  Manage RustFS IAM groups and their members. Changing members calls PUT /rustfs/admin/v3/update-group-members: adding a member needs admin:AddUserToGroup and removing one needs admin:RemoveUserFromGroup. Destroying a non-empty group also removes its members. A scoped credential that holds only admin:AddUserToGroup fails a removal, and therefore the destroy, with AccessDenied.
 ---
 
 # rustfs_group Resource
 
-Manage RustFS IAM groups and their members
+Manage RustFS IAM groups and their members. Changing `members` calls `PUT /rustfs/admin/v3/update-group-members`: adding a member needs `admin:AddUserToGroup` and removing one needs `admin:RemoveUserFromGroup`. Destroying a non-empty group also removes its members. A scoped credential that holds only `admin:AddUserToGroup` fails a removal, and therefore the destroy, with `AccessDenied`.
 
 ## Example Usage
 

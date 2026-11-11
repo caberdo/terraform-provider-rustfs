@@ -74,9 +74,10 @@ func (d *BucketUsageDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 		"The numbers are not real-time: the scanner publishes them after a cycle, the endpoint caches a computed " +
 		"answer for up to 30 seconds, and `sets_reporting` below `sets_total` means at least one erasure set could " +
 		"not contribute, so the counters are a lower bound. A newly created bucket can report zeros until the first " +
-		"cycle covers it. An unknown bucket fails the read instead of reporting zeros. The read also performs an " +
-		"S3 `HeadBucket` existence check, so the provider credentials need `s3:ListBucket` (or equivalent) on the " +
-		"bucket in addition to the admin permission that serves the usage route. This is the scanner's " +
+		"cycle covers it. An unknown bucket fails the read instead of reporting zeros. The read also performs a " +
+		"bucket-scoped S3 `HeadBucket` existence check, so the provider credentials need `s3:ListBucket` on " +
+		"that bucket (or an equivalent grant) in addition to the admin permission that serves the usage " +
+		"route. This is the scanner's " +
 		"eventually-consistent accounting, not the quota subsystem's view: use `rustfs_quota_stats` for the " +
 		"configured quota limit, the quota subsystem's usage and the remaining headroom."
 	resp.Schema = schema.Schema{

@@ -47,8 +47,12 @@ func (r *GroupResource) Metadata(_ context.Context, req resource.MetadataRequest
 
 func (r *GroupResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Manage RustFS IAM groups",
-		MarkdownDescription: "Manage RustFS IAM groups and their members",
+		Description: "Manage RustFS IAM groups",
+		MarkdownDescription: "Manage RustFS IAM groups and their members. Changing `members` calls " +
+			"`PUT /rustfs/admin/v3/update-group-members`: adding a member needs `admin:AddUserToGroup` " +
+			"and removing one needs `admin:RemoveUserFromGroup`. Destroying a non-empty group also " +
+			"removes its members. A scoped credential that holds only `admin:AddUserToGroup` fails a " +
+			"removal, and therefore the destroy, with `AccessDenied`.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:    true,

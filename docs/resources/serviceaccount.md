@@ -46,7 +46,7 @@ resource "rustfs_serviceaccount" "ci_token" {
 - `description` (String) Short description of the scope we plan to use this token
 - `expiration` (String) Expiration timestamp in RFC3339 format without fractional seconds (e.g. 2030-01-01T00:00:00Z). Defaults to 9999-01-01T00:00:00Z.
 - `policy` (String) IAM policy document (JSON) the service account is scoped to. Changing this forces a new resource to be created.
-- `user` (String) Optional user the token should be scoped to. Changing this forces a new resource to be created.
+- `user` (String) Optional user the token should be scoped to. Changing this forces a new resource to be created. The parent must stay inside the caller's scope: a non-owner credential can only create the service account under itself, while parenting it to root or to another user requires an owner (root) caller. An out-of-scope parent fails the apply with `AccessDenied`.
 
 ### Read-Only
 

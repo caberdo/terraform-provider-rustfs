@@ -76,8 +76,11 @@ func (r *ServiceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				MarkdownDescription: "Short description of the scope we plan to use this token",
 			},
 			"user": schema.StringAttribute{
-				Optional:            true,
-				MarkdownDescription: "Optional user the token should be scoped to. Changing this forces a new resource to be created.",
+				Optional: true,
+				MarkdownDescription: "Optional user the token should be scoped to. Changing this forces a new resource to be created. " +
+					"The parent must stay inside the caller's scope: a non-owner credential can only create the service " +
+					"account under itself, while parenting it to root or to another user requires an owner (root) " +
+					"caller. An out-of-scope parent fails the apply with `AccessDenied`.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
