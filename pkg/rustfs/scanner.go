@@ -399,7 +399,7 @@ func init() {
 	registerFeature(FeatureScannerStatus, featureSpec{
 		route: "GET /rustfs/admin/v3/scanner/status",
 		// The route is registered and implemented in the tagged RustFS source
-		// for 1.0.1 through 1.0.3, so there is no version floor to advertise.
+		// for 1.0.1 through 1.0.5, so there is no version floor to advertise.
 		// A build that does not implement it produces a capability error
 		// naming the exact server version, and the acceptance precheck skips.
 	})

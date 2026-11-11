@@ -57,7 +57,7 @@ in detail, including the complete resource and data source tables.
   API v3 (`/rustfs/admin/v3`), both with SigV4-signed requests.
 - Terraform 1.0 or later is required (plugin protocol 6.0); the provider is also available for
   OpenTofu.
-- CI exercises the acceptance suite against RustFS `1.0.1`, `1.0.2`, `1.0.3` and `latest`; see
+- CI exercises the acceptance suite against RustFS `1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest`; see
   [`.github/rustfs-versions.txt`](https://github.com/caberdo/terraform-provider-rustfs/blob/main/.github/rustfs-versions.txt).
 - Capabilities that depend on server-side sub-systems - KMS (`rustfs_kms_key`), LDAP
   (`rustfs_ldap_*`), storage tiers and ILM (`rustfs_tier`, `rustfs_rebalance`), audit
@@ -68,30 +68,33 @@ in detail, including the complete resource and data source tables.
 
 ### Supported RustFS versions
 
-| Capability | Provider types | `1.0.1` | `1.0.2` | `1.0.3` |
-|---|---|:--:|:--:|:--:|
-| S3 API and admin API v3 routes (buckets, IAM, quotas, replication, tiers, targets, config, health, info, …) | every resource and data source not listed below | ✅ | ✅ | ✅ |
-| S3 Tables catalog switch — `PUT`/`GET /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` create and read | ✅ | ✅ | ✅ |
-| S3 Tables catalog disable — `DELETE /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` destroy | ❌ | ✅ | ✅ |
-| Admin metrics stream — `GET /rustfs/admin/v3/metrics` | `rustfs_metrics` data source | ❌ | ❌ | ❌ |
-| OIDC providers — `GET`/`PUT`/`DELETE /rustfs/admin/v3/oidc/config` and `POST /rustfs/admin/v3/oidc/validate` | `rustfs_oidc_provider` resource, `rustfs_oidc_config` data source | ✅ | ✅ | ✅ |
-| Orphaned bucket recovery — `POST /rustfs/admin/v3/recover-orphaned-bucket/{bucket}` | `rustfs_bucket_recovery` | ❌¹ | ✅ | ✅ |
-| TLS certificate publication — `POST /rustfs/admin/v3/tls/certificate` | `rustfs_tls_certificate` create | ❌ | ✅ | ✅ |
-| TLS certificate state — `GET /rustfs/admin/v3/tls/certificate-state` | `rustfs_tls_certificate` refresh, `rustfs_tls_certificate_state` data source | ❌ | ✅ | ✅ |
+| Capability | Provider types | `1.0.1` | `1.0.2` | `1.0.3` | `1.0.4` | `1.0.5` |
+|---|---|:--:|:--:|:--:|:--:|:--:|
+| S3 API and admin API v3 routes (buckets, IAM, quotas, replication, tiers, targets, config, health, info, …) | every resource and data source not listed below | ✅ | ✅ | ✅ | ✅ | ✅ |
+| S3 Tables catalog switch — `PUT`/`GET /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` create and read | ✅ | ✅ | ✅ | ✅ | ✅ |
+| S3 Tables catalog disable — `DELETE /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` destroy | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Admin metrics stream — `GET /rustfs/admin/v3/metrics` | `rustfs_metrics` data source | ❌ | ❌ | ❌ | ❌ | ❌ |
+| OIDC providers — `GET`/`PUT`/`DELETE /rustfs/admin/v3/oidc/config` and `POST /rustfs/admin/v3/oidc/validate` | `rustfs_oidc_provider` resource, `rustfs_oidc_config` data source | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Orphaned bucket recovery — `POST /rustfs/admin/v3/recover-orphaned-bucket/{bucket}` | `rustfs_bucket_recovery` | ❌¹ | ✅ | ✅ | ✅ | ✅ |
+| TLS certificate publication — `POST /rustfs/admin/v3/tls/certificate` | `rustfs_tls_certificate` create | ❌ | ✅ | ✅ | ✅ | ✅ |
+| TLS certificate state — `GET /rustfs/admin/v3/tls/certificate-state` | `rustfs_tls_certificate` refresh, `rustfs_tls_certificate_state` data source | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 ¹ The recovery route is absent on `1.0.1` (the server answers `404`), rather than registered and
 unimplemented; the resource reports the route and the required `1.0.2` version.
 
 `1.0.3` is a console-only update: it ships the same server code as `1.0.2`, so its server
-capabilities are identical. A ❌ means the route is registered but not implemented (see below); the
-data source fails with a diagnostic naming the route and the server version instead of the raw
-error payload, and destroying `rustfs_table_bucket` on `1.0.1` warns, names the route and drops the
-resource from state.
+capabilities are identical. `1.0.4` and `1.0.5` are full server releases; the `1.0.5` cells were
+verified live on 2026-11-11 (metrics still answers `501`, OIDC answers `200`, the recovery and TLS
+routes are present, and the S3 Tables read reports `disable-supported`), while `1.0.4` was not
+re-probed and repeats the `1.0.3` values. A ❌ means the route is registered but not implemented
+(see below); the data source fails with a diagnostic naming the route and the server version
+instead of the raw error payload, and destroying `rustfs_table_bucket` on `1.0.1` warns, names the
+route and drops the resource from state.
 
 RustFS registers admin routes before it implements them and answers `501 NotImplemented` instead of
 `404`, so a route in the server's route table is not proof of support — `DELETE
 /iceberg/v1/buckets/{warehouse}` is registered but unimplemented on `1.0.1` (it works on `1.0.2` and
-`1.0.3`). For the routes
+later). For the routes
 it depends on, the provider treats `404`, `405` and `501` as a capability gap and reports the
 feature, the route and the server version instead of the raw error payload.
 
