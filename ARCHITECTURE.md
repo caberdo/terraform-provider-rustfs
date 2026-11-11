@@ -96,23 +96,25 @@ Two halves, decided separately:
    routes. They join `rustfs_scanner_status`, `rustfs_ilm_expiry_status` and
    `rustfs_replication_mrf` as observability, not lifecycle.
 
-The probe (2026-10-27; `rustfs/rustfs:1.0.1`, `:1.0.2`, `:1.0.3` and `:latest`, which reported
-`refs/tags/1.0.4`, one single-node container each, SigV4 admin credentials):
+The probe (2026-10-27 for `rustfs/rustfs:1.0.1`, `:1.0.2`, `:1.0.3` and `:latest`, which reported
+`refs/tags/1.0.4`; `:1.0.5` re-probed on 2026-11-11, which reported `refs/tags/1.0.5`; one
+single-node container each, SigV4 admin credentials):
 
-| Route | Method | 1.0.1 | 1.0.2 | 1.0.3 | 1.0.4 | Observed |
-|---|---|:--:|:--:|:--:|:--:|---|
-| `/rustfs/admin/v3/heal/` | POST | 200 | 200 | 200 | 200 | Returns `clientToken` immediately. Root heal needs `recursive = true` (400 otherwise); an empty body is 400 "err request body parse". |
-| `/rustfs/admin/v3/heal/{bucket}` | POST | 200 | 200 | 200 | 200 | Start, then `?clientToken=…` reports progress and `&forceStop=true` cancels. |
-| `/rustfs/admin/v3/heal/{bucket}/{prefix}` | POST | 200 | 200 | 200 | 200 | Same start/status/cancel, scoped to the prefix. |
-| `/rustfs/admin/v3/background-heal/status` | POST | 200 | 200 | 200 | 200 | Healer state, queue/admission counters and coverage. Two consecutive calls were byte-identical and changed nothing: read-only. |
-| `/rustfs/admin/v4/heal/mrf/responsibilities` | GET | 200 | 200 | 200 | 200 | `contractVersion: 1`, `nodeLocal: true`, empty list. Read-only. |
-| `/rustfs/admin/v4/heal/mrf/responsibilities/actions` | POST | 400 | 400 | 400 | 400 | Empty and nil-UUID bodies are rejected before mutation; the `Refresh`/`Recheck`/`AcceptUnverifiedRisk` branches mutate queue state in `heal.rs`, and the single-node probe had no legacy responsibility to exercise them. |
-| `/rustfs/admin/v4/heal/replacement-recovery` | GET | 200 | 200 | 200 | 200 | `contractVersion: 2`, definitive local and cluster status, empty records. Read-only. |
+| Route | Method | 1.0.1 | 1.0.2 | 1.0.3 | 1.0.4 | 1.0.5 | Observed |
+|---|---|:--:|:--:|:--:|:--:|:--:|---|
+| `/rustfs/admin/v3/heal/` | POST | 200 | 200 | 200 | 200 | 200 | Returns `clientToken` immediately. Root heal needs `recursive = true`; on 1.0.5 the body must carry the full `HealOpts` set, and an empty or partial body is 400 "err request body parse". |
+| `/rustfs/admin/v3/heal/{bucket}` | POST | 200 | 200 | 200 | 200 | 200 | Start, then `?clientToken=…` reports progress and `&forceStop=true` cancels. On 1.0.5 an overlapping start while another heal is active is refused with 409 `OperationAborted` (`overlapping_paths`). |
+| `/rustfs/admin/v3/heal/{bucket}/{prefix}` | POST | 200 | 200 | 200 | 200 | 200 | Same start/status/cancel, scoped to the prefix. |
+| `/rustfs/admin/v3/background-heal/status` | POST | 200 | 200 | 200 | 200 | 200 | Healer state, queue/admission counters and coverage. Two consecutive calls were byte-identical and changed nothing: read-only. |
+| `/rustfs/admin/v4/heal/mrf/responsibilities` | GET | 200 | 200 | 200 | 200 | 200 | `contractVersion` 1 on 1.0.1–1.0.4 and 2 on 1.0.5, `nodeLocal: true`, empty list. Read-only. |
+| `/rustfs/admin/v4/heal/mrf/responsibilities/actions` | POST | 400 | 400 | 400 | 400 | 400 | Empty and nil-UUID bodies are rejected before mutation; the `Refresh`/`Recheck`/`AcceptUnverifiedRisk` branches mutate queue state in `heal.rs`, and the single-node probe had no legacy responsibility to exercise them. |
+| `/rustfs/admin/v4/heal/replacement-recovery` | GET | 200 | 200 | 200 | 200 | 200 | `contractVersion: 2`, definitive local and cluster status, empty records. Read-only. |
 
 `dry_run` is not side-effect free: a dry-run root start raised
-`healOperations.admission.accepted` from 6 to 7. The run is asynchronous, has no list route and no
-server-owned job id independent of the caller's token. A wrong method answers `426 Upgrade
-Required`, not `405`; clients must use the exact method above.
+`healOperations.admission.accepted` from 6 to 7 on the 2026-10-27 probe and from 3 to 4 on 1.0.5.
+The run is asynchronous, has no list route and no server-owned job id independent of the caller's
+token. A wrong method answers `426 Upgrade Required` on a v4 route and `501 NotImplemented` on a v3
+heal route, not `405`; clients must use the exact method above.
 
 **Rejected alternatives.** A one-shot `rustfs_heal` resource (option B) has no honest lifecycle:
 the provider's job resources wrap a server-returned durable job with an id, status route and
@@ -132,7 +134,7 @@ heal/MRF non-goal row with one that names only the actions route, and add this r
 
 | Area | Not modeled | Why it is out of scope |
 |---|---|---|
-| Heal runs | `POST /rustfs/admin/v3/heal/`, `POST /rustfs/admin/v3/heal/{bucket}`, `POST /rustfs/admin/v3/heal/{bucket}/{*prefix}`, and their `clientToken` status and `forceStop` queries | Starting, querying or cancelling a heal is an operator repair action over object data, not desired state. A run has no server-listable durable record, and `terraform destroy` must not be able to cancel a repair by accident. `dry_run` still admits a task: on 1.0.1–1.0.4 a dry-run start raised the admission counter. The read-only background healer status is tracked for a data source in #177. Use `mc admin heal`, the console or the deployment tooling to start or cancel a run. |
+| Heal runs | `POST /rustfs/admin/v3/heal/`, `POST /rustfs/admin/v3/heal/{bucket}`, `POST /rustfs/admin/v3/heal/{bucket}/{*prefix}`, and their `clientToken` status and `forceStop` queries | Starting, querying or cancelling a heal is an operator repair action over object data, not desired state. A run has no server-listable durable record, and `terraform destroy` must not be able to cancel a repair by accident. `dry_run` still admits a task: on 1.0.1–1.0.5 a dry-run start raised the admission counter. The read-only background healer status is tracked for a data source in #177. Use `mc admin heal`, the console or the deployment tooling to start or cancel a run. |
 
 ## Entry point and wiring
 

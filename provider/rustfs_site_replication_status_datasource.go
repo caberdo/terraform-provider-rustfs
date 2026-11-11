@@ -191,7 +191,7 @@ func (d *SiteReplicationStatusDataSource) Schema(_ context.Context, _ datasource
 		"GET /rustfs/admin/v3/site-replication/info, the per-site replication counters from " +
 		"GET /rustfs/admin/v3/site-replication/status, and the topology counts from " +
 		"GET /rustfs/admin/v3/site-replication/metainfo. Read-only: it never changes the group.\n\n" +
-		"`status_available` reports whether the status route answered. RustFS 1.0.1 through 1.0.3 " +
+		"`status_available` reports whether the status route answered. RustFS 1.0.1 through 1.0.5 " +
 		"implement it; a server that answers it as unimplemented still yields the info and metainfo " +
 		"result with `status_available = false`, empty status collections and every site's " +
 		"`sync_state` set to `unknown`, instead of failing the read. Any other status error fails the " +

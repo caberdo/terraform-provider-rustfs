@@ -9,7 +9,7 @@ description: |-
   RustFS creates a job paused and runs it only after a resume. Create creates the job and resumes it in one apply; Read reports the current state, revision and per-item results. Every configurable attribute carries RequiresReplace, so changing one starts a new job. One integrity worker runs per cluster, so a second resume can be refused with SlowDown while another job is active.
   Delete sends cancel through the control route. Cancelling is idempotent and does not roll back bytes already verified or migrated; a terminal job is returned unchanged. There is no route that deletes a job record, so destroy only stops the work and forgets the record.
   Readiness and requirements
-  migrate requires RUSTFS_SHARD_INTEGRITY_WRITE and RUSTFS_SHARD_INTEGRITY_FLEET_CONFIRMED on every node; without them the apply fails before a job is created. Read the rustfs_integrity_readiness data source to inspect those switches. The routes are implemented in RustFS 1.0.1 through 1.0.3; a server that does not implement them produces a version-aware diagnostic.
+  migrate requires RUSTFS_SHARD_INTEGRITY_WRITE and RUSTFS_SHARD_INTEGRITY_FLEET_CONFIRMED on every node; without them the apply fails before a job is created. Read the rustfs_integrity_readiness data source to inspect those switches. The routes are implemented in RustFS 1.0.1 through 1.0.5; a server that does not implement them produces a version-aware diagnostic.
   Import
   Import with <bucket>/<job_id>, because the status route is bucket-scoped.
 ---
@@ -30,7 +30,7 @@ RustFS creates a job paused and runs it only after a resume. `Create` creates th
 
 ### Readiness and requirements
 
-`migrate` requires `RUSTFS_SHARD_INTEGRITY_WRITE` and `RUSTFS_SHARD_INTEGRITY_FLEET_CONFIRMED` on every node; without them the apply fails before a job is created. Read the `rustfs_integrity_readiness` data source to inspect those switches. The routes are implemented in RustFS 1.0.1 through 1.0.3; a server that does not implement them produces a version-aware diagnostic.
+`migrate` requires `RUSTFS_SHARD_INTEGRITY_WRITE` and `RUSTFS_SHARD_INTEGRITY_FLEET_CONFIRMED` on every node; without them the apply fails before a job is created. Read the `rustfs_integrity_readiness` data source to inspect those switches. The routes are implemented in RustFS 1.0.1 through 1.0.5; a server that does not implement them produces a version-aware diagnostic.
 
 ### Import
 

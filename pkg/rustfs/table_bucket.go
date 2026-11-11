@@ -14,7 +14,7 @@ import (
 //
 // The route lives outside the admin API base, so every call goes through
 // DoDirectRequest. The field set mirrors a live GET payload (verified on
-// RustFS 1.0.1, 1.0.2 and 1.0.3); server-only fields the provider does not
+// RustFS 1.0.1, 1.0.2, 1.0.3 and 1.0.5); server-only fields the provider does not
 // model are intentionally absent.
 type TableBucket struct {
 	TableBucket         string `json:"table-bucket"`
@@ -79,8 +79,9 @@ func init() {
 	registerFeature(FeatureTableBucket, featureSpec{
 		route: "DELETE /iceberg/v1/buckets/{bucket}",
 		// Probed live: 1.0.1 answers 501 NotImplemented for the disable route,
-		// while 1.0.2 and 1.0.3 disable the catalog. Enable and read work on
-		// all three.
+		// while 1.0.2 and later disable the catalog (1.0.5 reports
+		// disable-supported on the read). Enable and read work on every
+		// release.
 		minVersion: &Version{Major: 1, Minor: 0, Patch: 2, Raw: "1.0.2"},
 	})
 }

@@ -344,7 +344,7 @@ func init() {
 	registerFeature(FeatureOnDemandMigration, featureSpec{
 		route: "PUT|GET|DELETE /rustfs/admin/v3/on-demand-migration/{bucket}",
 		// The ODM admin handlers are present, and wired into the admin router,
-		// in every supported release (1.0.1 through 1.0.3). A 1.0.1 server is
+		// in every supported release (1.0.1 through 1.0.5). A 1.0.1 server is
 		// therefore the lowest version that can serve this feature.
 		minVersion: &Version{Major: 1, Minor: 0, Patch: 1, Raw: "1.0.1"},
 	})

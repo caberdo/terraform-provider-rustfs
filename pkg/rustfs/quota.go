@@ -175,7 +175,7 @@ func init() {
 	registerFeature(FeatureQuotaStats, featureSpec{
 		route: "GET /rustfs/admin/v3/quota-stats/{bucket}",
 		// The route is implemented in the tagged RustFS source for 1.0.1
-		// through 1.0.3, so there is no version floor to advertise. A build that
+		// through 1.0.5, so there is no version floor to advertise. A build that
 		// does not serve it produces a capability error naming the version.
 	})
 	registerFeature(FeatureQuotaCheck, featureSpec{

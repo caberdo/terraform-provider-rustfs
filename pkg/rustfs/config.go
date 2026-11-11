@@ -30,7 +30,7 @@ func init() {
 	registerFeature(FeatureConfigHistory, featureSpec{
 		route: "GET /rustfs/admin/v3/list-config-history-kv",
 		// The route is registered and implemented in the tagged RustFS source
-		// for 1.0.1 through 1.0.3, so there is no version floor to advertise.
+		// for 1.0.1 through 1.0.5, so there is no version floor to advertise.
 	})
 	registerFeature(FeatureConfigRestore, featureSpec{
 		route: "PUT /rustfs/admin/v3/restore-config-history-kv",

@@ -208,7 +208,8 @@ func init() {
 	// Probed live on RustFS 1.0.1, 1.0.2 and 1.0.3: the list, mutation and
 	// validation routes all exist and work. The generic /idp-config route is
 	// not modelled: its writes answer 501 for both openid and ldap, and the
-	// typed OIDC routes are the only surface that persists a provider.
+	// typed OIDC routes are the only surface that persists a provider. The list
+	// route was re-probed on 1.0.5.
 	registerFeature(FeatureOIDCConfig, featureSpec{
 		route:      "GET /rustfs/admin/v3/oidc/config",
 		minVersion: &Version{Major: 1, Minor: 0, Patch: 1, Raw: "1.0.1"},

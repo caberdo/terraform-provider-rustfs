@@ -34,7 +34,7 @@ func (d *MetricsDataSource) Metadata(_ context.Context, req datasource.MetadataR
 
 func (d *MetricsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	description := "Metrics stream for the RustFS server. Requires a server that implements " +
-		"`GET /rustfs/admin/v3/metrics`: RustFS 1.0.1 through 1.0.3 register the route but answer " +
+		"`GET /rustfs/admin/v3/metrics`: RustFS 1.0.1 through 1.0.5 register the route but answer " +
 		"`501 NotImplemented`, which Terraform reports as an unsupported capability naming the " +
 		"server version and the route."
 	resp.Schema = schema.Schema{

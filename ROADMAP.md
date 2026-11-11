@@ -13,7 +13,7 @@ A Terraform provider for [RustFS](https://github.com/rustfs/rustfs): it manages 
 v3 objects (IAM users/groups/policies, service accounts, LDAP, KMS keys, quotas, storage tiers and
 ILM, audit/notification targets, cluster config and health) through Terraform state. The complete
 resource and data source list is in the README; the provider is tested against RustFS `1.0.1`,
-`1.0.2`, `1.0.3` and `latest`.
+`1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest`.
 
 ## Landed — supply-chain and process hardening
 

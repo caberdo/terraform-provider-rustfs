@@ -2,12 +2,12 @@
 page_title: "rustfs_bucket_policy_status Data Source - rustfs"
 subcategory: ""
 description: |-
-  Read whether the server considers a bucket public (GetBucketPolicyStatus). RustFS evaluates the bucket policy itself and is strict: on 1.0.1 through 1.0.3 it reports true only for a statement that grants s3:* on the bucket to an explicit {"AWS": ["*"]} principal. A public s3:GetObject policy, the string form "*" and canned ACLs all report false. Canned bucket ACLs are accepted by RustFS but not stored, so they never make this value true. Read-only.
+  Read whether the server considers a bucket public (GetBucketPolicyStatus). RustFS evaluates the bucket policy itself and is strict: on 1.0.1 through 1.0.5 it reports true only for a statement that grants s3:* on the bucket to an explicit {"AWS": ["*"]} principal. A public s3:GetObject policy, the string form "*" and canned ACLs all report false. Canned bucket ACLs are accepted by RustFS but not stored, so they never make this value true. Read-only.
 ---
 
 # rustfs_bucket_policy_status Data Source
 
-Read whether the server considers a bucket public (`GetBucketPolicyStatus`). RustFS evaluates the bucket policy itself and is strict: on 1.0.1 through 1.0.3 it reports true only for a statement that grants `s3:*` on the bucket to an explicit `{"AWS": ["*"]}` principal. A public `s3:GetObject` policy, the string form `"*"` and canned ACLs all report false. Canned bucket ACLs are accepted by RustFS but not stored, so they never make this value true. Read-only.
+Read whether the server considers a bucket public (`GetBucketPolicyStatus`). RustFS evaluates the bucket policy itself and is strict: on 1.0.1 through 1.0.5 it reports true only for a statement that grants `s3:*` on the bucket to an explicit `{"AWS": ["*"]}` principal. A public `s3:GetObject` policy, the string form `"*"` and canned ACLs all report false. Canned bucket ACLs are accepted by RustFS but not stored, so they never make this value true. Read-only.
 
 ## Example Usage
 

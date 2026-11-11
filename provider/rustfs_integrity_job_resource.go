@@ -126,7 +126,7 @@ func (r *IntegrityJobResource) Schema(_ context.Context, _ resource.SchemaReques
 		"`migrate` requires `RUSTFS_SHARD_INTEGRITY_WRITE` and `RUSTFS_SHARD_INTEGRITY_FLEET_CONFIRMED` on every " +
 		"node; without them the apply fails before a job is created. Read the " +
 		"`rustfs_integrity_readiness` data source to inspect those switches. The routes are implemented in " +
-		"RustFS 1.0.1 through 1.0.3; a server that does not implement them produces a version-aware diagnostic.\n\n" +
+		"RustFS 1.0.1 through 1.0.5; a server that does not implement them produces a version-aware diagnostic.\n\n" +
 		"### Import\n\n" +
 		"Import with `<bucket>/<job_id>`, because the status route is bucket-scoped."
 
