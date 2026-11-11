@@ -412,6 +412,7 @@ func TestBucketResourceLifecyclePaths(t *testing.T) {
 	t.Run("create: a fully populated plan is sent", func(t *testing.T) {
 		client, recorder := routedClient(t,
 			requestRoute{method: http.MethodHead, status: http.StatusNotFound, body: s3ErrorXML("NoSuchBucket", "gone")},
+			requestRoute{method: http.MethodGet, pathContains: "/admin/v3/info", status: http.StatusOK, body: serverInfoBody("eu-west-1")},
 			requestRoute{method: http.MethodPut, status: http.StatusOK},
 			requestRoute{method: http.MethodGet, status: http.StatusOK},
 		)
@@ -609,6 +610,250 @@ func TestBuildBucketACLInput(t *testing.T) {
 		empty.GrantReadACP != nil || empty.GrantWriteACP != nil || empty.GrantFullControl != nil {
 		t.Errorf("unset attributes must not be sent: %+v", empty)
 	}
+}
+
+// serverInfoBody renders the GET /admin/v3/info answer for region. An empty
+// region is omitted, which is what a server that reports none sends.
+func serverInfoBody(region string) string {
+	if region == "" {
+		return `{"info":{}}`
+	}
+	return fmt.Sprintf(`{"info":{"region":%q}}`, region)
+}
+
+// healthInfoBody renders the GET /admin/v3/healthinfo answer for region.
+func healthInfoBody(region string) string {
+	return fmt.Sprintf(`{"region":%q}`, region)
+}
+
+// TestBucketResourceLocationConstraint covers the create-time comparison of
+// location_constraint with the region the server reports. RustFS 1.0.5 rejects a
+// mismatch itself with InvalidLocationConstraint, so the provider refuses it
+// first, before CreateBucket is sent, and names the accepted values.
+func TestBucketResourceLocationConstraint(t *testing.T) {
+	t.Parallel()
+
+	createRoutes := func(regionRoutes ...requestRoute) []requestRoute {
+		routes := []requestRoute{
+			{method: http.MethodHead, status: http.StatusNotFound, body: s3ErrorXML("NoSuchBucket", "gone")},
+		}
+		routes = append(routes, regionRoutes...)
+		return append(routes,
+			requestRoute{method: http.MethodPut, status: http.StatusOK},
+			requestRoute{method: http.MethodGet, status: http.StatusOK},
+		)
+	}
+	infoRoute := func(body string) requestRoute {
+		return requestRoute{
+			method:       http.MethodGet,
+			pathContains: "/admin/v3/info",
+			status:       http.StatusOK,
+			body:         body,
+		}
+	}
+	plan := func(constraint string) *bucketResourceModel {
+		return &bucketResourceModel{
+			Name: types.StringValue("tf-test"),
+			CreateBucketConfiguration: &createBucketConfigurationModel{
+				LocationConstraint: types.StringValue(constraint),
+				Tags:               types.MapNull(types.StringType),
+			},
+		}
+	}
+	countRequests := func(recorder *recordingServer, substr string) int {
+		n := 0
+		for _, req := range recorder.snapshot() {
+			if strings.Contains(req, substr) {
+				n++
+			}
+		}
+		return n
+	}
+
+	t.Run("a matching region creates the bucket after one region read", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(infoRoute(serverInfoBody("eu-west-1")))...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("eu-west-1"))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		if got := len(resp.Diagnostics); got != 0 {
+			t.Errorf("expected no diagnostics, got %d: %v", got, resp.Diagnostics)
+		}
+		recorder.assertRequest(t, "PUT")
+		if got := countRequests(recorder, "/admin/v3/info"); got != 1 {
+			t.Errorf("expected one region read, got %d: %v", got, recorder.snapshot())
+		}
+	})
+
+	t.Run("the EU alias for eu-west-1 creates the bucket", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(infoRoute(serverInfoBody("eu-west-1")))...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("EU"))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		if got := len(resp.Diagnostics); got != 0 {
+			t.Errorf("expected no diagnostics, got %d: %v", got, resp.Diagnostics)
+		}
+		recorder.assertRequest(t, "PUT")
+	})
+
+	t.Run("a mismatch fails before CreateBucket is sent", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(infoRoute(serverInfoBody("eu-west-1")))...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("us-east-1"))
+
+		assertErrorDiagnostic(t, resp.Diagnostics,
+			"Invalid location_constraint for bucket tf-test", `"eu-west-1"`)
+		detail := resp.Diagnostics[0].Detail()
+		for _, want := range []string{`"us-east-1"`, "EU", "omit create_bucket_configuration"} {
+			if !strings.Contains(detail, want) {
+				t.Errorf("diagnostic detail %q does not mention %q", detail, want)
+			}
+		}
+		recorder.assertNoRequest(t, "PUT")
+		h.assertNoPartialState(resp, plan("us-east-1"))
+	})
+
+	t.Run("EU is not accepted for any other region", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(infoRoute(serverInfoBody("us-east-1")))...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("EU"))
+
+		assertErrorDiagnostic(t, resp.Diagnostics,
+			"Invalid location_constraint for bucket tf-test", `"us-east-1"`)
+		detail := resp.Diagnostics[0].Detail()
+		if strings.Contains(detail, "or EU") {
+			t.Errorf("detail offers the EU alias for a region that does not accept it: %q", detail)
+		}
+		recorder.assertNoRequest(t, "PUT")
+	})
+
+	t.Run("a server that reports no region skips the check", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(infoRoute(serverInfoBody("")))...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("us-east-1"))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		recorder.assertRequest(t, "PUT")
+	})
+
+	t.Run("a failed info read falls back to healthinfo", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(
+			requestRoute{
+				method:       http.MethodGet,
+				pathContains: "/admin/v3/info",
+				status:       http.StatusNotFound,
+				body:         s3ErrorXML("NotFound", "no info route"),
+			},
+			requestRoute{
+				method:       http.MethodGet,
+				pathContains: "/admin/v3/healthinfo",
+				status:       http.StatusOK,
+				body:         healthInfoBody("eu-west-1"),
+			},
+		)...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("eu-west-1"))
+
+		requireNoDiagnostics(t, resp.Diagnostics)
+		recorder.assertRequest(t, "/admin/v3/healthinfo")
+		recorder.assertRequest(t, "PUT")
+	})
+
+	t.Run("an unreadable region warns and lets the server decide", func(t *testing.T) {
+		client, recorder := routedClient(t, createRoutes(
+			requestRoute{
+				method:       http.MethodGet,
+				pathContains: "/admin/v3/info",
+				status:       http.StatusNotFound,
+				body:         s3ErrorXML("NotFound", "no info route"),
+			},
+			requestRoute{
+				method:       http.MethodGet,
+				pathContains: "/admin/v3/healthinfo",
+				status:       http.StatusNotFound,
+				body:         s3ErrorXML("NotFound", "no health route"),
+			},
+		)...)
+		h := newCRUDHarness(t, NewBucketResource(), client)
+
+		resp := h.create(plan("us-east-1"))
+
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("a failed region read must not fail the create: %v", resp.Diagnostics.Errors())
+		}
+		if got := resp.Diagnostics.WarningsCount(); got != 1 {
+			t.Fatalf("expected one warning, got %d: %v", got, resp.Diagnostics)
+		}
+		if !strings.Contains(resp.Diagnostics[0].Summary(), "Could not read the RustFS region") {
+			t.Errorf("warning summary = %q", resp.Diagnostics[0].Summary())
+		}
+		recorder.assertRequest(t, "PUT")
+	})
+}
+
+// TestAccBucketResource_locationConstraint proves a constraint that matches the
+// server's region is accepted live. The compose server runs RustFS' default
+// region, so the region is read from the server instead of hardcoded; a server
+// that reports none has nothing to match and the case skips. The mismatch case
+// is covered by TestBucketResourceLocationConstraint: a failing apply is not
+// expressible as a passing acceptance step.
+func TestAccBucketResource_locationConstraint(t *testing.T) {
+	region := testAccServerRegion(t)
+	name := fmt.Sprintf("tf-test-bucket-location-%d", acctest.RandInt())
+	resourceName := "rustfs_bucket.test"
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckBucketDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccBucketLocationConstraintConfig(name, region),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckBucketExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName,
+						"create_bucket_configuration.location_constraint", region),
+				),
+			},
+		},
+	})
+}
+
+// testAccServerRegion returns the region the running RustFS reports. The probe
+// runs before resource.ParallelTest, so it performs the acceptance precheck
+// itself.
+func testAccServerRegion(t *testing.T) string {
+	t.Helper()
+	testAccPreCheck(t)
+
+	client := testAccRustClient()
+	info, err := client.ServerInfo(context.Background())
+	if err != nil {
+		t.Fatalf("reading server info: %v", err)
+	}
+	if info.Info.Region == nil || *info.Info.Region == "" {
+		t.Skip("server reports no region; there is no constraint to match")
+	}
+	return *info.Info.Region
+}
+
+func testAccBucketLocationConstraintConfig(name, region string) string {
+	return testAccProviderConfig() + fmt.Sprintf(`
+resource "rustfs_bucket" "test" {
+  name = "%s"
+
+  create_bucket_configuration {
+    location_constraint = "%s"
+  }
+}
+`, name, region)
 }
 
 func TestBucketResourceUpdateFailures(t *testing.T) {

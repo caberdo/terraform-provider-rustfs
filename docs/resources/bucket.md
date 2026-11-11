@@ -86,5 +86,5 @@ resource "rustfs_bucket" "scratch" {
 
 Optional:
 
-- `location_constraint` (String) Region in which the bucket is created (for example eu-west-1).
+- `location_constraint` (String) Region in which the bucket is created (for example eu-west-1). RustFS 1.0.5 and later reject a constraint that does not match the server's configured region: use the region the server reports (the rustfs_server_info data source exposes it), EU when that region is eu-west-1, or omit create_bucket_configuration on the default region. The provider reads the server region once per constrained create and fails before CreateBucket is sent when the value cannot match.
 - `tags` (Map of String) Map of key/value tag pairs applied to the bucket at creation time.
