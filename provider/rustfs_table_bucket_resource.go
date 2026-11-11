@@ -56,6 +56,12 @@ func (r *TableBucketResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"Destroying this resource only switches the catalog off: the bucket and every object in it " +
 			"are left untouched, but the bucket returns to ordinary lifecycle behaviour (table buckets " +
 			"are excluded from normal expiration).\n\n" +
+			"Permissions: the caller must own the claimed warehouse location. Enabling the catalog " +
+			"requires `admin:ClaimTableLocation` on that location's canonical physical prefix, for " +
+			"example `arn:aws:s3:::warehouse/owned`, where `arn:aws:s3:::warehouse/owned/*` covers " +
+			"descendants. `admin:CreateTable` alone is not enough when the caller selects the location: " +
+			"a scoped credential without the claim fails the apply with `AccessDenied`. Root credentials " +
+			"satisfy the grant.\n\n" +
 			"S3 Tables is a preview feature upstream. This resource exposes the switch, not Iceberg " +
 			"client compatibility.",
 		Attributes: map[string]schema.Attribute{

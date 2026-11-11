@@ -4,6 +4,7 @@ subcategory: ""
 description: |-
   Manage the S3 Tables (Iceberg REST catalog) switch of an existing rustfs bucket.
   Enabling the catalog marks the bucket as a table bucket served at catalog_uri. Destroying this resource only switches the catalog off: the bucket and every object in it are left untouched, but the bucket returns to ordinary lifecycle behaviour (table buckets are excluded from normal expiration).
+  Permissions: the caller must own the claimed warehouse location. Enabling the catalog requires admin:ClaimTableLocation on that location's canonical physical prefix, for example arn:aws:s3:::warehouse/owned, where arn:aws:s3:::warehouse/owned/* covers descendants. admin:CreateTable alone is not enough when the caller selects the location: a scoped credential without the claim fails the apply with AccessDenied. Root credentials satisfy the grant.
   S3 Tables is a preview feature upstream. This resource exposes the switch, not Iceberg client compatibility.
 ---
 
@@ -13,15 +14,24 @@ Manage the S3 Tables (Iceberg REST catalog) switch of an existing rustfs bucket.
 
 Enabling the catalog marks the bucket as a table bucket served at `catalog_uri`. Destroying this resource only switches the catalog off: the bucket and every object in it are left untouched, but the bucket returns to ordinary lifecycle behaviour (table buckets are excluded from normal expiration).
 
+Permissions: the caller must own the claimed warehouse location. Enabling the catalog requires `admin:ClaimTableLocation` on that location's canonical physical prefix, for example `arn:aws:s3:::warehouse/owned`, where `arn:aws:s3:::warehouse/owned/*` covers descendants. `admin:CreateTable` alone is not enough when the caller selects the location: a scoped credential without the claim fails the apply with `AccessDenied`. Root credentials satisfy the grant.
+
 S3 Tables is a preview feature upstream. This resource exposes the switch, not Iceberg client compatibility.
 
 ## Example Usage
 
 ```terraform
+# A table bucket is an existing bucket first; see the rustfs_bucket example.
 resource "rustfs_bucket" "warehouse" {
   name = "lakehouse"
 }
 
+# Enabling the catalog claims the bucket's warehouse location. A scoped
+# (non-root) credential needs admin:ClaimTableLocation on the location's
+# canonical physical prefix -- here arn:aws:s3:::lakehouse/owned
+# (arn:aws:s3:::lakehouse/owned/* covers descendants) -- in addition to
+# admin:CreateTable, and the caller must own that location. Without the claim
+# the apply fails with AccessDenied; root credentials satisfy every grant.
 resource "rustfs_table_bucket" "warehouse" {
   bucket     = rustfs_bucket.warehouse.name
   depends_on = [rustfs_bucket.warehouse]

@@ -54,8 +54,11 @@ func (r *RustfsUserResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "Display name. Defaults to access_key value. RustFS uses access_key as the user identifier.",
 			},
 			"access_key": schema.StringAttribute{
-				MarkdownDescription: "Access Key",
-				Required:            true,
+				MarkdownDescription: "Access Key. It must not be the system access key or a key held by a live STS session " +
+					"or service account: `add-user` rejects those with `InvalidArgument` instead of shadowing the " +
+					"credential. Reusing an existing ordinary user's access key updates that user. Changing this " +
+					"forces a new resource to be created.",
+				Required: true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},

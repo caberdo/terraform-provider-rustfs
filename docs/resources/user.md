@@ -31,7 +31,7 @@ resource "rustfs_user" "example" {
 
 ### Required
 
-- `access_key` (String) Access Key
+- `access_key` (String) Access Key. It must not be the system access key or a key held by a live STS session or service account: `add-user` rejects those with `InvalidArgument` instead of shadowing the credential. Reusing an existing ordinary user's access key updates that user. Changing this forces a new resource to be created.
 - `secret_key` (String, Sensitive) Secret Key. Changing this rotates the secret in place.
 
 ### Optional
