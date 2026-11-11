@@ -148,7 +148,7 @@ services:
       - .
       - /workspaces/terraform-provider-rustfs/acc_test/tls
     environment:
-      # go.mod requires go 1.27.3; let the image fetch that toolchain if its
+      # go.mod requires go 1.27.4; let the image fetch that toolchain if its
       # bundled Go is older, matching the test service.
       GOTOOLCHAIN: auto
 

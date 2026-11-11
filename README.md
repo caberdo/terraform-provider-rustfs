@@ -101,7 +101,7 @@ terraform apply                                              # with RUSTFS_ENDPO
 |---|---|
 | Terraform | 1.0 or later (plugin protocol 6.0); also available for [OpenTofu](https://search.opentofu.org/provider/caberdo/rustfs) |
 | RustFS | Acceptance-tested against `1.0.1`, `1.0.2`, `1.0.3` and `latest` — see the [version matrix](#supported-rustfs-versions) and [`.github/rustfs-versions.txt`](./.github/rustfs-versions.txt) |
-| Go (to build from source) | 1.27.3 |
+| Go (to build from source) | 1.27.4 |
 
 ### Supported RustFS versions
 
