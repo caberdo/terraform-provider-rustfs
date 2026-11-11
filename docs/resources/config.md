@@ -25,7 +25,7 @@ resource "rustfs_config" "primary" {
 
 ### Required
 
-- `settings` (Map of String) Key/value settings applied to the sub-system scope.
+- `settings` (Map of String) Key/value settings applied to the sub-system scope. Only these keys are refreshed once the resource is applied: keys the server retains in the scope but the configuration does not declare (RustFS keeps unsupported, legacy and alias keys) are ignored until they are added here. On import the whole scope is read, including those keys.
 - `sub_system` (String) Sub-system scope to manage, e.g. `notify_webhook` or `notify_webhook:primary`. Changing this forces recreation.
 
 ### Read-Only

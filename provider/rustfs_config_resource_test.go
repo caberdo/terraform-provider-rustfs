@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"regexp"
@@ -183,6 +184,70 @@ func TestAccConfigResource(t *testing.T) {
 	})
 }
 
+// TestAccConfigResourceRetainedSettings pins the refresh contract on a live
+// server: a setting that sits in the scope but is not declared in the
+// configuration is server-retained, not managed, so it must not produce a plan.
+// RustFS 1.0.5 retains unsupported, legacy and alias keys at their original
+// paths (rustfs/rustfs#8803); this fixture uses an accepted setting instead of
+// an unknown one so it works on every version in the matrix and does not depend
+// on the server rejecting or accepting an invented key.
+func TestAccConfigResourceRetainedSettings(t *testing.T) {
+	scope := fmt.Sprintf("notify_webhook:tfretained%d", acctest.RandInt())
+	resourceName := "rustfs_config.test"
+	const endpoint = "http://127.0.0.1:18080/rustfs/retained"
+
+	// Pre-cleanup in case a previous interrupted run left the scope behind.
+	client := rustfs.New(&rustfs.RustfsAdminConfig{
+		AccessKey:    os.Getenv("RUSTFS_USER"),
+		AccessSecret: os.Getenv("RUSTFS_SECRET"),
+		Endpoint:     os.Getenv("RUSTFS_ENDPOINT"),
+		Ssl:          false,
+	})
+	_ = client.DeleteConfig(context.Background(), scope)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		PreCheck:                 func() { testAccPreCheck(t) },
+		CheckDestroy:             testAccCheckConfigDestroy,
+		Steps: []resource.TestStep{
+			// Apply only the managed key.
+			{
+				Config: testAccConfigConfig(scope, endpoint),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "settings.%", "1"),
+					testAccCheckConfigServerSetting(scope, "endpoint", endpoint),
+				),
+			},
+			// A setting written to the scope behind Terraform's back is kept by
+			// the server but not declared in the configuration, so the refresh
+			// ignores it and the plan stays empty. Adopting it would plan its
+			// removal, the update would send only the configured keys, the
+			// server would keep it, and the next read would adopt it again: a
+			// perpetual diff. The check runs before the post-refresh plan.
+			{
+				Config:             testAccConfigConfig(scope, endpoint),
+				ExpectNonEmptyPlan: false,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckConfigServerExists(scope),
+					testAccMutateConfigOutOfBand(scope, "queue_limit", "12345"),
+				),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			// Ignoring the retained setting is not deleting it: the server
+			// still holds it after the empty plan.
+			{
+				Config: testAccConfigConfig(scope, endpoint),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckConfigServerSetting(scope, "endpoint", endpoint),
+					testAccCheckConfigServerSetting(scope, "queue_limit", "12345"),
+				),
+			},
+		},
+	})
+}
+
 func testAccConfigConfig(scope, endpoint string) string {
 	return fmt.Sprintf(testAccProviderConfig()+`
 resource "rustfs_config" "test" {
@@ -276,9 +341,10 @@ func testAccCheckConfigServerSetting(scope, key, want string) resource.TestCheck
 }
 
 // testAccMutateConfigOutOfBand rewrites one setting of a config scope directly
-// through the admin client, bypassing Terraform, to simulate drift. The server
-// rewrites the whole scope, so every key currently stored is sent back with the
-// single requested setting replaced.
+// through the admin client, bypassing Terraform, to simulate drift or a
+// server-retained key. The server rewrites the whole scope, so every key
+// currently stored is sent back with the single requested setting replaced, or
+// appended when the scope does not have it yet.
 func testAccMutateConfigOutOfBand(scope, key, value string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccRustClient()
@@ -303,6 +369,179 @@ func testAccMutateConfigOutOfBand(scope, key, value string) resource.TestCheckFu
 	}
 }
 
+// rustfs105LegacyConfigPayload is the get-config-kv rendering RustFS 1.0.5
+// produces for a MinIO-migrated identity_openid scope (rustfs/rustfs#8803):
+// the keys the provider manages (config_url, client_id), an unsupported key the
+// server now retains at its original path (legacy_scopes), and the legacy alias
+// branch (openid) which the server keeps alongside identity_openid and keeps in
+// sync. Before 1.0.5 those extra keys were dropped on save, so a read could not
+// see them.
+const rustfs105LegacyConfigPayload = `identity_openid config_url="https://idp.example.test/.well-known/openid-configuration" client_id="rustfs" legacy_scopes="openid"` + "\n" +
+	`openid config_url="https://idp.example.test/.well-known/openid-configuration" client_id="rustfs" claim_name="groups"` + "\n"
+
+// TestConfigResourceReadIgnoresServerRetainedKeys pins the refresh contract:
+// after an apply the resource manages the keys the configuration declared, and
+// a refresh keeps only those keys even when the server returns more. This is what stops a RustFS 1.0.5 deployment with a
+// migrated or legacy config from producing a perpetual diff: without the
+// filter, Read adopts legacy_scopes/claim_name into state, the next plan
+// removes them, Update sends only the configured keys, the server keeps the
+// extras, and the read after that adopts them again.
+func TestConfigResourceReadIgnoresServerRetainedKeys(t *testing.T) {
+	ctx := context.Background()
+
+	client, rec := routedClient(t,
+		requestRoute{method: http.MethodPut, pathContains: "set-config-kv", status: http.StatusOK},
+		requestRoute{method: http.MethodGet, pathContains: "get-config-kv", status: http.StatusOK, body: rustfs105LegacyConfigPayload},
+	)
+	h := newCRUDHarness(t, NewConfigResource(), client)
+
+	plan := &ConfigResourceModel{
+		SubSystem: types.StringValue("identity_openid"),
+		Settings: types.MapValueMust(types.StringType, map[string]attr.Value{
+			"config_url": types.StringValue("https://idp.example.test/.well-known/openid-configuration"),
+			"client_id":  types.StringValue("rustfs"),
+		}),
+	}
+	created := h.create(plan)
+	requireNoDiagnostics(t, created.Diagnostics)
+
+	var applied ConfigResourceModel
+	requireNoDiagnostics(t, created.State.Get(ctx, &applied))
+	// Create stores exactly the configured set; this is the managed set the
+	// refresh has to preserve.
+	assertConfigSettings(t, applied.Settings, map[string]string{
+		"config_url": "https://idp.example.test/.well-known/openid-configuration",
+		"client_id":  "rustfs",
+	})
+
+	refreshed := h.read(&applied)
+	requireNoDiagnostics(t, refreshed.Diagnostics)
+	rec.assertRequest(t, "get-config-kv")
+
+	var read ConfigResourceModel
+	requireNoDiagnostics(t, refreshed.State.Get(ctx, &read))
+	assertConfigSettings(t, read.Settings, map[string]string{
+		"config_url": "https://idp.example.test/.well-known/openid-configuration",
+		"client_id":  "rustfs",
+	})
+}
+
+// TestConfigResourceReadStillReportsManagedKeyDrift guards the other half of
+// the contract: filtering out server-retained keys must not hide a change to a
+// key the configuration does manage, and must not keep a managed key the server
+// no longer reports. Either case has to reach state so the plan proposes an
+// update.
+func TestConfigResourceReadStillReportsManagedKeyDrift(t *testing.T) {
+	ctx := context.Background()
+
+	client, _ := routedClient(t, requestRoute{
+		method:       http.MethodGet,
+		pathContains: "get-config-kv",
+		status:       http.StatusOK,
+		// client_id is missing from the scope, config_url was rewritten out of
+		// band, and the retained keys are still there.
+		body: `identity_openid config_url="https://other.example.test/.well-known/openid-configuration" legacy_scopes="openid"` + "\n",
+	})
+	h := newCRUDHarness(t, NewConfigResource(), client)
+
+	state := &ConfigResourceModel{
+		SubSystem: types.StringValue("identity_openid"),
+		Settings: types.MapValueMust(types.StringType, map[string]attr.Value{
+			"config_url": types.StringValue("https://idp.example.test/.well-known/openid-configuration"),
+			"client_id":  types.StringValue("rustfs"),
+		}),
+	}
+	resp := h.read(state)
+	requireNoDiagnostics(t, resp.Diagnostics)
+
+	var read ConfigResourceModel
+	requireNoDiagnostics(t, resp.State.Get(ctx, &read))
+	assertConfigSettings(t, read.Settings, map[string]string{
+		"config_url": "https://other.example.test/.well-known/openid-configuration",
+	})
+}
+
+// TestConfigResourceReadImportAdoptsWholeScope covers import, where there is no
+// prior state to define a managed set: the read has to adopt every key the
+// scope holds, including the ones the server retains, or an imported resource
+// would start out empty and the first plan would discard them.
+func TestConfigResourceReadImportAdoptsWholeScope(t *testing.T) {
+	ctx := context.Background()
+
+	client, _ := routedClient(t, requestRoute{
+		method:       http.MethodGet,
+		pathContains: "get-config-kv",
+		status:       http.StatusOK,
+		body:         rustfs105LegacyConfigPayload,
+	})
+	h := newCRUDHarness(t, NewConfigResource(), client)
+
+	// What ImportState leaves behind: the sub_system, and a null settings map.
+	resp := h.read(&ConfigResourceModel{
+		SubSystem: types.StringValue("identity_openid"),
+		Settings:  nullStringMap(),
+	})
+	requireNoDiagnostics(t, resp.Diagnostics)
+
+	var read ConfigResourceModel
+	requireNoDiagnostics(t, resp.State.Get(ctx, &read))
+	assertConfigSettings(t, read.Settings, map[string]string{
+		"config_url":    "https://idp.example.test/.well-known/openid-configuration",
+		"client_id":     "rustfs",
+		"legacy_scopes": "openid",
+		"claim_name":    "groups",
+	})
+}
+
+// TestConfigResourceReadEmptyManagedSetStaysEmpty pins that an explicitly empty
+// settings map is a managed set with no keys, not an import: a configuration
+// that declares no settings must not adopt the scope's retained keys either.
+func TestConfigResourceReadEmptyManagedSetStaysEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	client, _ := routedClient(t, requestRoute{
+		method:       http.MethodGet,
+		pathContains: "get-config-kv",
+		status:       http.StatusOK,
+		body:         rustfs105LegacyConfigPayload,
+	})
+	h := newCRUDHarness(t, NewConfigResource(), client)
+
+	resp := h.read(&ConfigResourceModel{
+		SubSystem: types.StringValue("identity_openid"),
+		Settings:  types.MapValueMust(types.StringType, map[string]attr.Value{}),
+	})
+	requireNoDiagnostics(t, resp.Diagnostics)
+
+	var read ConfigResourceModel
+	requireNoDiagnostics(t, resp.State.Get(ctx, &read))
+	if read.Settings.IsNull() {
+		t.Fatal("settings = null, want an empty map")
+	}
+	assertConfigSettings(t, read.Settings, map[string]string{})
+}
+
+// assertConfigSettings compares a settings map against the expected key/value
+// pairs, so a test fails on both a missing and an unexpected key.
+func assertConfigSettings(t *testing.T, got types.Map, want map[string]string) {
+	t.Helper()
+
+	if got.IsNull() || got.IsUnknown() {
+		t.Fatalf("settings = %v, want %v", got, want)
+	}
+	have := make(map[string]string, len(got.Elements()))
+	for key, value := range got.Elements() {
+		str, ok := value.(types.String)
+		if !ok {
+			t.Fatalf("setting %q has unexpected type %T", key, value)
+		}
+		have[key] = str.ValueString()
+	}
+	if !maps.Equal(have, want) {
+		t.Fatalf("settings = %v, want %v", have, want)
+	}
+}
+
 // Migrated from main's read/delete/create error-path work.
 func TestConfigResourceLifecyclePaths(t *testing.T) {
 	t.Parallel()
@@ -310,10 +549,12 @@ func TestConfigResourceLifecyclePaths(t *testing.T) {
 	readCases := []struct {
 		name         string
 		routes       []requestRoute
+		settings     types.Map
 		wantRemoved  bool
 		wantSummary  string
 		wantDetail   string
 		wantEndpoint string
+		wantSettings map[string]string
 	}{
 		{
 			// Probed against RustFS latest: get-config-kv answers 400
@@ -342,9 +583,15 @@ func TestConfigResourceLifecyclePaths(t *testing.T) {
 			wantDetail:  "Could not read config, unexpected error: ",
 		},
 		{
-			name:         "configured scope mirrors the server settings",
-			routes:       []requestRoute{{status: http.StatusOK, body: "notify_webhook endpoint=" + `"http://example.test"` + " enable=" + `"on"` + "\n"}},
+			// A refresh keeps the managed keys and mirrors their server
+			// values; a key the server retains but the configuration never
+			// declared is not adopted (see
+			// TestConfigResourceReadIgnoresServerRetainedKeys).
+			name:         "configured scope mirrors the managed server settings",
+			routes:       []requestRoute{{status: http.StatusOK, body: "notify_webhook endpoint=" + `"http://example.test"` + " enable=" + `"on"` + " legacy_queue_limit=" + `"100000"` + "\n"}},
+			settings:     types.MapValueMust(types.StringType, map[string]attr.Value{"endpoint": types.StringValue("http://before.test")}),
 			wantEndpoint: "http://example.test",
+			wantSettings: map[string]string{"endpoint": "http://example.test"},
 		},
 	}
 
@@ -353,7 +600,11 @@ func TestConfigResourceLifecyclePaths(t *testing.T) {
 			client, _ := routedClient(t, tc.routes...)
 			h := newCRUDHarness(t, NewConfigResource(), client)
 
-			resp := h.read(&ConfigResourceModel{SubSystem: types.StringValue("tf-test"), Settings: nullStringMap()})
+			settings := tc.settings
+			if settings.IsNull() {
+				settings = nullStringMap()
+			}
+			resp := h.read(&ConfigResourceModel{SubSystem: types.StringValue("tf-test"), Settings: settings})
 
 			if tc.wantRemoved {
 				requireNoDiagnostics(t, resp.Diagnostics)
@@ -368,6 +619,13 @@ func TestConfigResourceLifecyclePaths(t *testing.T) {
 			requireNoDiagnostics(t, resp.Diagnostics)
 			assertStatePresent(t, resp.State)
 			assertStateString(t, resp.State, path.Root("settings").AtMapKey("endpoint"), tc.wantEndpoint)
+			if tc.wantSettings != nil {
+				var got types.Map
+				if diags := resp.State.GetAttribute(context.Background(), path.Root("settings"), &got); diags.HasError() {
+					t.Fatalf("reading the settings state: %v", diags)
+				}
+				assertConfigSettings(t, got, tc.wantSettings)
+			}
 		})
 	}
 
