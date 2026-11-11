@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -73,9 +74,10 @@ type TierResource struct {
 }
 
 type tierResourceModel struct {
-	Name       types.String `tfsdk:"name"`
-	TierType   types.String `tfsdk:"tier_type"`
-	ConfigJson types.String `tfsdk:"config_json"`
+	Name         types.String `tfsdk:"name"`
+	TierType     types.String `tfsdk:"tier_type"`
+	ConfigJson   types.String `tfsdk:"config_json"`
+	ForceDestroy types.Bool   `tfsdk:"force_destroy"`
 }
 
 func NewTierResource() resource.Resource {
@@ -88,8 +90,15 @@ func (r *TierResource) Metadata(_ context.Context, req resource.MetadataRequest,
 
 func (r *TierResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description:         "Manage RustFS storage tiers",
-		MarkdownDescription: "Manage RustFS storage tiers for data transition to external backends",
+		Description: "Manage RustFS storage tiers",
+		MarkdownDescription: "Manage RustFS storage tiers for data transition to external backends.\n\n" +
+			"`force_destroy` only changes how destroy behaves: it removes the tier record even when RustFS " +
+			"reports the backend as non-empty or still in use, and it never deletes remote data. " +
+			"When RustFS refuses a destroy, the diagnostic includes the server's `deletion-check` verdict " +
+			"(`scan_status` and the blocker kinds) on RustFS 1.0.5 or later; older servers report the " +
+			"plain refusal. Durable cleanup for a tier blocked on `CLEANUP_PENDING` can be requested with " +
+			"the admin route `POST /rustfs/admin/v3/tier/{tier}/cleanup-retry`, which this provider does " +
+			"not call because it starts work.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
 				Required:      true,
@@ -105,6 +114,15 @@ func (r *TierResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Required:    true,
 				Sensitive:   true,
 				Description: "Backend-specific configuration as a JSON string. See RustFS tier documentation for the expected format per backend type.",
+			},
+			"force_destroy": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Description: "Remove the tier record on destroy even when RustFS refuses because the backend is not " +
+					"empty or is still in use. RustFS 1.0.5 and later can also skip the backend probe, so a tier " +
+					"with an unroutable endpoint can be removed. This only deletes the tier record: objects already " +
+					"transitioned to the backend are never deleted. Defaults to false.",
 			},
 		},
 	}
@@ -152,6 +170,14 @@ func (r *TierResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	name := state.Name.ValueString()
+
+	// force_destroy only affects Delete, so the server has no value to report
+	// for it. An import seeds it null; recording the documented default keeps
+	// the next plan empty instead of planning an update for a value the user
+	// never set.
+	if state.ForceDestroy.IsNull() || state.ForceDestroy.IsUnknown() {
+		state.ForceDestroy = types.BoolValue(false)
+	}
 
 	// GET tier/<name> is the server's own verdict on this exact tier: 200 when
 	// it holds the tier, 500 TierNotFound when it does not (probed on 1.0.1 and
@@ -247,8 +273,24 @@ func (r *TierResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	var state tierResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	if !json.Valid([]byte(plan.ConfigJson.ValueString())) {
 		resp.Diagnostics.AddError("Invalid JSON", "config_json must be valid JSON")
+		return
+	}
+
+	// force_destroy is the only updatable attribute besides config_json, and
+	// it is read only by Delete. Editing the tier would make the server probe
+	// the backend again, which is exactly what a user setting force_destroy for
+	// an unroutable backend is trying to avoid, so a plan that only toggles it
+	// records the value without an API call.
+	if plan.ConfigJson.Equal(state.ConfigJson) {
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		return
 	}
 
@@ -269,12 +311,76 @@ func (r *TierResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	if err := tierMutation(func() error {
-		return r.client.RustClient.RemoveTier(ctx, data.Name.ValueString())
-	}); err != nil {
-		resp.Diagnostics.AddError("Error removing tier", "Could not remove tier: "+err.Error())
+	name := data.Name.ValueString()
+	// A state written before force_destroy existed carries no value; ValueBool
+	// answers false for null, which is the old delete behaviour.
+	force := data.ForceDestroy.ValueBool()
+	err := tierMutation(func() error {
+		return r.client.RustClient.RemoveTier(ctx, name, force)
+	})
+	if err == nil {
 		return
 	}
+
+	// RustFS names the two refusals, so only those are explained: any other
+	// failure keeps the server's own message.
+	detail := "Could not remove tier: " + err.Error()
+	if isTierDeletionRefusal(err) {
+		detail = r.tierDeletionRefusalDetail(ctx, name, err.Error(), force)
+	}
+	resp.Diagnostics.AddError("Error removing tier", detail)
+}
+
+// isTierDeletionRefusal reports whether the server refused the removal because
+// the tier still has entries it will not drop silently: the backend is not
+// empty (XMinioAdminTierBackendNotEmpty, 400) or something still uses it
+// (XMinioAdminTierBackendInUse, 409).
+func isTierDeletionRefusal(err error) bool {
+	return rustfs.IsAPIErrorCode(err, "XMinioAdminTierBackendNotEmpty", "XMinioAdminTierBackendInUse")
+}
+
+// tierDeletionRefusalDetail explains a refused tier removal. RustFS 1.0.5
+// answers GET tier/<name>/deletion-check with the blockers it found, so the
+// diagnostic names them instead of leaving the user to run mc or rc by hand.
+// The check only explains: when the route is missing (a server older than
+// 1.0.5) or the check itself fails, the original refusal is reported unchanged
+// rather than replacing one error with another.
+func (r *TierResource) tierDeletionRefusalDetail(ctx context.Context, name, cause string, force bool) string {
+	detail := "Could not remove tier: " + cause
+
+	check, err := r.client.RustClient.CheckTierDeletion(ctx, name)
+	if err != nil {
+		return detail
+	}
+
+	kinds := make([]string, 0, len(check.Reasons))
+	for _, reason := range check.Reasons {
+		if reason.Kind != "" {
+			kinds = append(kinds, reason.Kind)
+		}
+	}
+
+	var explanation strings.Builder
+	if check.ScanStatus == "" {
+		fmt.Fprintf(&explanation, " The deletion check for tier %s found no scan status", name)
+	} else {
+		fmt.Fprintf(&explanation, " The deletion check for tier %s reports scan_status %q", name, check.ScanStatus)
+	}
+	if !check.ProofComplete {
+		explanation.WriteString(" with an incomplete proof, so the blockers listed are a lower bound")
+	}
+	if len(kinds) > 0 {
+		explanation.WriteString("; blockers: " + strings.Join(kinds, ", "))
+	} else {
+		explanation.WriteString("; it listed no blockers")
+	}
+	if force {
+		explanation.WriteString(". force_destroy is already set, so the server refused for another reason.")
+	} else {
+		explanation.WriteString(". Resolve the blockers first, or set force_destroy = true to remove the tier record without deleting remote data.")
+	}
+
+	return detail + explanation.String()
 }
 
 func (r *TierResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

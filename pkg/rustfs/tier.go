@@ -6,18 +6,40 @@ package rustfs
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 )
 
-// FeatureTierList is the tier listing read by the rustfs_tiers data source
-// (GET /rustfs/admin/v3/tier).
-const FeatureTierList Feature = "tier listing"
+const (
+	// FeatureTierList is the tier listing read by the rustfs_tiers data source
+	// (GET /rustfs/admin/v3/tier).
+	FeatureTierList Feature = "tier listing"
+
+	// FeatureTierDeletionCheck explains why a tier cannot be removed
+	// (GET /rustfs/admin/v3/tier/{tier}/deletion-check). RustFS 1.0.5 added
+	// the route; older servers answer 501 NotImplemented.
+	FeatureTierDeletionCheck Feature = "tier deletion check"
+
+	// FeatureTierCleanupRetry enqueues durable free-version cleanup for a tier
+	// (POST /rustfs/admin/v3/tier/{tier}/cleanup-retry). RustFS 1.0.5 added the
+	// route; older servers answer 501 NotImplemented.
+	FeatureTierCleanupRetry Feature = "tier cleanup retry"
+)
 
 func init() {
 	registerFeature(FeatureTierList, featureSpec{
 		route: "GET /rustfs/admin/v3/tier",
 		// The route is implemented in RustFS 1.0.1 through 1.0.3 and later.
+	})
+	registerFeature(FeatureTierDeletionCheck, featureSpec{
+		route:      "GET /rustfs/admin/v3/tier/{tier}/deletion-check",
+		minVersion: &Version{Major: 1, Minor: 0, Patch: 5, Raw: "1.0.5"},
+	})
+	registerFeature(FeatureTierCleanupRetry, featureSpec{
+		route:      "POST /rustfs/admin/v3/tier/{tier}/cleanup-retry",
+		minVersion: &Version{Major: 1, Minor: 0, Patch: 5, Raw: "1.0.5"},
 	})
 }
 
@@ -49,10 +71,21 @@ func (c *RustfsAdmin) EditTier(ctx context.Context, name string, config json.Raw
 	return nil
 }
 
-func (c *RustfsAdmin) RemoveTier(ctx context.Context, name string) error {
+// RemoveTier deletes a tier's registry record (DELETE /rustfs/admin/v3/tier/{tier}).
+//
+// force sends ?force=true, which RustFS 1.0.5 makes skip driver construction:
+// the record is removed even when the backend endpoint is unroutable or private
+// and the server therefore cannot probe it. It never deletes remote data. A
+// tier the server still considers in use is refused with
+// XMinioAdminTierBackendNotEmpty or XMinioAdminTierBackendInUse; callers can
+// explain that refusal through CheckTierDeletion.
+func (c *RustfsAdmin) RemoveTier(ctx context.Context, name string, force bool) error {
 	reqData := RequestData{
-		Method:  "DELETE",
+		Method:  http.MethodDelete,
 		RelPath: "tier/" + name,
+	}
+	if force {
+		reqData.QueryValues = url.Values{"force": []string{"true"}}
 	}
 	resp, err := c.doRequest(ctx, reqData)
 	if err != nil {
@@ -60,6 +93,90 @@ func (c *RustfsAdmin) RemoveTier(ctx context.Context, name string) error {
 	}
 	defer drainClose(resp)
 	return nil
+}
+
+// TierDeletionReason is one blocker the server reports for a tier removal. The
+// server sends a kind plus kind-specific detail; the provider pins the kind
+// only, because RustFS adds kinds and fields as deletion proof grows and a
+// typed field that stops matching must not turn the route into a decode
+// failure. The known kinds are SCREAMING_SNAKE_CASE, for example
+// LIFECYCLE_REFERENCE, LIVE_TRANSITIONED_VERSION, CLEANUP_PENDING and
+// TRANSITION_PENDING.
+type TierDeletionReason struct {
+	Kind string `json:"kind"`
+}
+
+// TierDeletionCheck is the server's read-only verdict on whether a tier can be
+// removed (GET /rustfs/admin/v3/tier/{tier}/deletion-check).
+//
+// ProofComplete reports whether the scan that produced the verdict finished;
+// ScanStatus is "complete", "stopped_after_blocker" or "incomplete". When the
+// proof is incomplete the reasons list is a lower bound, not a complete list.
+// Remote is the backend's own section and stays raw JSON: the provider does not
+// pin a shape RustFS has not committed to.
+type TierDeletionCheck struct {
+	TierName      string               `json:"tier_name"`
+	ProofComplete bool                 `json:"proof_complete"`
+	ScanStatus    string               `json:"scan_status"`
+	Reasons       []TierDeletionReason `json:"reasons"`
+	Remote        json.RawMessage      `json:"remote"`
+}
+
+// CheckTierDeletion reports why RustFS would refuse to remove a tier and which
+// blockers still exist. The route is read-only: it scans tier metadata but
+// starts no cleanup and changes nothing. RustFS 1.0.5 added it, so an older
+// server answers with an *UnsupportedFeatureError naming the route.
+func (c *RustfsAdmin) CheckTierDeletion(ctx context.Context, name string) (TierDeletionCheck, error) {
+	reqData := RequestData{
+		Method:  http.MethodGet,
+		RelPath: "tier/" + name + "/deletion-check",
+	}
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return TierDeletionCheck{}, c.featureErrorPreservingCode(ctx, err, FeatureTierDeletionCheck)
+	}
+	defer drainClose(resp)
+
+	var check TierDeletionCheck
+	if err := json.NewDecoder(resp.Body).Decode(&check); err != nil {
+		return TierDeletionCheck{}, err
+	}
+	return check, nil
+}
+
+// TierCleanupRetry is the server's answer to a cleanup-retry request
+// (POST /rustfs/admin/v3/tier/{tier}/cleanup-retry). Status stays a string
+// because the accepted answer is not the only possible value; Enqueued and
+// Failed count the durable free-version cleanup tasks the server queued and
+// dropped.
+type TierCleanupRetry struct {
+	Status   string `json:"status"`
+	Enqueued int    `json:"enqueued"`
+	Failed   int    `json:"failed"`
+}
+
+// RetryTierCleanup asks RustFS to enqueue durable free-version cleanup for a
+// tier that is blocked on CLEANUP_PENDING entries
+// (POST /rustfs/admin/v3/tier/{tier}/cleanup-retry). The route mutates: it
+// starts work, so the provider never calls it implicitly. RustFS answers 202.
+// RustFS 1.0.5 added the route, so an older server answers with an
+// *UnsupportedFeatureError naming the route.
+func (c *RustfsAdmin) RetryTierCleanup(ctx context.Context, name string) (TierCleanupRetry, error) {
+	reqData := RequestData{
+		Method:  http.MethodPost,
+		RelPath: "tier/" + name + "/cleanup-retry",
+	}
+	resp, err := c.doRequest(ctx, reqData)
+	if err != nil {
+		return TierCleanupRetry{}, c.featureErrorPreservingCode(ctx, err, FeatureTierCleanupRetry)
+	}
+	defer drainClose(resp)
+
+	var retry TierCleanupRetry
+	if err := json.NewDecoder(resp.Body).Decode(&retry); err != nil {
+		return TierCleanupRetry{}, err
+	}
+	return retry, nil
 }
 
 // TierExists reports whether the server holds a tier by that name. RustFS
