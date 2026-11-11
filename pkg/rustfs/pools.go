@@ -11,9 +11,24 @@ import (
 // PoolInfo describes one storage pool. The admin API identifies a pool by the
 // command line it was started with (its endpoint list), which is the name the
 // provider exposes.
+//
+// RustFS 1.0.5 added the partial-outage-safe diagnostics (availability,
+// capacity state and metadata freshness). Servers before 1.0.5 omit them, so
+// they are pointers: an absent field decodes to nil instead of a zero value
+// the provider would have invented.
 type PoolInfo struct {
 	Name   string `json:"cmdline"`
 	Status string `json:"status"`
+	// Availability is online, offline or unknown.
+	Availability *string `json:"availability"`
+	// CapacityStatus is live, partial or unknown.
+	CapacityStatus *string `json:"capacityStatus"`
+	// PoolMetadataStatus reports how fresh the pool metadata is.
+	PoolMetadataStatus *string `json:"poolMetadataStatus"`
+	// RebalanceMetadataStatus reports how fresh the rebalance metadata is.
+	RebalanceMetadataStatus *string `json:"rebalanceMetadataStatus"`
+	// ObservedAt is when the server sampled the diagnostics (RFC3339).
+	ObservedAt *string `json:"observedAt"`
 }
 
 // ListPools returns the cluster's storage pools from
