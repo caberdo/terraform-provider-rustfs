@@ -152,6 +152,175 @@ func TestGetScannerStatus(t *testing.T) {
 	if status.RawJSON != scannerStatusPayload {
 		t.Errorf("status JSON was not kept verbatim")
 	}
+	// RustFS 1.0.1 through 1.0.4 do not send the observation blocks.
+	if status.UsagePublication != nil {
+		t.Errorf("usage publication = %+v, want nil", status.UsagePublication)
+	}
+	if status.HealObservation != nil {
+		t.Errorf("heal observation = %+v, want nil", status.HealObservation)
+	}
+}
+
+// scannerStatus105Payload is the RustFS 1.0.5 shape: metrics.usage_publication
+// and a top-level heal_observation. The extra keys inside both blocks prove an
+// unrecognised field does not fail the decode.
+const scannerStatus105Payload = `{
+  "enabled": true,
+  "metrics": {
+    "current_cycle": 0,
+    "usage_freshness": {"dirty_pending_buckets": 0, "last_publication_state": "published", "last_durable_success_unix_secs": 1794385123},
+    "usage_publication": {
+      "scanner_epoch": 1,
+      "cycle": 3,
+      "class": "complete_converged",
+      "outcome": "saved",
+      "pending_bucket_count": 0,
+      "snapshot_updated_at_unix_secs": 1794385123,
+      "observed_at_unix_secs": 1794385124,
+      "future_field": "ignored"
+    }
+  },
+  "heal_observation": {
+    "state": "active",
+    "generation": 7,
+    "retained_pending_tasks": 2,
+    "terminal_candidates": [
+      {"execution": "completed", "disposition": "deferred", "scope": "content_and_leader_unknown", "scan_mode": "deep", "count": 1, "future_field": "ignored"},
+      {"execution": "failed", "disposition": "unrepaired", "scope": "object", "scan_mode": "normal", "count": 2}
+    ],
+    "unknown_candidates": [
+      {"reason": "content_and_leader_unknown", "count": 1},
+      {"reason": "observer_full_or_closed", "count": 3}
+    ],
+    "integrity_state": "unknown"
+  }
+}`
+
+func TestGetScannerStatusDecodesObservationBlocks(t *testing.T) {
+	client := newScannerTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, scannerStatus105Payload)
+	})
+
+	status, err := client.GetScannerStatus(context.Background())
+	if err != nil {
+		t.Fatalf("read scanner status: %v", err)
+	}
+
+	publication := status.UsagePublication
+	if publication == nil {
+		t.Fatal("usage publication was not decoded")
+	}
+	if publication.ScannerEpoch == nil || *publication.ScannerEpoch != 1 {
+		t.Errorf("scanner epoch = %v, want 1", publication.ScannerEpoch)
+	}
+	if publication.Cycle == nil || *publication.Cycle != 3 {
+		t.Errorf("cycle = %v, want 3", publication.Cycle)
+	}
+	if publication.Class != "complete_converged" || publication.Outcome != "saved" {
+		t.Errorf("class/outcome = %q/%q", publication.Class, publication.Outcome)
+	}
+	if publication.PendingBucketCount == nil || *publication.PendingBucketCount != 0 {
+		t.Errorf("pending bucket count = %v, want 0", publication.PendingBucketCount)
+	}
+	if publication.SnapshotUpdatedAtUnixSecs == nil || *publication.SnapshotUpdatedAtUnixSecs != 1794385123 {
+		t.Errorf("snapshot updated = %v", publication.SnapshotUpdatedAtUnixSecs)
+	}
+	if publication.ObservedAtUnixSecs == nil || *publication.ObservedAtUnixSecs != 1794385124 {
+		t.Errorf("observed at = %v", publication.ObservedAtUnixSecs)
+	}
+
+	observation := status.HealObservation
+	if observation == nil {
+		t.Fatal("heal observation was not decoded")
+	}
+	if observation.RetainedPendingTasks == nil || *observation.RetainedPendingTasks != 2 {
+		t.Errorf("retained pending tasks = %v, want 2", observation.RetainedPendingTasks)
+	}
+	if observation.IntegrityState != "unknown" {
+		t.Errorf("integrity state = %q, want unknown", observation.IntegrityState)
+	}
+	if observation.TerminalCandidateCount != 3 {
+		t.Errorf("terminal candidate count = %d, want 3", observation.TerminalCandidateCount)
+	}
+	if observation.UnknownCandidateCount != 4 {
+		t.Errorf("unknown candidate count = %d, want 4", observation.UnknownCandidateCount)
+	}
+	if len(observation.TerminalCandidates) != 2 {
+		t.Fatalf("terminal candidates = %d, want 2", len(observation.TerminalCandidates))
+	}
+	if got := observation.TerminalCandidates[0]; got.Execution != "completed" ||
+		got.Disposition != "deferred" || got.Scope != "content_and_leader_unknown" ||
+		got.ScanMode != "deep" || got.Count != 1 {
+		t.Errorf("terminal candidate[0] = %+v", got)
+	}
+	if len(observation.UnknownCandidates) != 2 {
+		t.Fatalf("unknown candidates = %d, want 2", len(observation.UnknownCandidates))
+	}
+	if got := observation.UnknownCandidates[1]; got.Reason != "observer_full_or_closed" || got.Count != 3 {
+		t.Errorf("unknown candidate[1] = %+v", got)
+	}
+
+	if status.RawJSON != scannerStatus105Payload {
+		t.Errorf("status JSON was not kept verbatim")
+	}
+}
+
+// TestGetScannerStatusKeepsUnavailablePublicationValuesNull covers the default
+// 1.0.5 answer: the blocks are present but the server could not confirm a
+// snapshot or start an observer, so the optional fields are null rather than
+// zero.
+func TestGetScannerStatusKeepsUnavailablePublicationValuesNull(t *testing.T) {
+	const payload = `{"enabled":true,"metrics":{"usage_publication":{` +
+		`"scanner_epoch":null,"cycle":null,"class":"unknown","outcome":"none",` +
+		`"pending_bucket_count":null,"snapshot_updated_at_unix_secs":null,` +
+		`"observed_at_unix_secs":null}},` +
+		`"heal_observation":{"state":"not_started","retained_pending_tasks":null,` +
+		`"terminal_candidates":[],"unknown_candidates":[],"integrity_state":"unknown"}}`
+
+	client := newScannerTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, payload)
+	})
+
+	status, err := client.GetScannerStatus(context.Background())
+	if err != nil {
+		t.Fatalf("read scanner status: %v", err)
+	}
+
+	publication := status.UsagePublication
+	if publication == nil {
+		t.Fatal("usage publication was not decoded")
+	}
+	if publication.ScannerEpoch != nil || publication.Cycle != nil || publication.PendingBucketCount != nil {
+		t.Errorf("counters = %v/%v/%v, want nil",
+			publication.ScannerEpoch, publication.Cycle, publication.PendingBucketCount)
+	}
+	if publication.SnapshotUpdatedAtUnixSecs != nil || publication.ObservedAtUnixSecs != nil {
+		t.Errorf("timestamps = %v/%v, want nil",
+			publication.SnapshotUpdatedAtUnixSecs, publication.ObservedAtUnixSecs)
+	}
+	if publication.Class != "unknown" || publication.Outcome != "none" {
+		t.Errorf("class/outcome = %q/%q", publication.Class, publication.Outcome)
+	}
+
+	observation := status.HealObservation
+	if observation == nil {
+		t.Fatal("heal observation was not decoded")
+	}
+	if observation.RetainedPendingTasks != nil {
+		t.Errorf("retained pending tasks = %v, want nil", observation.RetainedPendingTasks)
+	}
+	if observation.TerminalCandidateCount != 0 || observation.UnknownCandidateCount != 0 {
+		t.Errorf("candidate counts = %d/%d, want 0/0",
+			observation.TerminalCandidateCount, observation.UnknownCandidateCount)
+	}
+	if observation.TerminalCandidates == nil || observation.UnknownCandidates == nil {
+		t.Error("empty candidate arrays must decode as empty, not nil")
+	}
+	if observation.IntegrityState != "unknown" {
+		t.Errorf("integrity state = %q", observation.IntegrityState)
+	}
 }
 
 func TestGetScannerStatusKeepsReasonStrings(t *testing.T) {

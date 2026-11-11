@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/caberdo/terraform-provider-rustfs/pkg/rustfs"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	datasourceschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -48,6 +49,46 @@ const scannerStatusTestPayload = `{
   "pause_backlog": {"phase": "idle"}
 }`
 
+// scannerStatusTestPayload105 is the RustFS 1.0.5 shape: metrics.usage_publication
+// and a top-level heal_observation.
+const scannerStatusTestPayload105 = `{
+  "enabled": true,
+  "disabled_reason": null,
+  "freshness": {"state": "fresh"},
+  "metrics": {
+    "current_cycle": 0,
+    "usage_freshness": {"dirty_pending_buckets": 0, "last_publication_state": "published", "last_durable_success_unix_secs": 1794385123},
+    "usage_publication": {
+      "scanner_epoch": 1,
+      "cycle": 3,
+      "class": "complete_converged",
+      "outcome": "saved",
+      "pending_bucket_count": 0,
+      "snapshot_updated_at_unix_secs": 1794385123,
+      "observed_at_unix_secs": 1794385124
+    }
+  },
+  "cycle_schedule": {"effective_interval_seconds": 60, "usage_bootstrap_rebuild_pending": false},
+  "cycle_recovery": {"state": "healthy", "reason": null},
+  "data_movement_pause": {"paused": false},
+  "pause_backlog": {"phase": "idle"},
+  "heal_observation": {
+    "state": "active",
+    "retained_pending_tasks": 0,
+    "terminal_candidates": [
+      {"execution": "completed", "disposition": "deferred", "scope": "content_and_leader_unknown", "scan_mode": "deep", "count": 1}
+    ],
+    "unknown_candidates": [
+      {"reason": "content_and_leader_unknown", "count": 1}
+    ],
+    "integrity_state": "unknown"
+  }
+}`
+
+const scannerStatusTestHealCandidatesJSON = `{"terminal_candidates":[{"execution":"completed",` +
+	`"disposition":"deferred","scope":"content_and_leader_unknown","scan_mode":"deep","count":1}],` +
+	`"unknown_candidates":[{"reason":"content_and_leader_unknown","count":1}]}`
+
 func TestScannerStatusDataSourceSchema(t *testing.T) {
 	sch := dataSourceSchemaOf(t, NewScannerStatusDataSource())
 
@@ -59,6 +100,11 @@ func TestScannerStatusDataSourceSchema(t *testing.T) {
 		"usage_bootstrap_rebuild_pending", "usage_publication_state", "usage_last_durable_success_unix_secs",
 		"usage_dirty_pending_buckets", "maintenance_primary_control", "cycle_recovery_state",
 		"cycle_recovery_reason", "data_movement_paused", "pause_backlog_phase",
+		"usage_publication_scanner_epoch", "usage_publication_cycle", "usage_publication_class",
+		"usage_publication_outcome", "usage_publication_pending_bucket_count",
+		"usage_publication_snapshot_updated_at_unix_secs", "usage_publication_observed_at_unix_secs",
+		"heal_retained_pending_tasks", "heal_terminal_candidate_count", "heal_unknown_candidate_count",
+		"heal_integrity_state", "heal_candidates_json",
 	}
 	for _, name := range required {
 		attr, ok := sch.Attributes[name]
@@ -188,6 +234,87 @@ func TestScannerStatusDataSourceRead(t *testing.T) {
 		if got.DataMovementPaused.ValueBool() || got.PauseBacklogPhase.ValueString() != "idle" {
 			t.Errorf("movement pause = %v/%q", got.DataMovementPaused.ValueBool(), got.PauseBacklogPhase.ValueString())
 		}
+		// RustFS 1.0.1 through 1.0.4 omit both observation blocks; the newer
+		// attributes must stay null rather than report a zero attempt.
+		for name, value := range map[string]attr.Value{
+			"usage_publication_scanner_epoch":                 got.UsagePublicationScannerEpoch,
+			"usage_publication_cycle":                         got.UsagePublicationCycle,
+			"usage_publication_class":                         got.UsagePublicationClass,
+			"usage_publication_outcome":                       got.UsagePublicationOutcome,
+			"usage_publication_pending_bucket_count":          got.UsagePublicationPendingBucketCount,
+			"usage_publication_snapshot_updated_at_unix_secs": got.UsagePublicationSnapshotUpdatedAtUnixSecs,
+			"usage_publication_observed_at_unix_secs":         got.UsagePublicationObservedAtUnixSecs,
+			"heal_retained_pending_tasks":                     got.HealRetainedPendingTasks,
+			"heal_terminal_candidate_count":                   got.HealTerminalCandidateCount,
+			"heal_unknown_candidate_count":                    got.HealUnknownCandidateCount,
+			"heal_integrity_state":                            got.HealIntegrityState,
+			"heal_candidates_json":                            got.HealCandidatesJSON,
+		} {
+			if !value.IsNull() {
+				t.Errorf("%s = %v, want null on a pre-1.0.5 payload", name, value)
+			}
+		}
+	})
+
+	t.Run("surfaces usage publication and heal observation", func(t *testing.T) {
+		srv, _ := newRecorderServer(t, http.StatusOK, scannerStatusTestPayload105)
+		d := NewScannerStatusDataSource().(*ScannerStatusDataSource)
+		d.client = newUnitAllClient(srv)
+
+		resp := readScannerStatus(t, d, dataSourceSchemaOf(t, d))
+		if resp.Diagnostics.HasError() {
+			t.Fatalf("unexpected diagnostics: %v", resp.Diagnostics)
+		}
+
+		var got ScannerStatusDataSourceModel
+		if diags := resp.State.Get(context.Background(), &got); diags.HasError() {
+			t.Fatalf("reading the state back: %v", diags)
+		}
+
+		if got.UsagePublicationScannerEpoch.ValueInt64() != 1 {
+			t.Errorf("usage_publication_scanner_epoch = %d", got.UsagePublicationScannerEpoch.ValueInt64())
+		}
+		if got.UsagePublicationCycle.ValueInt64() != 3 {
+			t.Errorf("usage_publication_cycle = %d", got.UsagePublicationCycle.ValueInt64())
+		}
+		if got.UsagePublicationClass.ValueString() != "complete_converged" {
+			t.Errorf("usage_publication_class = %q", got.UsagePublicationClass.ValueString())
+		}
+		if got.UsagePublicationOutcome.ValueString() != "saved" {
+			t.Errorf("usage_publication_outcome = %q", got.UsagePublicationOutcome.ValueString())
+		}
+		if got.UsagePublicationPendingBucketCount.ValueInt64() != 0 {
+			t.Errorf("usage_publication_pending_bucket_count = %d",
+				got.UsagePublicationPendingBucketCount.ValueInt64())
+		}
+		if got.UsagePublicationSnapshotUpdatedAtUnixSecs.ValueInt64() != 1794385123 {
+			t.Errorf("usage_publication_snapshot_updated_at_unix_secs = %d",
+				got.UsagePublicationSnapshotUpdatedAtUnixSecs.ValueInt64())
+		}
+		if got.UsagePublicationObservedAtUnixSecs.ValueInt64() != 1794385124 {
+			t.Errorf("usage_publication_observed_at_unix_secs = %d",
+				got.UsagePublicationObservedAtUnixSecs.ValueInt64())
+		}
+		// The older field stays reported alongside the new block.
+		if got.UsagePublicationState.ValueString() != "published" {
+			t.Errorf("usage_publication_state = %q", got.UsagePublicationState.ValueString())
+		}
+
+		if got.HealRetainedPendingTasks.ValueInt64() != 0 {
+			t.Errorf("heal_retained_pending_tasks = %d", got.HealRetainedPendingTasks.ValueInt64())
+		}
+		if got.HealTerminalCandidateCount.ValueInt64() != 1 {
+			t.Errorf("heal_terminal_candidate_count = %d", got.HealTerminalCandidateCount.ValueInt64())
+		}
+		if got.HealUnknownCandidateCount.ValueInt64() != 1 {
+			t.Errorf("heal_unknown_candidate_count = %d", got.HealUnknownCandidateCount.ValueInt64())
+		}
+		if got.HealIntegrityState.ValueString() != "unknown" {
+			t.Errorf("heal_integrity_state = %q", got.HealIntegrityState.ValueString())
+		}
+		if got.HealCandidatesJSON.ValueString() != scannerStatusTestHealCandidatesJSON {
+			t.Errorf("heal_candidates_json = %s", got.HealCandidatesJSON.ValueString())
+		}
 	})
 
 	t.Run("explains a capability gap with the server version", func(t *testing.T) {
@@ -257,6 +384,44 @@ data "rustfs_scanner_status" "test" {}
 					resource.TestCheckResourceAttr("data.rustfs_scanner_status.test", "id", "scanner-status"),
 					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "status_json"),
 					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "freshness_state"),
+				),
+			},
+		},
+	})
+}
+
+// TestAccScannerStatusDataSourcePublicationAndHeal asserts the 1.0.5
+// observation blocks against the live route. It runs only on a server that
+// sends them: on 1.0.1 through 1.0.4 the attributes are null by design, so a
+// version check keeps the shared acceptance cells honest instead of relaxing
+// the assertions.
+func TestAccScannerStatusDataSourcePublicationAndHeal(t *testing.T) {
+	testAccScannerStatusPreCheck(t)
+
+	client := testAccAdminClient()
+	version, raw, err := client.ServerVersion(context.Background())
+	if err != nil {
+		t.Skipf("cannot determine the RustFS version, skipping: %v", err)
+	}
+	if !version.AtLeast(rustfs.Version{Major: 1, Minor: 0, Patch: 5}) {
+		t.Skipf("usage publication and heal observation ship in RustFS 1.0.5; this server reports %s", raw)
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccScannerStatusPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccProviderConfig() + `
+data "rustfs_scanner_status" "test" {}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "usage_publication_class"),
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "usage_publication_outcome"),
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "heal_integrity_state"),
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "heal_candidates_json"),
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "heal_terminal_candidate_count"),
+					resource.TestCheckResourceAttrSet("data.rustfs_scanner_status.test", "heal_unknown_candidate_count"),
 				),
 			},
 		},
