@@ -11,7 +11,7 @@
 # - `push: tags: ["v*"]`, for a signed tag pushed from a developer machine (the
 #   GPG-signed tag the release is built and attested from).
 #
-# Tag creation is deliberately not inferred here: `version-file` is empty and
+# Tag creation is deliberately not inferred here: there is no version file, and
 # the caller always supplies the tag, so the reusable workflow's tag job never
 # invents a version for this repository.
 name: Release
@@ -43,7 +43,7 @@ concurrency:
 
 jobs:
   release:
-    uses: caberdo/terraform-provider-kit/.github/workflows/provider-release.yml@v0.8.0
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-release.yml@v0.12.0
     # `contents: write` uploads the release; `id-token: write` mints the OIDC
     # identity `actions/attest` signs the provenance with; `attestations: write`
     # stores that provenance in the repository's attestation record. Nothing
@@ -57,12 +57,9 @@ jobs:
       provider: rustfs
       dist-prefix: terraform-provider-rustfs
       goreleaser-config: .github/goreleaser.yml
-      # No VERSION file: a tag is always supplied by the trigger, never derived.
-      version-file: ""
-      # The kit's changelog check expects `## [X.Y.Z] - YYYY-MM-DD`, while
-      # scripts/changelog-release.sh writes `## X.Y.Z (YYYY-MM-DD)`. The check
-      # stays off; the Conventions workflow owns the changelog format.
-      changelog-check: false
+      # No version file: the tag is the version. The kit's tag job is skipped
+      # on a tag-driven caller, and `changelog-check` lives in that job; the
+      # changelog is checked by `tfkit release check` against the last tag.
       # The tag job's version resolution never runs when `tag` is set, so this
       # guard is inert for this caller; keep the pre-migration failure mode for
       # any future caller path that does resolve a version.

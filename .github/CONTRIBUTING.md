@@ -223,7 +223,9 @@ and run `make coverage-readme`. Do that in the same pull request that adds the t
 3. `make generate` produces no `docs/` diff.
 4. `make coverage-merge && make coverage-gate` passes, and the coverage floor in
    `.github/coverage-baseline.txt` is raised if the change improved it.
-5. The change is described in `CHANGELOG.md` under `Unreleased`.
+5. The change carries a `changelog.d/<issue>-<kind>-<slug>.md` fragment describing
+   it (or the pull request is labelled `skip-changelog` when no user can observe
+   the change); `CHANGELOG.md` itself is written only by the release pull request.
 
 ### Pull request process
 

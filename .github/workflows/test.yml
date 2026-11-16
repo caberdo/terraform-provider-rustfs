@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: caberdo/terraform-provider-kit/.github/workflows/provider-ci.yml@v0.8.0
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-ci.yml@v0.12.0
     # GitHub validates a caller's grant against every job of the called workflow
     # before any `if:` or input is evaluated, so these are the union of what
     # provider-ci declares, not what this run happens to execute:
@@ -85,13 +85,14 @@ jobs:
       # unions them into one synthetic module (with stubs), so the example job
       # below keeps that behaviour instead of losing the check.
       examples: false
-      # Declared for intent, but rustfs has no VERSION file: its changelog is
-      # assembled from changelog.d/ fragments by scripts/changelog-release.sh and
-      # the fragment convention is enforced by conventions.yml. The kit's
-      # release check reads a VERSION file, so the empty path disables that step
-      # instead of failing on a file this repository does not have.
+      # The released version is the last tag: `tfkit release check` compares
+      # CHANGELOG.md and the README install constraint against it. The changelog
+      # is assembled from changelog.d/ fragments by scripts/changelog-release.sh
+      # and the fragment convention is enforced by conventions.yml as well.
       changelog: true
-      version-file: ""
+      # Every pull request that can change what a user sees carries a fragment
+      # in changelog.d/ instead of editing CHANGELOG.md.
+      changelog-fragments: true
       # docs.yml's `Generate Docs` job failed on drift on every pull request and
       # on main; docs-mode: drift keeps that check in the docs job, so the
       # context stays `ci / Generate Docs` rather than moving into Test.
@@ -140,7 +141,7 @@ jobs:
   acceptance:
     needs: [ci, examples]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: caberdo/terraform-provider-kit/.github/workflows/provider-acceptance.yml@v0.8.0
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-acceptance.yml@v0.12.0
     permissions:
       contents: read
     with:
