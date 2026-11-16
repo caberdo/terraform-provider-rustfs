@@ -70,7 +70,7 @@ See [`ARCHITECTURE.md`](../ARCHITECTURE.md) for what the pieces do at runtime.
 
 * `make fmt` (`gofmt`) and `make vet` (`go vet ./...`) before every commit.
 * `make lint` runs golangci-lint with the repository configuration
-  ([`.github/golangci.yml`](../.github/golangci.yml)); CI runs the same config with a pinned
+  ([`.golangci.yml`](../.golangci.yml)); CI runs the same config with a pinned
   linter version, so a green local run means a green CI run.
 * Follow idiomatic Go and the conventions in [`AGENTS.md`](../AGENTS.md): append diagnostics then
   bail out on error, human-readable error titles with a contextual detail, `tflog` at CRUD
