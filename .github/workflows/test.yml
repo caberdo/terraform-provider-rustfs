@@ -56,7 +56,7 @@ jobs:
       # RustFS's packages are `provider` and `pkg/rustfs`, not `./internal/...`.
       packages: ./...
       # Pinned so CI and local runs agree on the linter set and gofmt behaviour.
-      golangci-config: .github/golangci.yml
+      golangci-config: .golangci.yml
       golangci-version: v2.14.0
       # The old job used the action's default binary install; only the version
       # was pinned in the repository.

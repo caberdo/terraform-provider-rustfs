@@ -488,7 +488,7 @@ make build              # build ./bin/terraform-provider-rustfs
 make install            # install into ~/.terraform.d/plugins for local dev_overrides
 make test coverage      # unit tests + coverage table
 make testacc-docker     # acceptance suite, Docker
-make lint vet fmt       # golangci-lint (.github/golangci.yml), go vet, gofmt
+make lint vet fmt       # golangci-lint (.golangci.yml), go vet, gofmt
 make generate           # regenerate docs/ with terraform-plugin-docs
 make validate-examples  # check examples/ against the provider schema
 ```
