@@ -24,16 +24,16 @@ those responsibilities and the automations in `.github/workflows/` do the mechan
    the reasoning written down (see [#54](https://github.com/caberdo/terraform-provider-rustfs/issues/54)
    for an example where the options and their trade-offs are recorded before a choice is made).
 2. **Every change lands through a pull request against `main`.** Direct pushes are impossible: the
-   `protect-main` ruleset requires a pull request, requires the `Lint & Security` and `Test` checks,
-   forbids force-pushes and deletions, dismisses stale reviews and requires review conversations to
-   be resolved.
+   `protect-main` ruleset requires a pull request, requires the `ci / Lint & Security`,
+   `ci / Test`, `ci / Coverage` and `examples / Validate Examples` checks, forbids force-pushes and
+   deletions, dismisses stale reviews and requires review conversations to be resolved.
 3. **The maintainer decides.** Where an issue reaches no consensus, the maintainer records the
    decision and the rationale in the issue and moves on. Disagreement is expressed in the issue, not
    by re-litigating a merged change.
-4. **Releases are cut, not continuous.** `Create Release Tag` computes the next version from
-   `main`, creates a GPG-signed tag and invokes the `Release` workflow. The version scheme and the
-   release process are described in [`README.md`](./README.md#verifying-a-release) and
-   [`CHANGELOG.md`](./CHANGELOG.md); breaking changes are listed under `BREAKING CHANGES` and
+4. **Releases are cut, not continuous.** `Release` publishes a tag: a maintainer creates and pushes
+   a GPG-signed tag, or dispatches `Release` with an existing tag to (re)publish it. The version
+   scheme and the release process are described in [`README.md`](./README.md#verifying-a-release)
+   and [`CHANGELOG.md`](./CHANGELOG.md); breaking changes are listed under `BREAKING CHANGES` and
    Terraform-visible schema changes carry `RequiresReplace()`.
 5. **Backwards compatibility is a commitment.** Terraform type and attribute names are public API:
    renaming `rustfs_bucket` or an attribute silently breaks user state, so it is not done (the
@@ -44,11 +44,13 @@ those responsibilities and the automations in `.github/workflows/` do the mechan
 
 | Check | Workflow | Runs on |
 |---|---|---|
-| `Lint & Security` (golangci-lint, gosec → SARIF) | `test.yml` | every pull request and push to `main` |
-| `Test` (build, vet, validate examples, `go test -race` with coverage) | `test.yml` | every pull request and push to `main` |
-| `Acceptance Tests` (RustFS matrix in Docker) | `test.yml` | push to `main` |
-| `Generate Docs` (docs drift) / `Validate Markdown Files` | `docs.yml` | push to `main` / pull request and push to `main` |
-| `Scorecard` (OpenSSF, published to the Scorecard API) | `scorecard.yml` | weekly, push to `main`, branch-protection changes |
+| `ci / Lint & Security` (golangci-lint, gosec → SARIF) | `test.yml` | every pull request and push to `main` |
+| `ci / Test` (build, vet, `go test -race` with coverage) | `test.yml` | every pull request and push to `main` |
+| `ci / Coverage` (merged unit + acceptance profile against the floor) | `test.yml` | every pull request |
+| `examples / Validate Examples` (fragments unioned against the provider schema) | `test.yml` | every pull request and push to `main` |
+| `acceptance / Acceptance` (RustFS matrix in Docker, stable roll-up) | `test.yml` | push to `main` |
+| `ci / Generate Docs` (docs drift) / `ci / Validate Markdown Files` | `test.yml` | push to `main` (and tags) / pull request and push to `main` |
+| `analysis / Scorecard analysis` (OpenSSF, published to the Scorecard API) | `scorecard.yml` | weekly, push to `main`, branch-protection changes |
 
 ## Access and continuity
 

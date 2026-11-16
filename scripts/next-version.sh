@@ -2,9 +2,8 @@
 # Copyright (c) 2026 The terraform-provider-rustfs contributors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Resolve the version to release. Shared by the Create Release Tag workflow and
-# the Prepare Release workflow so the two cannot disagree about what "patch"
-# means.
+# Resolve the version to release. Used by the Prepare Release workflow; the
+# Release workflow's tag job performs the same patch/minor/major bump in tfkit.
 #
 # Usage: scripts/next-version.sh <latest-tag> <release-type> [manual-version]
 #   latest-tag       newest tag, with or without a leading v (v0.5.1)

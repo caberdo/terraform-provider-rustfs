@@ -13,7 +13,8 @@
 # pushes the branch and prints the manual compare link.
 #
 # Tagging stays manual: it is irreversible and publishes immediately. After the
-# release pull request merges, dispatch Create Release Tag with the same version.
+# release pull request merges, create and push the GPG-signed tag and dispatch
+# Release with it.
 name: Prepare Release
 
 on:
@@ -208,8 +209,8 @@ jobs:
           the resource tables. It was opened by the release GitHub App so the
           \`pull_request\` workflows run on it.
 
-          Merge it once the checks pass, then dispatch **Create Release Tag** with
-          \`version: v$VERSION\`.
+          Merge it once the checks pass, then create and push the GPG-signed tag
+          and dispatch **Release** with \`tag: v$VERSION\`.
           EOF
           )
 
@@ -261,7 +262,7 @@ jobs:
                 echo "   (set the \`APP_ID\` repository variable and the \`APP_PRIVATE_KEY\` secret to open it automatically)"
               fi
               echo "2. Merge it once the checks pass."
-              echo "3. Dispatch **Create Release Tag** with \`version: ${{ steps.version.outputs.version }}\`."
+              echo "3. Create and push the GPG-signed tag, then dispatch **Release** with \`tag: v${{ steps.version.outputs.version }}\`."
             else
               echo "The release branch was not pushed or the pull request was not opened. See the failing step above."
             fi

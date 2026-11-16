@@ -326,9 +326,9 @@ ancestors of `main`.
 - **Unit tests (provider, no server)**: `go test ./provider/... -v -skip '^TestAcc'`
 - **Coverage (unit + acceptance)**: `make coverage` writes `coverage.out`; the acceptance container
   (`acc_test/docker-compose.yml`) writes `coverage-acceptance.out` into the worktree, and
-  `make coverage-merge` (→ `scripts/merge-coverage.sh`) merges both into `coverage-union.out` and
+  `make coverage-merge` (→ `tfkit coverage merge`) merges both into `coverage-union.out` and
   prints the combined table. The acceptance job in `test.yml` publishes that table in its summary.
-- **Coverage floor (do not lower)**: `make coverage-gate` (→ `scripts/coverage-gate.sh`) fails when
+- **Coverage floor (do not lower)**: `make coverage-gate` (→ `tfkit coverage gate`) fails when
   `coverage-union.out` is below `.github/coverage-baseline.txt`. The `Coverage` check runs it on
   every pull request and the `latest` acceptance cell repeats it on `main`. Raising the floor is part
   of a coverage PR: update `measured_*`/`floor_*` in that file and run `make coverage-readme`, which

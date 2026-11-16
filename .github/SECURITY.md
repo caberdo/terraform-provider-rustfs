@@ -92,7 +92,7 @@ What it does **not** guarantee:
 | B2 Provider ↔ RustFS server | provider | server responses are parsed as bytes | TLS 1.2+ verified by default; SigV4 request signing; typed `encoding/xml` + `encoding/json` decoding; error bodies stringified, never executed |
 | B3 Provider ↔ Terraform state | — | state may be shared/stored remotely | `Sensitive` on credential attributes; README documents state protection; provider writes no files |
 | B4 Release artifacts ↔ user | GitHub + GPG signature | the network | signed tags, GPG-signed `SHA256SUMS`, SBOM, lock-file checksums |
-| B5 Maintainer ↔ repository | maintainer | — | PR-only `main` with required `Lint & Security` + `Test` checks, no force-push, no deletion, review threads resolved (see [`GOVERNANCE.md`](../GOVERNANCE.md)) |
+| B5 Maintainer ↔ repository | maintainer | — | PR-only `main` with required `ci / Lint & Security`, `ci / Test`, `ci / Coverage` and `examples / Validate Examples` checks, no force-push, no deletion, review threads resolved (see [`GOVERNANCE.md`](../GOVERNANCE.md)) |
 
 The asset that matters most is the **admin credential** for the RustFS server: it is used for
 signed admin calls and travels in the Terraform configuration/environment and the state file, not

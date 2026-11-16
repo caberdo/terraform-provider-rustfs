@@ -70,7 +70,7 @@ See [`ARCHITECTURE.md`](../ARCHITECTURE.md) for what the pieces do at runtime.
 
 * `make fmt` (`gofmt`) and `make vet` (`go vet ./...`) before every commit.
 * `make lint` runs golangci-lint with the repository configuration
-  ([`.github/golangci.yml`](../.github/golangci.yml)); CI runs the same config with a pinned
+  ([`.golangci.yml`](../.golangci.yml)); CI runs the same config with a pinned
   linter version, so a green local run means a green CI run.
 * Follow idiomatic Go and the conventions in [`AGENTS.md`](../AGENTS.md): append diagnostics then
   bail out on error, human-readable error titles with a contextual detail, `tflog` at CRUD
@@ -199,13 +199,13 @@ The acceptance container also writes `coverage-acceptance.out`; `make coverage` 
 
 ### Coverage
 
-Merged (unit + acceptance) statement coverage is enforced. `scripts/coverage-gate.sh` compares a
+Merged (unit + acceptance) statement coverage is enforced. `make coverage-gate` compares a
 profile against [`.github/coverage-baseline.txt`](./coverage-baseline.txt), and the `Coverage` check
 fails a pull request that drops below the floor. The badge and the bar chart in `README.md` are
 generated from that same file, so the published number and the enforced floor cannot drift apart.
 
 ```bash
-make coverage            # unit profile + per-package table
+make coverage            # unit profile + per-function coverage listing
 make testacc-docker      # writes coverage-acceptance.out
 make coverage-merge      # merge both into coverage-union.out
 make coverage-gate       # fail when below the floor
@@ -235,7 +235,8 @@ and run `make coverage-readme`. Do that in the same pull request that adds the t
 ### Code review
 
 Every change to `main` goes through a pull request; the `protect-main` ruleset requires the
-`Lint & Security` and `Test` checks to pass, forbids force-pushes and branch deletion, dismisses
+`ci / Lint & Security`, `ci / Test`, `ci / Coverage` and `examples / Validate Examples` checks to
+pass, forbids force-pushes and branch deletion, dismisses
 stale reviews on new pushes and requires review threads to be resolved. Reviewers check:
 
 | Area | What has to be true |

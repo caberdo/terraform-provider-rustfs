@@ -1,6 +1,6 @@
 # Statement-coverage floor for the merged unit + acceptance profile.
 #
-# `scripts/coverage-gate.sh` fails a run whose merged coverage falls below a
+# `make coverage-gate` (tfkit) fails a run whose merged coverage falls below a
 # `floor_*` value. The `Coverage` job runs that gate on every pull request
 # (RustFS `latest`) and the `latest` cell of the acceptance matrix repeats it on
 # `main`, so the number can only move up.

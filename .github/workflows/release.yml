@@ -1,15 +1,19 @@
-# This GitHub action publishes assets for a release when a tag is created, when
-# it is invoked through workflow_call with an explicit tag, or when it is
-# dispatched manually with the tag to (re)publish.
+# Releasing is delegated to the reusable release workflow in
+# caberdo/terraform-provider-kit.
 #
-# It uses an action (crazy-max/ghaction-import-gpg) that assumes you set your
-# private key in the `GPG_PRIVATE_KEY` secret and passphrase in the `PASSPHRASE`
-# secret. If you would rather own your own GPG handling, please fork this action
-# or use an alternative one for key handling.
+# Three entry points, all with an explicit tag:
 #
-# You will need to pass the `--batch` flag to `gpg` in your signing step
-# in `goreleaser` to indicate this is being used in a non-interactive mode.
+# - `workflow_call`, for a workflow that has already created (or chosen) a tag;
+#   `tag` is required, as it was before the migration.
+# - `workflow_dispatch`, to publish or republish an existing tag. `tag` is
+#   required so a dispatch that forgets it cannot silently cut and publish a
+#   patch.
+# - `push: tags: ["v*"]`, for a signed tag pushed from a developer machine (the
+#   GPG-signed tag the release is built and attested from).
 #
+# Tag creation is deliberately not inferred here: `version-file` is empty and
+# the caller always supplies the tag, so the reusable workflow's tag job never
+# invents a version for this repository.
 name: Release
 
 on:
@@ -22,103 +26,45 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to publish (or republish), e.g. v0.4.0"
+        description: "Existing tag to publish (or republish), e.g. v0.9.0"
         required: true
         type: string
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 permissions:
   contents: read
 
+# A manual dispatch can race a merge or another dispatch. Serialise them instead
+# of cancelling, so a half-created tag is never abandoned.
+concurrency:
+  group: create-release-tag
+  cancel-in-progress: false
+
 jobs:
-  goreleaser:
-    runs-on: ubuntu-latest
-    # `contents: write` uploads the release. `id-token: write` mints the OIDC
-    # identity `actions/attest` signs the build provenance with, and
-    # `attestations: write` stores that provenance in the repository's
-    # attestation record. Nothing else in this job needs write access.
+  release:
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-release.yml@v0.8.0
+    # `contents: write` uploads the release; `id-token: write` mints the OIDC
+    # identity `actions/attest` signs the provenance with; `attestations: write`
+    # stores that provenance in the repository's attestation record. Nothing
+    # else needs write access.
     permissions:
       contents: write
       id-token: write
       attestations: write
-    timeout-minutes: 30
-    env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: ${{ env.RELEASE_TAG }}
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      - name: Import GPG key
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.PASSPHRASE }}
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
-        with:
-          version: "~> v2"
-          args: release --clean --config .github/goreleaser.yml
-        env:
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_TAG: ${{ env.RELEASE_TAG }}
-
-      # GoReleaser names the checksum file after the version without the `v`
-      # prefix, which is also the version the tag is checked out at.
-      - name: Resolve the release artifact names
-        id: artifacts
-        run: |
-          VERSION="${RELEASE_TAG#v}"
-          echo "checksums=dist/terraform-provider-rustfs_${VERSION}_SHA256SUMS" >> "$GITHUB_OUTPUT"
-          echo "provenance=terraform-provider-rustfs_${VERSION}_provenance.intoto.jsonl" >> "$GITHUB_OUTPUT"
-
-      # The checksum file lists exactly the artifacts the release publishes, so
-      # attesting it attests the same set the GPG signature, the SBOM and the
-      # Terraform Registry manifest describe. The result is SLSA v1.0 build
-      # provenance, verifiable with `gh attestation verify`.
-      - name: Attest build provenance
-        id: attest
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-checksums: ${{ steps.artifacts.outputs.checksums }}
-
-      # The attestation record is not a release asset and OpenSSF Scorecard's
-      # Signed-Releases check reads release assets, so the Sigstore bundle that
-      # `actions/attest` just produced is attached to the release as well. It
-      # holds the same in-toto statement in a DSSE envelope, which `gh
-      # attestation verify --bundle` checks against a downloaded release.
-      - name: Publish the provenance bundle
-        env:
-          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-          PROVENANCE: ${{ steps.artifacts.outputs.provenance }}
-        run: |
-          cp "${BUNDLE_PATH}" "${PROVENANCE}"
-          test -s "${PROVENANCE}"
-
-      - name: Generate SBOM
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          path: ./dist
-          format: spdx-json
-          output-file: sbom.spdx.json
-
-      - name: Upload the SBOM and the provenance to release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          files: |
-            sbom.spdx.json
-            ${{ steps.artifacts.outputs.provenance }}
-          tag_name: ${{ env.RELEASE_TAG }}
+    secrets: inherit
+    with:
+      provider: rustfs
+      dist-prefix: terraform-provider-rustfs
+      goreleaser-config: .github/goreleaser.yml
+      # No VERSION file: a tag is always supplied by the trigger, never derived.
+      version-file: ""
+      # The kit's changelog check expects `## [X.Y.Z] - YYYY-MM-DD`, while
+      # scripts/changelog-release.sh writes `## X.Y.Z (YYYY-MM-DD)`. The check
+      # stays off; the Conventions workflow owns the changelog format.
+      changelog-check: false
+      # The tag job's version resolution never runs when `tag` is set, so this
+      # guard is inert for this caller; keep the pre-migration failure mode for
+      # any future caller path that does resolve a version.
+      tag-exists: fail
+      tag: ${{ inputs.tag || github.event.inputs.tag }}
