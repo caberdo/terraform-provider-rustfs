@@ -1,6 +1,6 @@
 ## Unreleased
 
-## 0.9.0 (2026-11-11)
+## [0.9.0] - 2026-11-11
 
 FEATURES:
 - `rustfs_tier` gains `force_destroy`. Destroying a tier with `force_destroy = true`
@@ -47,7 +47,7 @@ CHORES:
   admin metrics stream still answers `501 NotImplemented` on `1.0.5`.
 - The module now requires Go 1.27.4 instead of 1.27.3. Go 1.27.3's standard library is affected by GO-2026-6859 (`net/http` HTTP/1 server crash due to a `MaxBytesReader` header race), which `govulncheck` reports on every build. Building from source now needs Go 1.27.4; `GOTOOLCHAIN=auto` fetches it automatically.
 
-## 0.8.0 (2026-10-27)
+## [0.8.0] - 2026-10-27
 
 FEATURES:
 - `rustfs_bucket` gains `force_destroy` (default `false`). With `force_destroy = true` a destroy
@@ -152,7 +152,7 @@ BUG FIXES:
   rejected instead of being pasted into a URL. Configurations that set `ssl` and omit the scheme are
   unchanged.
 
-## 0.7.0 (2026-10-22)
+## [0.7.0] - 2026-10-22
 
 BUG FIXES:
 - `rustfs_bucket_lifecycle_configuration` now accepts a `rule` list whose value is
@@ -165,7 +165,7 @@ BUG FIXES:
   survives to apply is refused instead of being written to the bucket as an empty
   rule list.
 
-## 0.6.1 (2026-10-21)
+## [0.6.1] - 2026-10-21
 
 BUG FIXES:
 - The provider now compiles for 32-bit targets. The data-integrity job's byte limits
@@ -174,7 +174,7 @@ BUG FIXES:
   only fixes the build: 64-bit users see no behaviour change, and no state or
   schema moved.
 
-## 0.6.0 (2026-10-21)
+## [0.6.0] - 2026-10-21
 
 FEATURES:
 - `rustfs_table_bucket` manages the S3 Tables (Iceberg REST catalog) switch of an existing bucket:
@@ -334,7 +334,7 @@ CHORES:
   `APP_PRIVATE_KEY` secret are absent (forks, or before the App exists) the branch is still pushed
   and the summary prints the manual compare link.
 
-## 0.5.1 (2026-10-19)
+## [0.5.1] - 2026-10-19
 
 BUG FIXES:
 - `rustfs_pools` reads `GET /rustfs/admin/v3/pools/list`, the route RustFS 1.0.x serves, instead of the
@@ -495,7 +495,7 @@ CHORES:
   their create/read/update/delete/import flows, including every documented import ID form, are
   asserted in `provider/` instead, which also pins the wire bodies those resources send
 
-## 0.5.0 (2026-10-18)
+## [0.5.0] - 2026-10-18
 
 BUG FIXES:
 - `rustfs_group_policy_attachment` no longer replaces every policy on the group. Attach and detach
@@ -570,7 +570,7 @@ CHORES:
   `golang.org/x/crypto/openpgp` advisory is documented as accepted in
   [`.github/SECURITY.md`](./.github/SECURITY.md)
 
-## 0.4.1 (2026-10-18)
+## [0.4.1] - 2026-10-18
 
 CHORES:
 - The acceptance environment no longer pins the notify and audit feature modules with
@@ -582,7 +582,7 @@ CHORES:
   (`avail_space`, `free_inodes`, `used_space`) into an output, which made the second step flap
   between an empty and a non-empty refresh plan depending on whether the metrics had moved
 
-## 0.4.0 (2026-10-18)
+## [0.4.0] - 2026-10-18
 
 FEATURES:
 - **New Resource:** `rustfs_notification_target` — event-notification targets for all nine target
@@ -594,7 +594,7 @@ FEATURES:
   be configured for every target type; the flat webhook attributes keep working and cannot be
   combined with a typed block
 
-## 0.3.0 (2026-10-08)
+## [0.3.0] - 2026-10-08
 
 IMPROVEMENTS:
 - Admin/S3 error responses are parsed into a structured `*APIError` (`Code`, `Message`,
@@ -610,7 +610,7 @@ CHORES:
 - Completed the README resource and data source tables
 - Removed the test-only admin bucket create/delete and `IsAdmin` helpers
 
-## 0.2.0 (2026-10-08)
+## [0.2.0] - 2026-10-08
 
 BREAKING CHANGES:
 - `rustfs_bucket_encryption`: the flat `algorithm`/`kms_master_key_id` attributes are replaced by a
@@ -647,7 +647,7 @@ BUG FIXES:
 CHORES:
 - Go toolchain bumped to 1.27.1; dependencies updated to latest (including `aws/smithy-go` v1.28.4)
 
-## 0.1.0 (2026-10-07)
+## [0.1.0] - 2026-10-07
 
 BREAKING CHANGES: None
 

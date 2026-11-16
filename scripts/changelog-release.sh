@@ -51,7 +51,7 @@ if ! grep -Eq '^## Unreleased[[:space:]]*$' "$changelog"; then
 	echo "refusing: $changelog has no '## Unreleased' heading" >&2
 	exit 1
 fi
-if grep -Eq "^## ${version//./\\.}([[:space:]]|\$)" "$changelog"; then
+if grep -Eq "^## \[?${version//./\\.}\]?([[:space:]]|\$)" "$changelog"; then
 	echo "refusing: $changelog already has a section for $version" >&2
 	exit 1
 fi
@@ -114,7 +114,7 @@ section="$(mktemp)"
 trap 'rm -f "$section"' EXIT
 
 {
-	printf '## %s (%s)\n' "$version" "$(date -u +%Y-%m-%d)"
+	printf '## [%s] - %s\n' "$version" "$(date -u +%Y-%m-%d)"
 	for kind in "${kinds[@]}"; do
 		files=()
 		while IFS=$'\t' read -r record_kind _ file; do
