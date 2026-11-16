@@ -5,6 +5,9 @@ name: Conventions
 # and the shared release files (CHANGELOG.md, AGENTS.md, README.md,
 # docs/index.md, templates/) are written by exactly one actor.
 #
+# The changelog-fragment half runs in the `Test` caller (`provider-ci.yml`,
+# `changelog-fragments: true`); this file keeps the shared-file and table checks.
+#
 # Exemptions:
 #   - `release/*` branches: the release PR edits the shared files by design
 #     (scripts/changelog-release.sh + make generate-tables).
@@ -25,98 +28,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changelog:
-    name: Changelog Fragment
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Dependabot cannot add a fragment or a label, and its PRs are excluded
-    # from the release notes by author in .github/release.yml.
-    if: github.actor != 'dependabot[bot]'
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Require a well-formed fragment
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          # Backticks in the messages below are literal Markdown.
-          # shellcheck disable=SC2016
-          set -euo pipefail
-
-          if [[ "$HEAD_REF" == release/* ]]; then
-            echo "Release branch: the changelog is assembled from changelog.d/ by scripts/changelog-release.sh."
-            exit 0
-          fi
-
-          labels="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.labels[].name')"
-          if grep -qx 'skip-changelog' <<<"$labels"; then
-            echo "skip-changelog label present; no fragment required."
-            exit 0
-          fi
-
-          files="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --paginate \
-            --jq '.[] | [.status, .filename] | @tsv')"
-
-          tab=$'\t'
-
-          if grep -qE "^(added|modified|removed|renamed)${tab}CHANGELOG\.md$" <<<"$files"; then
-            {
-              echo "## Do not edit CHANGELOG.md in a feature pull request"
-              echo ""
-              echo "Add \`changelog.d/<issue>-<kind>-<slug>.md\` instead. The release pull request"
-              echo "bundles the fragments with \`make changelog-release VERSION=x.y.z\`."
-            } >>"$GITHUB_STEP_SUMMARY"
-            echo "CHANGELOG.md must not be edited outside a release/* branch." >&2
-            exit 1
-          fi
-
-          fragments=()
-          while IFS= read -r fragment; do
-            [[ -z "$fragment" ]] && continue
-            fragments+=("$fragment")
-          done < <(grep -E "^added${tab}changelog\.d/[^/]+\.md$" <<<"$files" | cut -f2 | grep -v '^changelog\.d/README\.md$' || true)
-
-          if (( ${#fragments[@]} == 0 )); then
-            {
-              echo "## Missing changelog fragment"
-              echo ""
-              echo "Add \`changelog.d/<issue>-<kind>-<slug>.md\`, or label the pull request"
-              echo "\`skip-changelog\` when no user can observe the change."
-            } >>"$GITHUB_STEP_SUMMARY"
-            echo "No changelog.d/ fragment added." >&2
-            exit 1
-          fi
-
-          pattern='^changelog\.d/[0-9]+-(breaking|feature|improvement|bugfix|security|chore)-[a-z0-9][a-z0-9-]*\.md$'
-          bad=()
-          for fragment in "${fragments[@]}"; do
-            if [[ ! "$fragment" =~ $pattern ]]; then
-              bad+=("$fragment")
-            fi
-          done
-
-          if (( ${#bad[@]} > 0 )); then
-            {
-              echo "## Malformed changelog fragment name"
-              echo ""
-              echo "Expected \`changelog.d/<issue>-<kind>-<slug>.md\`, where \`<kind>\` is one of"
-              echo "\`breaking\`, \`feature\`, \`improvement\`, \`bugfix\`, \`security\` or \`chore\`."
-              echo ""
-              echo "\`\`\`"
-              printf '%s\n' "${bad[@]}"
-              echo "\`\`\`"
-            } >>"$GITHUB_STEP_SUMMARY"
-            echo "Malformed fragment name(s):" >&2
-            printf '%s\n' "${bad[@]}" >&2
-            exit 1
-          fi
-
-          echo "Changelog fragments:"
-          printf '%s\n' "${fragments[@]}"
-
   shared-md:
     name: Shared Markdown Untouched
     runs-on: ubuntu-latest
