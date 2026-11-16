@@ -205,7 +205,7 @@ fails a pull request that drops below the floor. The badge and the bar chart in 
 generated from that same file, so the published number and the enforced floor cannot drift apart.
 
 ```bash
-make coverage            # unit profile + per-package table
+make coverage            # unit profile + per-function coverage listing
 make testacc-docker      # writes coverage-acceptance.out
 make coverage-merge      # merge both into coverage-union.out
 make coverage-gate       # fail when below the floor
@@ -235,7 +235,8 @@ and run `make coverage-readme`. Do that in the same pull request that adds the t
 ### Code review
 
 Every change to `main` goes through a pull request; the `protect-main` ruleset requires the
-`Lint & Security` and `Test` checks to pass, forbids force-pushes and branch deletion, dismisses
+`ci / Lint & Security`, `ci / Test`, `ci / Coverage` and `examples / Validate Examples` checks to
+pass, forbids force-pushes and branch deletion, dismisses
 stale reviews on new pushes and requires review threads to be resolved. Reviewers check:
 
 | Area | What has to be true |

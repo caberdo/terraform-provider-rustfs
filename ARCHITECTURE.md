@@ -240,5 +240,6 @@ they stand and `README.md` for the commands.
 freebsd, windows, linux and darwin on amd64/386/arm/arm64 (darwin/386 and windows/arm{,64} are
 excluded), `SHA256SUMS` signed with the release key
 (`.github/release-signing-key.asc`), registry manifest and SPDX SBOM attached to the GitHub
-release. `main` is protected by the `protect-main` ruleset: pull requests only, `Lint & Security`
-and `Test` required, no force-push, no deletion, stale reviews dismissed.
+release. `main` is protected by the `protect-main` ruleset: pull requests only,
+`ci / Lint & Security`, `ci / Test`, `ci / Coverage` and `examples / Validate Examples` required,
+no force-push, no deletion, stale reviews dismissed.

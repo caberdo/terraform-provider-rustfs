@@ -440,7 +440,7 @@ registered to the releasing account.
 | Command | What it runs |
 |---|---|
 | `make test` | Unit tests (the `TestAcc*` suite skips itself without `TF_ACC`) |
-| `make coverage` | Unit tests plus a per-package coverage table; `make coverage-html` opens a report |
+| `make coverage` | Unit tests plus a per-function coverage listing (`go tool cover -func`); `make coverage-html` opens a report |
 | `make testacc-docker` | The full acceptance suite against RustFS in Docker — this is what CI runs |
 | `make testacc-live` | Starts RustFS with `podman-compose` and runs the acceptance suite against it |
 | `make coverage-merge` | Merges the unit profile with the acceptance profile (`coverage-acceptance.out`, written by the acceptance container) into one statement-coverage table |
@@ -452,7 +452,8 @@ targets replay their committed seed corpus, and the live CRUD tests skip themsel
 server cannot provide what they need (no LDAP identity provider is configurable on RustFS `1.0.x`,
 a single-pool deployment has nothing to rebalance, and the metrics stream is not implemented). CI
 runs the unit tests with `-race`, then the acceptance matrix; the acceptance job merges both
-coverage profiles and publishes a per-package table in the job summary of every run. A weekly
+coverage profiles and publishes the per-function `go tool cover -func` listing in the job summary
+of every run. A weekly
 `Fuzz` workflow runs each fuzz target for a minute — deeper campaigns are `make fuzz FUZZTIME=10m`.
 
 Statement coverage of this repository, merged from the unit and acceptance profiles:

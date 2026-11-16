@@ -1,47 +1,36 @@
 # Releasing is delegated to the reusable release workflow in
 # caberdo/terraform-provider-kit.
 #
-# Two entry points share this workflow, as they did when the tag and the publish
-# lived in `create-release-tag.yml` and `release.yml`:
+# Three entry points, all with an explicit tag:
 #
-# - A `workflow_dispatch`, for the normal release (the tag job calculates the
-#   next version from `release_type` or takes `version` explicitly) and for a
-#   republish of an existing tag (`tag` set). RustFS tags manually after the
-#   release pull request merges, so there is no `push: branches: [main]` entry
-#   point and no VERSION file to watch.
-# - `push: tags: ["v*"]` stays for signed tags pushed from a developer machine:
-#   tags pushed with the default GITHUB_TOKEN do not trigger other workflows, so
-#   the tag job hands its own tag to the release job instead of relying on it.
+# - `workflow_call`, for a workflow that has already created (or chosen) a tag;
+#   `tag` is required, as it was before the migration.
+# - `workflow_dispatch`, to publish or republish an existing tag. `tag` is
+#   required so a dispatch that forgets it cannot silently cut and publish a
+#   patch.
+# - `push: tags: ["v*"]`, for a signed tag pushed from a developer machine (the
+#   GPG-signed tag the release is built and attested from).
 #
-# The GPG key and passphrase are the same two secrets as before: the tag job
-# creates and verifies a signed tag with them, and GoReleaser signs the checksum
-# file with the same key.
+# Tag creation is deliberately not inferred here: `version-file` is empty and
+# the caller always supplies the tag, so the reusable workflow's tag job never
+# invents a version for this repository.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to release"
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version to release (leave empty to auto-calculate from release_type)"
-        required: false
-        type: string
-        default: ""
-      release_type:
-        description: "Type of release (used when version is empty)"
-        required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-        default: "patch"
       tag:
         description: "Existing tag to publish (or republish), e.g. v0.9.0"
-        required: false
+        required: true
         type: string
-        default: ""
+  push:
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -54,11 +43,11 @@ concurrency:
 
 jobs:
   release:
-    uses: caberdo/terraform-provider-kit/.github/workflows/provider-release.yml@v0.6.0
-    # `contents: write` creates the tag and uploads the release; `id-token:
-    # write` mints the OIDC identity `actions/attest` signs the provenance
-    # with; `attestations: write` stores that provenance in the repository's
-    # attestation record. Nothing else needs write access.
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-release.yml@v0.8.0
+    # `contents: write` uploads the release; `id-token: write` mints the OIDC
+    # identity `actions/attest` signs the provenance with; `attestations: write`
+    # stores that provenance in the repository's attestation record. Nothing
+    # else needs write access.
     permissions:
       contents: write
       id-token: write
@@ -68,17 +57,14 @@ jobs:
       provider: rustfs
       dist-prefix: terraform-provider-rustfs
       goreleaser-config: .github/goreleaser.yml
-      # No VERSION file: the release pull request is assembled from
-      # changelog.d/ fragments and the tag is dispatched by hand. An empty path
-      # disables the "a push changed the version file" entry point.
+      # No VERSION file: a tag is always supplied by the trigger, never derived.
       version-file: ""
       # The kit's changelog check expects `## [X.Y.Z] - YYYY-MM-DD`, while
       # scripts/changelog-release.sh writes `## X.Y.Z (YYYY-MM-DD)`. The check
       # stays off; the Conventions workflow owns the changelog format.
       changelog-check: false
-      # The old tag job failed when the tag already existed, and directed a
-      # failed publish to the `tag` dispatch input instead.
+      # The tag job's version resolution never runs when `tag` is set, so this
+      # guard is inert for this caller; keep the pre-migration failure mode for
+      # any future caller path that does resolve a version.
       tag-exists: fail
-      version: ${{ github.event.inputs.version }}
-      release-type: ${{ github.event.inputs.release_type || 'patch' }}
-      tag: ${{ github.event.inputs.tag }}
+      tag: ${{ inputs.tag || github.event.inputs.tag }}
