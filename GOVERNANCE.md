@@ -45,9 +45,10 @@ those responsibilities and the automations in `.github/workflows/` do the mechan
 | Check | Workflow | Runs on |
 |---|---|---|
 | `Lint & Security` (golangci-lint, gosec → SARIF) | `test.yml` | every pull request and push to `main` |
-| `Test` (build, vet, validate examples, `go test -race` with coverage) | `test.yml` | every pull request and push to `main` |
+| `Test` (build, vet, `go test -race` with coverage) | `test.yml` | every pull request and push to `main` |
+| `Validate Examples` (fragments unioned against the provider schema) | `test.yml` | every pull request and push to `main` |
 | `Acceptance Tests` (RustFS matrix in Docker) | `test.yml` | push to `main` |
-| `Generate Docs` (docs drift) / `Validate Markdown Files` | `docs.yml` | push to `main` / pull request and push to `main` |
+| `Generate Docs` (docs drift) / `Validate Markdown Files` | `test.yml` | push to `main` (and tags) / pull request and push to `main` |
 | `Scorecard` (OpenSSF, published to the Scorecard API) | `scorecard.yml` | weekly, push to `main`, branch-protection changes |
 
 ## Access and continuity

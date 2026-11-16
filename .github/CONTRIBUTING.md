@@ -199,7 +199,7 @@ The acceptance container also writes `coverage-acceptance.out`; `make coverage` 
 
 ### Coverage
 
-Merged (unit + acceptance) statement coverage is enforced. `scripts/coverage-gate.sh` compares a
+Merged (unit + acceptance) statement coverage is enforced. `make coverage-gate` compares a
 profile against [`.github/coverage-baseline.txt`](./coverage-baseline.txt), and the `Coverage` check
 fails a pull request that drops below the floor. The badge and the bar chart in `README.md` are
 generated from that same file, so the published number and the enforced floor cannot drift apart.

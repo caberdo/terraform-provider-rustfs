@@ -5,6 +5,11 @@ VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 # Duration of each target's run in `make fuzz`; the weekly Fuzz workflow uses 60s.
 FUZZTIME ?= 30s
+# The shared tooling for the caberdo providers: the coverage gate, merge and
+# README targets. Keep this pin equal to the `uses:` refs in
+# .github/workflows/*.yml: one version for the local targets and the reusable
+# workflows, so they cannot drift apart.
+TFKIT ?= go run github.com/caberdo/terraform-provider-kit/cmd/tfkit@v0.6.0
 
 build:
 	go build -o bin/$(BINARY_NAME) -ldflags "-X main.version=$(VERSION)" .
@@ -15,7 +20,7 @@ test:
 coverage:
 	go test -count=1 -skip '^TestAcc' -covermode=atomic -coverprofile=coverage.out ./...
 	@echo
-	@./scripts/coverage-summary.sh coverage.out
+	@go tool cover -func=coverage.out
 
 coverage-html: coverage
 	go tool cover -html=coverage.out
@@ -23,22 +28,22 @@ coverage-html: coverage
 # Unit coverage (coverage.out) plus the acceptance profile written by
 # acc_test/docker-compose.yml (coverage-acceptance.out) as one number.
 coverage-merge:
-	./scripts/merge-coverage.sh coverage-union.out coverage.out coverage-acceptance.out
+	$(TFKIT) coverage merge --output coverage-union.out coverage.out coverage-acceptance.out
 	@echo
-	@./scripts/coverage-summary.sh coverage-union.out
+	@go tool cover -func=coverage-union.out
 
 # Fail when coverage-union.out is below .github/coverage-baseline.txt. CI runs
-# the same script on every pull request and on main.
+# the same tfkit command on every pull request and on main.
 coverage-gate:
-	./scripts/coverage-gate.sh coverage-union.out
+	$(TFKIT) coverage gate --profile coverage-union.out --packages ./...
 
 # Regenerate the coverage badge and block in README.md from the baseline;
 # `make coverage-readme-check` is what CI runs to fail on drift.
 coverage-readme:
-	./scripts/coverage-readme.sh
+	$(TFKIT) coverage readme
 
 coverage-readme-check:
-	./scripts/coverage-readme.sh --check
+	$(TFKIT) coverage readme --check
 
 # Short fuzz run of every target. `-fuzz` takes exactly one target, so each is
 # listed explicitly; the weekly Fuzz workflow runs the same commands (60s each).

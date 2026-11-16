@@ -1,8 +1,20 @@
+# CI is delegated to the reusable workflows in caberdo/terraform-provider-kit.
+#
+# The triggers, the concurrency group and the token scopes stay here: a
+# `workflow_call` file cannot declare triggers, and a called workflow can only
+# narrow the token its caller grants. Everything else — the job steps, the
+# versions-matrix parser, the coverage gate — lives in the kit, except the
+# fragment-union example validator, which has no kit equivalent (see the
+# `examples` job below).
 name: Test
 
 on:
   push:
     branches: [main]
+    # docs.yml ran its markdown link check on a release tag as well; folding it
+    # into this caller keeps that trigger. The docs job also checks the tagged
+    # tree, which is harmless (the tag points at a commit main already checked).
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
@@ -14,13 +26,107 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint & Security
+  ci:
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-ci.yml@v0.6.0
+    # GitHub validates a caller's grant against every job of the called workflow
+    # before any `if:` or input is evaluated, so these are the union of what
+    # provider-ci declares, not what this run happens to execute:
+    #
+    # - `contents: write` + `pull-requests: write`: requested unconditionally by
+    #   the called `docs` job. Omitting them rejects the whole run with "The
+    #   nested job 'docs' is requesting 'contents: write, pull-requests: write'".
+    # - `security-events: write`: the `Lint & Security` job uploads gosec SARIF
+    #   to code scanning.
+    #
+    # This does not widen the token any other job runs with: every other job in
+    # provider-ci.yml re-declares `contents: read` (and nothing else), and a
+    # called job can narrow the caller's grant, never widen it.
+    permissions:
+      contents: write
+      pull-requests: write
+      security-events: write
+    with:
+      provider: rustfs
+      provider-display: RustFS
+      module: github.com/caberdo/terraform-provider-rustfs
+      # RustFS's packages are `provider` and `pkg/rustfs`, not `./internal/...`.
+      packages: ./...
+      # Pinned so CI and local runs agree on the linter set and gofmt behaviour.
+      golangci-config: .github/golangci.yml
+      golangci-version: v2.14.0
+      # The old job used the action's default binary install; only the version
+      # was pinned in the repository.
+      golangci-install-mode: binary
+      # gosec v2.29.0 cannot decode the export data of the Go 1.27 toolchain, so
+      # it is built from the pinned source in .github/gosec (a nested module)
+      # with a tool-only x/tools override.
+      gosec-mode: nested-module
+      # The old job installed govulncheck and ran it in its own
+      # `Vulnerability Scan` job. `script` would move it into Lint & Security.
+      govuln-mode: install
+      vuln-timeout: 10
+      # Neither check ran in the old test job: `go build ./...` covered the host
+      # platform only and nothing verified go.mod was tidy.
+      tidy-check: false
+      cross-build: false
+      # The old setup-terraform step pinned no version, so use the newest
+      # release. This feeds the docs job, which needs Terraform for tfplugindocs.
+      terraform-version: ""
+      # require-terraform only guards the kit's own examples step, which this
+      # caller disables below.
+      require-terraform: false
+      # tfkit's examples validator checks each fragment directory as a module,
+      # but 78 of rustfs's 100 snippets reference a resource or data source
+      # declared in another snippet. The local scripts/validate-examples.py
+      # unions them into one synthetic module (with stubs), so the example job
+      # below keeps that behaviour instead of losing the check.
+      examples: false
+      # Declared for intent, but rustfs has no VERSION file: its changelog is
+      # assembled from changelog.d/ fragments by scripts/changelog-release.sh and
+      # the fragment convention is enforced by conventions.yml. The kit's
+      # release check reads a VERSION file, so the empty path disables that step
+      # instead of failing on a file this repository does not have.
+      changelog: true
+      version-file: ""
+      # docs.yml's `Generate Docs` job failed on drift on every pull request and
+      # on main; docs-mode: drift keeps that check in the docs job, so the
+      # context stays `ci / Generate Docs` rather than moving into Test.
+      docs: true
+      docs-mode: drift
+      docs-drift-in-test: false
+      # docs.yml's `Validate Markdown Files` job.
+      markdown: true
+      # Replay the committed fuzz seed corpora without exploring new inputs. The
+      # weekly mutating matrix stays in fuzz.yml: provider-ci only replays seeds.
+      fuzz: true
+      # The old Coverage job ran only on pull requests and gated the merged
+      # unit + acceptance profile, so the unit profile alone must not gate.
+      coverage-job: pull_request
+      coverage-merged: true
+      coverage-timeout: 30
+      coverage-gate-in-test: false
+      coverage-readme: true
+      # Both the Coverage job and the acceptance matrix wrote coverage-unit.out;
+      # the Test job now produces it once under the same name.
+      unit-profile: coverage-unit.out
+      coverage-note: "Unit tests only: the acceptance suite skips itself without `TF_ACC`, so packages whose behaviour is covered by `TestAcc*` (mostly `provider`) read low. Run `make coverage` locally, or see the acceptance job for the live suite."
+      acceptance-compose: docker compose -f acc_test/docker-compose.yml --profile test run --rm test
+      # Read on main only; provider-acceptance parses the same file itself.
+      versions-job: true
+      versions-file: .github/rustfs-versions.txt
+
+  # rustfs's snippets are not standalone modules: examples/data-sources/* and
+  # many examples/resources/* reference a bucket or user declared by another
+  # snippet. scripts/validate-examples.py concatenates them into one synthetic
+  # module (adding stubs for the parents) so every reference resolves and every
+  # argument is checked. tfkit validates each directory in place, which cannot
+  # express that union, so this one step from the old Test job stays local.
+  examples:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,98 +136,6 @@ jobs:
         with:
           go-version-file: "go.mod"
           cache: true
-          # The scanner is built from .github/gosec, a nested module, so its
-          # go.sum has to be listed for setup-go to cache that module too.
-          cache-dependency-path: |
-            go.sum
-            .github/gosec/go.sum
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          # Pinned so CI and local runs agree on the linter set and gofmt
-          # behaviour (tracked in .github/golangci.yml).
-          version: v2.14.0
-          args: --config .github/golangci.yml
-
-      # gosec v2.29.0 (the latest release) pins golang.org/x/tools v0.49.0,
-      # which cannot decode the export data the Go 1.27.2 toolchain emits
-      # ("export data version 5 is greater than maximum supported version 4"),
-      # so the scanner exits non-zero on a clean tree. It is built from the
-      # pinned v2.29.0 source with a tool-only x/tools override instead of the
-      # prebuilt action (securego/gosec#1771, securego/gosec#1774); drop the
-      # override once a gosec release ships golang.org/x/tools >= v0.50.0.
-      - name: Run Gosec Security Scanner
-        id: gosec
-        continue-on-error: true
-        env:
-          GOTOOLCHAIN: auto
-        run: |
-          go build -C .github/gosec -o "$RUNNER_TEMP/gosec" github.com/securego/gosec/v2/cmd/gosec
-          "$RUNNER_TEMP/gosec" -fmt sarif -out gosec.sarif -exclude-dir=vendor -tests=false ./
-
-      - name: Upload security scan results
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
-        if: always() && hashFiles('gosec.sarif') != ''
-        with:
-          sarif_file: gosec.sarif
-
-      - name: Fail on Gosec findings
-        if: always() && steps.gosec.outcome == 'failure'
-        run: |
-          echo "## Gosec Security Scanner Found Issues" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f gosec.sarif ]; then
-            echo "| Rule | File | Line | Description |" >> $GITHUB_STEP_SUMMARY
-            echo "|------|------|------|-------------|" >> $GITHUB_STEP_SUMMARY
-            jq -r '.runs[0].results[] | "| \(.ruleId) | \(.locations[0].physicalLocation.artifactLocation.uri) | \(.locations[0].physicalLocation.region.startLine) | \(.message.text) |"' gosec.sarif >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See the **Security** tab for full details." >> $GITHUB_STEP_SUMMARY
-          exit 1
-
-  govulncheck:
-    name: Vulnerability Scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      # Pinned like golangci-lint so a new release cannot change the gate
-      # silently. The scanner needs no RustFS server: it walks the module
-      # graph and the call graph against the Go vulnerability database.
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
-
-      - name: Run govulncheck
-        run: govulncheck ./...
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: lint
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      - name: Build and vet
-        run: |
-          go build ./...
-          go vet ./...
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
@@ -131,146 +145,37 @@ jobs:
       - name: Validate examples
         run: ./scripts/validate-examples.sh
 
-      # Narrow to ./internal/... once the code layout lands (#8-#11).
-      - name: Run tests
-        run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
-
-      - name: Coverage summary
-        if: always()
-        run: |
-          if [[ ! -f coverage.out ]]; then
-            echo "No coverage profile: the test step failed before writing one." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          {
-            echo "## Coverage"
-            echo ""
-            echo "Unit tests only: the acceptance suite skips itself without \`TF_ACC\`, so"
-            echo "packages whose behaviour is covered by \`TestAcc*\` (mostly \`provider\`) read low."
-            echo "Run \`make coverage\` locally, or see the acceptance job for the live suite."
-            echo ""
-            ./scripts/coverage-summary.sh coverage.out
-          } >> "$GITHUB_STEP_SUMMARY"
-          ./scripts/coverage-summary.sh coverage.out
-
-  # A pull request cannot make the project less tested: merge the unit profile
-  # with an acceptance profile from the newest RustFS release and fail when the
-  # result is below .github/coverage-baseline.txt. `main` repeats this gate in
-  # the `latest` cell of the acceptance matrix (see the acceptance job below).
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: test
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      # README.md carries the coverage badge and block, both generated from the
-      # baseline by scripts/coverage-readme.sh.
-      - name: README in sync with the coverage baseline
-        run: ./scripts/coverage-readme.sh --check
-
-      - name: Unit-test coverage
-        run: go test -count=1 -skip '^TestAcc' -covermode=atomic -coverprofile=coverage-unit.out ./...
-
-      # The container writes coverage-acceptance.out into the mounted worktree.
-      - name: Run acceptance tests
-        run: docker compose -f acc_test/docker-compose.yml --profile test run --rm test
-
-      - name: Coverage gate (unit + acceptance)
-        run: |
-          ./scripts/merge-coverage.sh coverage-union.out coverage-unit.out coverage-acceptance.out
-          ./scripts/coverage-gate.sh coverage-union.out
-          ./scripts/coverage-summary.sh coverage-union.out
-          {
-            echo "## Coverage (unit + acceptance)"
-            echo ""
-            echo "\`coverage-unit.out\` and \`coverage-acceptance.out\` merged by \`scripts/merge-coverage.sh\`."
-            echo "The gate compares the total, \`provider\` and \`pkg/rustfs\` against \`.github/coverage-baseline.txt\`."
-            echo ""
-            ./scripts/coverage-summary.sh coverage-union.out
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  rustfs_versions:
-    name: Supported RustFS Versions
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # Only the acceptance job consumes this, and that job only runs on main.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    outputs:
-      list: ${{ steps.read.outputs.list }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Read the supported versions into a JSON array
-        id: read
-        run: |
-          list=$(jq -R -s -c 'split("\n") | map(select(length > 0))' .github/rustfs-versions.txt)
-          echo "list=$list" >> "$GITHUB_OUTPUT"
-
+  # The old acceptance job ran only on a push to main, after `test` (which
+  # included the example validation), and took its matrix from
+  # .github/rustfs-versions.txt. A caller cannot express `needs.<job>.result`
+  # across a reusable-workflow boundary, so `needs: [ci, examples]` is the
+  # faithful spelling: a failing `ci` or example check skips acceptance, exactly
+  # as a failing `test` did before. The `ci` gate is wider now (any `ci` job, not
+  # just `test`).
   acceptance:
-    name: Acceptance Tests (RustFS ${{ matrix.rustfs }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs:
-      - test
-      - rustfs_versions
+    needs: [ci, examples]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    strategy:
-      fail-fast: false
-      matrix:
-        # Single source of truth: .github/rustfs-versions.txt.
-        rustfs: ${{ fromJSON(needs.rustfs_versions.outputs.list) }}
-    env:
-      RUSTFS_VERSION: ${{ matrix.rustfs }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: "go.mod"
-          cache: true
-
-      # The acceptance container writes coverage-acceptance.out into the mounted
-      # worktree; the unit profile is produced here so both can be merged into the
-      # one statement-coverage number the project publishes (see
-      # .github/OPENSSF-BEST-PRACTICES.md).
-      - name: Unit-test coverage
-        run: go test -count=1 -skip '^TestAcc' -covermode=atomic -coverprofile=coverage-unit.out ./...
-
-      - name: Run acceptance tests
-        run: docker compose -f acc_test/docker-compose.yml --profile test run --rm test
-
-      - name: Combined coverage (unit + acceptance)
-        if: always()
-        run: |
-          if [[ ! -f coverage-acceptance.out ]]; then
-            echo "No acceptance coverage profile: the container run did not finish." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          ./scripts/merge-coverage.sh coverage-union.out coverage-unit.out coverage-acceptance.out
-          {
-            echo "## Coverage (unit + acceptance)"
-            echo ""
-            echo "\`coverage-unit.out\` and \`coverage-acceptance.out\` merged by \`scripts/merge-coverage.sh\`."
-            echo ""
-            ./scripts/coverage-summary.sh coverage-union.out
-          } >> "$GITHUB_STEP_SUMMARY"
-          ./scripts/coverage-summary.sh coverage-union.out
-
-      # The floor is calibrated against the newest release; the older cells of
-      # the matrix legitimately skip version-gated tests, so they do not gate.
-      - name: Coverage gate (unit + acceptance)
-        if: matrix.rustfs == 'latest'
-        run: ./scripts/coverage-gate.sh coverage-union.out
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-acceptance.yml@v0.6.0
+    permissions:
+      contents: read
+    with:
+      provider: rustfs
+      provider-display: RustFS
+      packages: ./...
+      versions-file: .github/rustfs-versions.txt
+      version-env: RUSTFS_VERSION
+      # The acceptance fixture lives in acc_test/, not docker-compose.yml.
+      acceptance-compose: docker compose -f acc_test/docker-compose.yml --profile test run --rm test
+      # Both `logs` and `down -v` get these arguments; the trailing space is part
+      # of the input's contract.
+      compose-file-args: "-f acc_test/docker-compose.yml --profile test "
+      # The floor is calibrated on the literal `latest` entry, and older cells
+      # legitimately skip version-gated tests.
+      gate-cell: literal-latest
+      # The old combined-coverage step reported an incomplete profile and exited
+      # 0; only the gate on the latest cell failed a run.
+      fail-on-missing-acceptance-profile: false
+      unit-profile: coverage-unit.out
+      acceptance-timeout: 30
+      # The old matrix had no cap; the file has six entries.
+      max-parallel: 6

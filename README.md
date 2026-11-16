@@ -467,7 +467,7 @@ total       ██████████████████░░  90.2% 
 Measured on `f84538b` (unit + acceptance) on 2026-10-19.
 <!-- coverage:end -->
 
-The floor is enforced: `scripts/coverage-gate.sh` fails the `Coverage` check on a pull request whose
+The floor is enforced: `make coverage-gate` fails the `Coverage` check on a pull request whose
 merged coverage drops below `.github/coverage-baseline.txt`, and the `latest` cell of the acceptance
 matrix repeats that gate on `main`. The same check fails when this block drifts from the baseline.
 To raise the floor, run `make coverage` and `make coverage-merge`, update
