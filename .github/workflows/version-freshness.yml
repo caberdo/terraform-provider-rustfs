@@ -1,0 +1,61 @@
+# Monitors the RustFS maintenance window: compares the supported matrix with
+# the upstream releases, canaries the newest release the matrix does not cover,
+# and checks this repository's kit pin. Each job reports at most one labelled
+# issue and closes it when the finding goes away. The workflow never edits the
+# matrix or the pin: the bump stays a decision.
+#
+# One weekly cron (Monday 06:00 UTC) drives all three jobs. A caller file cannot
+# bind two crons to different jobs, and the maintainer chose weekly for the
+# canary. Re-checking the version window weekly costs one API call and updates
+# the existing issue in place, so the quieter monthly cadence buys nothing.
+name: Version maintenance
+
+on:
+  schedule:
+    # Weekly, Monday at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  freshness:
+    uses: caberdo/terraform-provider-kit/.github/workflows/provider-freshness.yml@v0.16.0
+    # `issues: write` opens or updates one labelled issue per category;
+    # `actions: read` lets the canary report read the failing job's log.
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    with:
+      provider-display: RustFS
+      versions-file: .github/rustfs-versions.txt
+      upstream: rustfs/rustfs
+      # Stable releases are tagged bare (`1.0.6`) and so is the matrix, apart
+      # from its trailing `latest` marker, which the comparison drops. `1.0.0-rc.6`
+      # is a prerelease and is skipped.
+      strip-v: false
+      # No suffix is stripped: the stable tag is bare (`1.0.6`).
+      strip-suffix: ""
+      canary: true
+      version-env: RUSTFS_VERSION
+      # Empty on purpose: the suite has no expected-version variable, and
+      # acc_test/docker-compose.yml defaults the image to `latest`.
+      expect-version-env: ""
+      # The acceptance fixture lives in acc_test/, not docker-compose.yml: the
+      # canary must run the same stack the acceptance matrix runs.
+      acceptance-compose: docker compose -f acc_test/docker-compose.yml --profile test run --rm test
+      # Both `logs` and `down -v` get these arguments; the trailing space is part
+      # of the input's contract.
+      compose-file-args: "-f acc_test/docker-compose.yml --profile test "
+      # rustfs has no internal/ directory: the Test workflow and the coverage
+      # gate run ./..., so the canary's unit profile must too.
+      packages: ./...
+      kit-check: true
