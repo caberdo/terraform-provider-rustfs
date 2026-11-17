@@ -54,7 +54,7 @@ terraform {
   required_providers {
     rustfs = {
       source  = "caberdo/rustfs"
-      version = "~> 0.9"
+      version = "~> 0.10"
     }
   }
 }
@@ -356,7 +356,7 @@ configuration change.
      required_providers {
        rustfs = {
          source  = "caberdo/rustfs"
-         version = "~> 0.9"
+         version = "~> 0.10"
        }
      }
    }
