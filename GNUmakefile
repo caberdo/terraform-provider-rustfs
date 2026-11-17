@@ -9,7 +9,7 @@ FUZZTIME ?= 30s
 # README targets. Keep this pin equal to the `uses:` refs in
 # .github/workflows/*.yml: one version for the local targets and the reusable
 # workflows, so they cannot drift apart.
-TFKIT ?= go run github.com/caberdo/terraform-provider-kit/cmd/tfkit@v0.13.0
+TFKIT ?= go run github.com/caberdo/terraform-provider-kit/cmd/tfkit@v0.15.0
 
 build:
 	go build -o bin/$(BINARY_NAME) -ldflags "-X main.version=$(VERSION)" .
