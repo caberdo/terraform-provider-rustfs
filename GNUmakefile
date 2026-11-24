@@ -10,6 +10,9 @@ FUZZTIME ?= 30s
 # .github/workflows/*.yml: one version for the local targets and the reusable
 # workflows, so they cannot drift apart.
 TFKIT ?= go run github.com/caberdo/terraform-provider-kit/cmd/tfkit@v0.17.0
+# The compose runner for the acceptance fixture. Override for Podman:
+# `COMPOSE="podman compose" make testacc-docker` or set it once per shell.
+COMPOSE ?= docker compose
 
 build:
 	go build -o bin/$(BINARY_NAME) -ldflags "-X main.version=$(VERSION)" .
@@ -75,7 +78,19 @@ install: build
 	cp bin/$(BINARY_NAME) ~/.terraform.d/plugins/registry.terraform.io/caberdo/rustfs/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/$(BINARY_NAME)
 
 testacc-docker:
-	docker compose -f acc_test/docker-compose.yml --profile test run --rm test
+	$(COMPOSE) -f acc_test/docker-compose.yml --profile test run --rm test
+
+# Run the acceptance suite once per entry in .github/rustfs-versions.txt. Each
+# cell starts from an empty fixture (the suite leaves buckets, users and
+# configuration behind, and the next version must not inherit them) and the
+# trailing `latest` entry exercises the floating tag the way CI does.
+testacc-matrix:
+	@while IFS= read -r version; do \
+		[ -n "$$version" ] || continue; \
+		echo "==> RustFS $$version"; \
+		RUSTFS_VERSION="$$version" $(MAKE) testacc-docker || exit 1; \
+		$(COMPOSE) -f acc_test/docker-compose.yml --profile test down -v >/dev/null || exit 1; \
+	done < .github/rustfs-versions.txt
 
 # The acceptance credentials belong to the deployment, not to the repository:
 # export RUSTFS_USER/RUSTFS_SECRET (the primary server) and
@@ -111,4 +126,4 @@ changelog-release:
 	@case "$(VERSION)" in [0-9]*.[0-9]*.[0-9]*) ;; *) echo "usage: make changelog-release VERSION=x.y.z" >&2; exit 2 ;; esac
 	./scripts/changelog-release.sh "$(VERSION)"
 
-.PHONY: build test coverage coverage-html coverage-merge coverage-gate coverage-readme coverage-readme-check testacc lint lint-fix fmt vet install testacc-docker testacc-live validate-examples generate generate-tables changelog-release fuzz
+.PHONY: build test coverage coverage-html coverage-merge coverage-gate coverage-readme coverage-readme-check testacc lint lint-fix fmt vet install testacc-docker testacc-matrix testacc-live validate-examples generate generate-tables changelog-release fuzz

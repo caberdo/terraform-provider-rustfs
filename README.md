@@ -24,7 +24,7 @@ cluster health all live in the same Terraform state as the rest of your infrastr
 | | |
 |---|---|
 | 🎯 **Broadest RustFS coverage** | Buckets, IAM (users, groups, policies, service accounts, LDAP), KMS keys, quotas, bucket + site replication, storage tiers and ILM, audit and notification targets, durability, module switches, cluster health, metrics and diagnostics |
-| 🧪 **Tested against real servers** | Unit tests for every client method and resource lifecycle path (four fuzz targets replay a committed seed corpus), plus acceptance tests against RustFS in Docker on a version matrix (`1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest`) |
+| 🧪 **Tested against real servers** | Unit tests for every client method and resource lifecycle path (four fuzz targets replay a committed seed corpus), plus acceptance tests against RustFS in Docker on a version matrix (`1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5`, `1.0.6` and `latest`) |
 | 🔐 **Verifiable supply chain** | GPG-signed release tags, signed `SHA256SUMS`, SLSA build provenance for every artifact, SPDX SBOM and the Terraform registry manifest in every release |
 | 🚚 **Drop-in successor** | 12 of the 16 resources of `weinmann-emt/rustfs` migrate with **zero** config changes, 1 has a rename, 3 need a small edit — see [Migrating](#migrating-from-weinmann-emtrustfs) |
 | ⚡ **Modern internals** | terraform-plugin-framework (plugin protocol 6.0), AWS SDK for Go v2, Go 1.27, Docker/Podman acceptance harness |
@@ -100,37 +100,37 @@ terraform apply                                              # with RUSTFS_ENDPO
 | | |
 |---|---|
 | Terraform | 1.0 or later (plugin protocol 6.0); also available for [OpenTofu](https://search.opentofu.org/provider/caberdo/rustfs) |
-| RustFS | Acceptance-tested against `1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest` — see the [version matrix](#supported-rustfs-versions) and [`.github/rustfs-versions.txt`](./.github/rustfs-versions.txt) |
+| RustFS | Acceptance-tested against `1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5`, `1.0.6` and `latest` — see the [version matrix](#supported-rustfs-versions) and [`.github/rustfs-versions.txt`](./.github/rustfs-versions.txt) |
 | Go (to build from source) | 1.27.4 |
 
 ### Supported RustFS versions
 
-CI runs the acceptance suite against RustFS `1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest`
+CI runs the acceptance suite against RustFS `1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5`, `1.0.6` and `latest`
 ([`.github/rustfs-versions.txt`](./.github/rustfs-versions.txt)). The provider does not enforce a
 server version up front; it reports a capability gap when a route it needs is unavailable.
 
-| Capability | Provider types | `1.0.1` | `1.0.2` | `1.0.3` | `1.0.4` | `1.0.5` |
-|---|---|:--:|:--:|:--:|:--:|:--:|
-| S3 API and admin API v3 routes (buckets, IAM, quotas, replication, tiers, targets, config, health, info, …) | every resource and data source not listed below | ✅ | ✅ | ✅ | ✅ | ✅ |
-| S3 Tables catalog switch — `PUT`/`GET /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` create and read | ✅ | ✅ | ✅ | ✅ | ✅ |
-| S3 Tables catalog disable — `DELETE /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` destroy | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Admin metrics stream — `GET /rustfs/admin/v3/metrics` | `rustfs_metrics` data source | ❌ | ❌ | ❌ | ❌ | ❌ |
-| OIDC providers — `GET`/`PUT`/`DELETE /rustfs/admin/v3/oidc/config` and `POST /rustfs/admin/v3/oidc/validate` | `rustfs_oidc_provider` resource, `rustfs_oidc_config` data source | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Orphaned bucket recovery — `POST /rustfs/admin/v3/recover-orphaned-bucket/{bucket}` | `rustfs_bucket_recovery` | ❌¹ | ✅ | ✅ | ✅ | ✅ |
-| TLS certificate publication — `POST /rustfs/admin/v3/tls/certificate` | `rustfs_tls_certificate` create | ❌ | ✅ | ✅ | ✅ | ✅ |
-| TLS certificate state — `GET /rustfs/admin/v3/tls/certificate-state` | `rustfs_tls_certificate` refresh, `rustfs_tls_certificate_state` data source | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Capability | Provider types | `1.0.1` | `1.0.2` | `1.0.3` | `1.0.4` | `1.0.5` | `1.0.6` |
+|---|---|:--:|:--:|:--:|:--:|:--:|:--:|
+| S3 API and admin API v3 routes (buckets, IAM, quotas, replication, tiers, targets, config, health, info, …) | every resource and data source not listed below | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| S3 Tables catalog switch — `PUT`/`GET /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` create and read | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| S3 Tables catalog disable — `DELETE /iceberg/v1/buckets/{bucket}` | `rustfs_table_bucket` destroy | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Admin metrics stream — `GET /rustfs/admin/v3/metrics` | `rustfs_metrics` data source | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| OIDC providers — `GET`/`PUT`/`DELETE /rustfs/admin/v3/oidc/config` and `POST /rustfs/admin/v3/oidc/validate` | `rustfs_oidc_provider` resource, `rustfs_oidc_config` data source | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Orphaned bucket recovery — `POST /rustfs/admin/v3/recover-orphaned-bucket/{bucket}` | `rustfs_bucket_recovery` | ❌¹ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| TLS certificate publication — `POST /rustfs/admin/v3/tls/certificate` | `rustfs_tls_certificate` create | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| TLS certificate state — `GET /rustfs/admin/v3/tls/certificate-state` | `rustfs_tls_certificate` refresh, `rustfs_tls_certificate_state` data source | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ¹ The recovery route is absent on `1.0.1` (the server answers `404`), rather than registered and
 unimplemented; the resource reports the route and the required `1.0.2` version.
 
 `1.0.3` is a console-only update: it ships the same server code as `1.0.2`, so its server
-capabilities are identical. `1.0.4` and `1.0.5` are full server releases; the `1.0.5` cells were
-verified live on 2026-11-11 (metrics still answers `501`, OIDC answers `200`, the recovery and TLS
-routes are present, and the S3 Tables read reports `disable-supported`), while `1.0.4` was not
-re-probed and repeats the `1.0.3` values. A ❌ means the route is registered but not implemented
-(see below); the data source fails with a diagnostic naming the route and the server version
-instead of the raw error payload, and destroying `rustfs_table_bucket` on `1.0.1` warns, names the
-route and drops the resource from state.
+capabilities are identical. `1.0.4`, `1.0.5` and `1.0.6` are full server releases; the `1.0.5` cells
+were verified live on 2026-11-11 and the `1.0.6` cells on 2026-11-24 (metrics still answers `501`,
+OIDC answers `200`, the recovery and TLS routes are present, and the S3 Tables read reports
+`disable-supported`), while `1.0.4` was not re-probed and repeats the `1.0.3` values. A ❌ means
+the route is registered but not implemented (see below); the data source fails with a diagnostic
+naming the route and the server version instead of the raw error payload, and destroying
+`rustfs_table_bucket` on `1.0.1` warns, names the route and drops the resource from state.
 
 #### Route presence is not support (501 semantics)
 
@@ -442,13 +442,14 @@ registered to the releasing account.
 | `make test` | Unit tests (the `TestAcc*` suite skips itself without `TF_ACC`) |
 | `make coverage` | Unit tests plus a per-function coverage listing (`go tool cover -func`); `make coverage-html` opens a report |
 | `make testacc-docker` | The full acceptance suite against RustFS in Docker — this is what CI runs |
+| `make testacc-matrix` | `testacc-docker` once per entry in `.github/rustfs-versions.txt`, tearing the fixture down between cells |
 | `make testacc-live` | Starts RustFS with `podman-compose` and runs the acceptance suite against it |
 | `make coverage-merge` | Merges the unit profile with the acceptance profile (`coverage-acceptance.out`, written by the acceptance container) into one statement-coverage table |
 
 The suite covers every `pkg/rustfs` client method and every resource lifecycle path. Four fuzz
 targets replay their committed seed corpus, and the live CRUD tests skip themselves when
 `RUSTFS_ENDPOINT` is unset. Acceptance tests run against real RustFS servers on the
-`.github/rustfs-versions.txt` matrix (`1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5` and `latest`); a few skip when the
+`.github/rustfs-versions.txt` matrix (`1.0.1`, `1.0.2`, `1.0.3`, `1.0.4`, `1.0.5`, `1.0.6` and `latest`); a few skip when the
 server cannot provide what they need (no LDAP identity provider is configurable on RustFS `1.0.x`,
 a single-pool deployment has nothing to rebalance, and the metrics stream is not implemented). CI
 runs the unit tests with `-race`, then the acceptance matrix; the acceptance job merges both
@@ -488,6 +489,7 @@ make build              # build ./bin/terraform-provider-rustfs
 make install            # install into ~/.terraform.d/plugins for local dev_overrides
 make test coverage      # unit tests + coverage table
 make testacc-docker     # acceptance suite, Docker
+make testacc-matrix     # acceptance suite for every version in .github/rustfs-versions.txt
 make lint vet fmt       # golangci-lint (.golangci.yml), go vet, gofmt
 make generate           # regenerate docs/ with terraform-plugin-docs
 make validate-examples  # check examples/ against the provider schema

@@ -165,5 +165,5 @@ jobs:
       fail-on-missing-acceptance-profile: false
       unit-profile: coverage-unit.out
       acceptance-timeout: 30
-      # The old matrix had no cap; the file has six entries.
-      max-parallel: 6
+      # The old matrix had no cap; the file has seven entries.
+      max-parallel: 7

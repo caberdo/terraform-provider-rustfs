@@ -23,7 +23,7 @@ services:
         else
           echo "Downloading Terraform $$TERRAFORM_VERSION ($$TERRAFORM_ARCH)..."
           apt-get update -qq && apt-get install -y -qq unzip wget >/dev/null 2>&1
-          wget -q --retry 3 --retry-delay 2 -O /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_$${TERRAFORM_ARCH}.zip"
+          wget -q -t 3 -O /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$${TERRAFORM_VERSION}/terraform_$${TERRAFORM_VERSION}_linux_$${TERRAFORM_ARCH}.zip"
           mkdir -p "$$TERRAFORM_DIR"
           unzip -o /tmp/terraform.zip -d "$$TERRAFORM_DIR"
           rm /tmp/terraform.zip

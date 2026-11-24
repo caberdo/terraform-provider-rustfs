@@ -340,7 +340,9 @@ ancestors of `main`.
 - **Acceptance tests (Docker, as CI runs them)**:
   `docker compose -f acc_test/docker-compose.yml up -d` then
   `docker compose -f acc_test/docker-compose.yml --profile test run --rm test`
-  (filter with `-e TEST_FILTER=TestAccBucketResource`)
+  (filter with `-e TEST_FILTER=TestAccBucketResource`); `make testacc-docker` runs the same
+  command, and `make testacc-matrix` repeats it for every entry in `.github/rustfs-versions.txt`,
+  tearing the fixture down between cells (`COMPOSE="podman compose"` switches the runner)
 - **Acceptance tests (local, Podman)**:
   `podman-compose -f acc_test/docker-compose.yml up -d` and
   `RUSTFS_ENDPOINT=127.0.0.1:9001 RUSTFS_USER=rustfsadmin RUSTFS_SECRET=rustfsadmin TF_ACC=1 go test -v ./provider -run TestAcc`
